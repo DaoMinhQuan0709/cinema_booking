@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * REST Controller cho module Booking.
  * Base path: /api/v1/bookings
- * Quyen: Customer (Authenticated)
+ * Quyen: Customer (Authenticated) / Admin
  */
 @RestController
 @RequestMapping("/api/v1/bookings")
@@ -29,16 +29,7 @@ public class BookingController {
     /**
      * POST /api/v1/bookings - Tao don dat ve moi (Giu ghe 10 phut).
      * Co che Two-Layer Locking: Redis Fast-Fail + PostgreSQL FOR UPDATE NOWAIT.
-     *
-     * Request Body:
-     * {
-     *   "showtimeId": 1,
-     *   "showtimeSeatIds": [10, 11, 12],
-     *   "products": [
-     *     { "productId": 1, "quantity": 2 },
-     *     { "productId": 3, "quantity": 1 }
-     *   ]
-     * }
+     * Real-time: Broadcast WebSocket HOLD toi client.
      */
     @PostMapping
     public ResponseEntity<ApiResponse<BookingResponse>> createBooking(
@@ -68,5 +59,21 @@ public class BookingController {
         BookingResponse response = bookingService.getBookingByCode(bookingCode, userDetails.getUsername());
 
         return ResponseEntity.ok(ApiResponse.success(200, "Lay chi tiet don dat ve thanh cong", response));
+    }
+
+    /**
+     * DELETE /api/v1/bookings/{bookingCode}/cancel - Huy giu cho chu dong (Cong viec 4.2).
+     * Chuyen Booking sang CANCELLED, nha ghe DB ve AVAILABLE, xoa key Redis, broadcast WebSocket RELEASE.
+     */
+    @DeleteMapping("/{bookingCode}/cancel")
+    public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(
+            @PathVariable String bookingCode,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        log.info("DELETE /api/v1/bookings/{}/cancel - user={}", bookingCode, userDetails.getUsername());
+
+        BookingResponse response = bookingService.cancelBooking(bookingCode, userDetails.getUsername());
+
+        return ResponseEntity.ok(ApiResponse.success(200, "Huy giu cho thanh cong", response));
     }
 }

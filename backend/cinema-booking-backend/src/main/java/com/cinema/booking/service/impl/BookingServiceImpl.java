@@ -6,6 +6,7 @@ import com.cinema.booking.dto.response.BookingResponse;
 import com.cinema.booking.entity.*;
 import com.cinema.booking.enums.BookingStatus;
 import com.cinema.booking.enums.ShowtimeSeatStatus;
+import com.cinema.booking.enums.UserRole;
 import com.cinema.booking.exception.BadRequestException;
 import com.cinema.booking.exception.ForbiddenException;
 import com.cinema.booking.exception.ResourceNotFoundException;
@@ -13,6 +14,7 @@ import com.cinema.booking.exception.SeatConflictException;
 import com.cinema.booking.repository.*;
 import com.cinema.booking.service.BookingService;
 import com.cinema.booking.service.SeatLockService;
+import com.cinema.booking.service.WebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,14 +27,19 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * CORE LOGIC: Tao don dat ve voi co che Two-Layer Locking.
+ * CORE LOGIC: Module Booking
  *
- * Buoc 1 (Anti-Deadlock): Sap xep showtimeSeatIds tang dan.
- * Buoc 2 (Tang 1 - Redis Fast-Fail): SET NX EX 600 tren tung ghe.
- *         Neu that bai -> rollback Redis keys -> 409 Conflict.
- * Buoc 3 (Tang 2 - PostgreSQL Transaction):
- *         SELECT ... FOR UPDATE NOWAIT -> cap nhat ghe LOCKED -> tao Booking PENDING.
- *         Neu that bai -> rollback DB (tu dong) + xoa Redis keys -> 409 Conflict.
+ * 1. Tao don dat ve voi co che Two-Layer Locking (Cong viec 4.1):
+ *    - Buoc 1 (Anti-Deadlock): Sap xep showtimeSeatIds tang dan.
+ *    - Buoc 2 (Tang 1 - Redis Fast-Fail): SET NX EX 600 tren tung ghe.
+ *    - Buoc 3 (Tang 2 - PostgreSQL Transaction): SELECT ... FOR UPDATE NOWAIT -> LOCKED.
+ *    - Buoc 4 (Real-time): Broadcast WebSocket HOLD.
+ *
+ * 2. Huy giu cho chu dong (Cong viec 4.2):
+ *    - Chuyen Booking sang CANCELLED.
+ *    - Nha ghe DB ve AVAILABLE.
+ *    - Xoa key Redis.
+ *    - Broadcast WebSocket RELEASE.
  */
 @Service
 @RequiredArgsConstructor
@@ -45,6 +52,7 @@ public class BookingServiceImpl implements BookingService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final SeatLockService seatLockService;
+    private final WebSocketService webSocketService;
 
     @Value("${application.booking.hold-seat-duration-seconds:600}")
     private long holdDurationSeconds;
@@ -112,7 +120,6 @@ public class BookingServiceImpl implements BookingService {
 
             // Kiem tra so luong ghe lay duoc co khop voi yeu cau
             if (availableSeats.size() != sortedSeatIds.size()) {
-                // Tim ghe bi thieu de bao loi cu the
                 Set<Long> foundIds = availableSeats.stream()
                         .map(ShowtimeSeat::getId)
                         .collect(Collectors.toSet());
@@ -149,7 +156,6 @@ public class BookingServiceImpl implements BookingService {
             BigDecimal productTotal = BigDecimal.ZERO;
 
             if (request.getProducts() != null && !request.getProducts().isEmpty()) {
-                // Lay tat ca product tu DB mot lan (batch query)
                 List<Long> productIds = request.getProducts().stream()
                         .map(BookingProductItem::getProductId)
                         .collect(Collectors.toList());
@@ -159,7 +165,6 @@ public class BookingServiceImpl implements BookingService {
                 for (BookingProductItem item : request.getProducts()) {
                     Product product = productMap.get(item.getProductId());
                     if (product == null) {
-                        // Rollback Redis + DB se tu rollback vi @Transactional
                         seatLockService.unlockSeats(showtime.getId(), sortedSeatIds);
                         throw new ResourceNotFoundException("Khong tim thay san pham voi ID: " + item.getProductId());
                     }
@@ -213,16 +218,19 @@ public class BookingServiceImpl implements BookingService {
             // --- Luu Booking (cascade luu BookingSeats + BookingProducts) ---
             Booking savedBooking = bookingRepository.save(booking);
 
+            // ================================================================
+            // BUOC 4: BROADCAST WEBSOCKET REAL-TIME (HOLD)
+            // ================================================================
+            webSocketService.broadcastSeatHold(showtime.getId(), sortedSeatIds);
+
             log.info("=== TAO DON THANH CONG === bookingCode={}, totalAmount={}, expiresAt={}",
                     bookingCode, totalAmount, lockedUntil);
 
             return mapToBookingResponse(savedBooking, availableSeats);
 
         } catch (SeatConflictException | ResourceNotFoundException | BadRequestException e) {
-            // Exception da biet -> re-throw (Redis da duoc rollback trong logic phia tren)
             throw e;
         } catch (Exception e) {
-            // Exception bat ngo (VD: PessimisticLockException tu FOR UPDATE NOWAIT)
             log.error("Buoc 3 - EXCEPTION BAT NGO khi lock DB. Rollback Redis. Error: {}", e.getMessage());
             seatLockService.unlockSeats(showtime.getId(), sortedSeatIds);
             throw new SeatConflictException(
@@ -236,18 +244,86 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don dat ve voi ma: " + bookingCode));
 
-        // Kiem tra quyen so huu
-        if (!booking.getUser().getEmail().equals(userEmail)) {
+        User currentUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
+
+        boolean isOwner = booking.getUser().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+
+        if (!isOwner && !isAdmin) {
             throw new ForbiddenException("Ban khong co quyen xem don dat ve nay");
         }
 
-        // Lay thong tin ghe
         List<Long> seatIds = booking.getBookingSeats().stream()
                 .map(bs -> bs.getShowtimeSeat().getId())
                 .collect(Collectors.toList());
         List<ShowtimeSeat> seats = showtimeSeatRepository.findAllByIdIn(seatIds);
 
         return mapToBookingResponse(booking, seats);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse cancelBooking(String bookingCode, String userEmail) {
+        log.info("=== BAT DAU HUY DON DAT VE === bookingCode={}, userEmail={}", bookingCode, userEmail);
+
+        // 1. Tim booking
+        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don dat ve voi ma: " + bookingCode));
+
+        // 2. Kiem tra quyen so huu (Owner hoac ADMIN)
+        User currentUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
+
+        boolean isOwner = booking.getUser().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new ForbiddenException("Ban khong co quyen huy don dat ve nay");
+        }
+
+        // 3. Kiem tra trang thai don hang
+        if (booking.getStatus() != BookingStatus.PENDING) {
+            if (booking.getStatus() == BookingStatus.CONFIRMED) {
+                throw new BadRequestException("Don dat ve da duoc thanh toan thanh cong, khong the huy giu cho");
+            } else if (booking.getStatus() == BookingStatus.CANCELLED) {
+                throw new BadRequestException("Don dat ve nay da duoc huy truoc do");
+            } else if (booking.getStatus() == BookingStatus.EXPIRED) {
+                throw new BadRequestException("Don dat ve da het han giu cho");
+            } else {
+                throw new BadRequestException("Khong the huy don dat ve o trang thai " + booking.getStatus());
+            }
+        }
+
+        // 4. Cap nhat Booking sang CANCELLED
+        booking.setStatus(BookingStatus.CANCELLED);
+        Booking savedBooking = bookingRepository.save(booking);
+
+        // 5. Lay danh sach ShowtimeSeat va nha ghe ve AVAILABLE tren DB
+        List<Long> seatIds = booking.getBookingSeats().stream()
+                .map(bs -> bs.getShowtimeSeat().getId())
+                .collect(Collectors.toList());
+
+        List<ShowtimeSeat> seats = showtimeSeatRepository.findAllByIdIn(seatIds);
+        for (ShowtimeSeat seat : seats) {
+            seat.setStatus(ShowtimeSeatStatus.AVAILABLE);
+            seat.setLockedByUser(null);
+            seat.setLockedUntil(null);
+        }
+        showtimeSeatRepository.saveAll(seats);
+
+        Long showtimeId = booking.getShowtime().getId();
+
+        // 6. Xoa key Redis (Fast-Fail Layer)
+        seatLockService.unlockSeats(showtimeId, seatIds);
+
+        // 7. Broadcast WebSocket real-time su kien nha ghe (RELEASE)
+        webSocketService.broadcastSeatRelease(showtimeId, seatIds);
+
+        log.info("=== HUY DON DAT VE THANH CONG === bookingCode={}, showtimeId={}, releasedSeats={}",
+                bookingCode, showtimeId, seatIds);
+
+        return mapToBookingResponse(savedBooking, seats);
     }
 
     // ========== Private Helper Methods ==========
@@ -321,4 +397,3 @@ public class BookingServiceImpl implements BookingService {
                 .build();
     }
 }
-
