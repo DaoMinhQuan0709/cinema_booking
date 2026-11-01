@@ -1,6 +1,7 @@
 package com.cinema.booking.repository;
 
 import com.cinema.booking.entity.ShowtimeSeat;
+import com.cinema.booking.enums.ShowtimeSeatStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,4 +17,27 @@ public interface ShowtimeSeatRepository extends JpaRepository<ShowtimeSeat, Long
            "WHERE ss.showtime.id = :showtimeId " +
            "ORDER BY s.rowChar ASC, s.seatNumber ASC")
     List<ShowtimeSeat> findByShowtimeIdWithSeat(@Param("showtimeId") Long showtimeId);
+
+    /**
+     * Truy van Pessimistic Lock: Lay danh sach ghe theo IDs voi trang thai AVAILABLE.
+     * FOR UPDATE NOWAIT: Khong cho doi, throw exception ngay neu row dang bi lock.
+     * Su dung trong Buoc 3 cua Two-Layer Locking.
+     */
+    @Query(value = "SELECT ss.* FROM showtime_seats ss " +
+                   "WHERE ss.id IN :seatIds " +
+                   "AND ss.status = 'AVAILABLE' " +
+                   "ORDER BY ss.id ASC " +
+                   "FOR UPDATE NOWAIT",
+           nativeQuery = true)
+    List<ShowtimeSeat> findAvailableSeatsForUpdateNowait(@Param("seatIds") List<Long> seatIds);
+
+    /**
+     * Tim tat ca ghe theo danh sach IDs (khong lock, dung de doc thong tin).
+     */
+    List<ShowtimeSeat> findAllByIdIn(List<Long> ids);
+
+    /**
+     * Tim tat ca ghe cua mot suat chieu voi trang thai cu the.
+     */
+    List<ShowtimeSeat> findByShowtimeIdAndStatus(Long showtimeId, ShowtimeSeatStatus status);
 }
