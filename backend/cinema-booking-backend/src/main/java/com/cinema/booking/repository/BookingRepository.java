@@ -20,8 +20,12 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     /**
      * Tim tat ca don PENDING da het han (dung cho Cronjob - Cong viec 4.3).
+     * Su dung JOIN FETCH de load san showtime va bookingSeats tranh N+1 query.
      */
-    @Query("SELECT b FROM Booking b " +
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.showtime s " +
+           "LEFT JOIN FETCH b.bookingSeats bs " +
+           "LEFT JOIN FETCH bs.showtimeSeat ss " +
            "WHERE b.status = :status " +
            "AND b.expiresAt < :now")
     List<Booking> findExpiredBookings(

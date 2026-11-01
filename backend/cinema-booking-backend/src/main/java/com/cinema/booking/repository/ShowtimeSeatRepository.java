@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -40,4 +41,15 @@ public interface ShowtimeSeatRepository extends JpaRepository<ShowtimeSeat, Long
      * Tim tat ca ghe cua mot suat chieu voi trang thai cu the.
      */
     List<ShowtimeSeat> findByShowtimeIdAndStatus(Long showtimeId, ShowtimeSeatStatus status);
+
+    /**
+     * Tim tat ca ghe dang bi LOCKED ma thoi gian locked_until da qua (dung cho Cronjob 4.3 quet ghe mo coi).
+     */
+    @Query("SELECT ss FROM ShowtimeSeat ss " +
+           "JOIN FETCH ss.showtime st " +
+           "WHERE ss.status = :status " +
+           "AND ss.lockedUntil < :now")
+    List<ShowtimeSeat> findExpiredLockedSeats(
+            @Param("status") ShowtimeSeatStatus status,
+            @Param("now") LocalDateTime now);
 }
