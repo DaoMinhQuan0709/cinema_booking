@@ -85,16 +85,17 @@ application:
 
   payment:
     vnpay:
-      tmn-code: ${VNPAY_TMN_CODE:}
-      hash-secret: ${VNPAY_HASH_SECRET:}
+      tmn-code: ${VNPAY_TMN_CODE:2QXUI4J4}
+      hash-secret: ${VNPAY_HASH_SECRET:RAOJPVRPKZSIIKNLQUXRVTXECTMVNXZG}
       url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
       return-url: http://localhost:5173/payment/vnpay-callback
     momo:
-      partner-code: ${MOMO_PARTNER_CODE:}
-      access-key: ${MOMO_ACCESS_KEY:}
-      secret-key: ${MOMO_SECRET_KEY:}
+      partner-code: ${MOMO_PARTNER_CODE:MOMO}
+      access-key: ${MOMO_ACCESS_KEY:F8BBA842ECF85}
+      secret-key: ${MOMO_SECRET_KEY:K951B6PE1waDMi640xX0hu2knHpBqDex}
       endpoint: https://test-payment.momo.vn/v2/gateway/api/create
       return-url: http://localhost:5173/payment/momo-callback
+      ipn-url: ${MOMO_IPN_URL:http://localhost:8080/api/v1/payments/momo-ipn}
 
 ---
 # Production profile
