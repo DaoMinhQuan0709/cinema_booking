@@ -55,6 +55,7 @@ public class SecurityConfig {
                                 "/api/v1/products/**",
                                 "/api/v1/payments/vnpay-ipn",
                                 "/api/v1/payments/momo-ipn",
+                                "/api/v1/bookings/*/qr",
                                 "/api/v1/chat/**",
                                 "/ws/**"
                         ).permitAll()

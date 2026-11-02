@@ -4,10 +4,12 @@ import com.cinema.booking.dto.request.BookingCreateRequest;
 import com.cinema.booking.dto.response.ApiResponse;
 import com.cinema.booking.dto.response.BookingResponse;
 import com.cinema.booking.service.BookingService;
+import com.cinema.booking.service.QrCodeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,7 +18,6 @@ import org.springframework.web.bind.annotation.*;
 /**
  * REST Controller cho module Booking.
  * Base path: /api/v1/bookings
- * Quyen: Customer (Authenticated) / Admin
  */
 @RestController
 @RequestMapping("/api/v1/bookings")
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final QrCodeService qrCodeService;
 
     /**
      * POST /api/v1/bookings - Tao don dat ve moi (Giu ghe 10 phut).
@@ -75,5 +77,17 @@ public class BookingController {
         BookingResponse response = bookingService.cancelBooking(bookingCode, userDetails.getUsername());
 
         return ResponseEntity.ok(ApiResponse.success(200, "Huy giu cho thanh cong", response));
+    }
+
+    /**
+     * GET /api/v1/bookings/{bookingCode}/qr - Lay anh ma QR cua don dat ve (dinh dang PNG) (Cong viec 5.3).
+     */
+    @GetMapping(value = "/{bookingCode}/qr", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> getBookingQrCode(@PathVariable String bookingCode) {
+        log.info("GET /api/v1/bookings/{}/qr", bookingCode);
+        byte[] qrBytes = qrCodeService.generateQrCodeImageBytes(bookingCode);
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_PNG)
+                .body(qrBytes);
     }
 }

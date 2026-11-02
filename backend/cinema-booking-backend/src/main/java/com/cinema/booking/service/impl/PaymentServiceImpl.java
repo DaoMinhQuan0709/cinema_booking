@@ -24,6 +24,7 @@ import com.cinema.booking.repository.ShowtimeSeatRepository;
 import com.cinema.booking.repository.UserRepository;
 import com.cinema.booking.service.PaymentService;
 import com.cinema.booking.service.SeatLockService;
+import com.cinema.booking.service.TicketFulfillmentService;
 import com.cinema.booking.service.WebSocketService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final UserRepository userRepository;
     private final SeatLockService seatLockService;
     private final WebSocketService webSocketService;
+    private final TicketFulfillmentService ticketFulfillmentService;
     private final VNPayConfig vnPayConfig;
     private final MoMoConfig moMoConfig;
 
@@ -292,6 +294,9 @@ public class PaymentServiceImpl implements PaymentService {
             seatLockService.unlockSeats(showtimeId, seatIds);
             webSocketService.broadcastSeatBooked(showtimeId, seatIds);
 
+            // Kich hoat xu ly ve bat dong bo (Async: ZXing QR Code + Email)
+            ticketFulfillmentService.fulfillTicketAsync(booking.getId());
+
             log.info("XAC NHAN DON THANH CONG: bookingCode={}, seatsCount={}", booking.getBookingCode(), seatIds.size());
             return;
         }
@@ -321,6 +326,9 @@ public class PaymentServiceImpl implements PaymentService {
 
                 seatLockService.unlockSeats(showtimeId, seatIds);
                 webSocketService.broadcastSeatBooked(showtimeId, seatIds);
+
+                // Kich hoat xu ly ve bat dong bo (Async: ZXing QR Code + Email)
+                ticketFulfillmentService.fulfillTicketAsync(booking.getId());
 
                 log.info("Phuc hoi thanh cong don EXPIRED: bookingCode={}", booking.getBookingCode());
             } else {
