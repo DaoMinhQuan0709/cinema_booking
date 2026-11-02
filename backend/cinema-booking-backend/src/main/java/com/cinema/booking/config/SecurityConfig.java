@@ -53,7 +53,8 @@ public class SecurityConfig {
                                 "/api/v1/cinemas/**",
                                 "/api/v1/showtimes/**",
                                 "/api/v1/products/**",
-                                "/api/v1/payments/**-ipn",
+                                "/api/v1/payments/vnpay-ipn",
+                                "/api/v1/payments/momo-ipn",
                                 "/api/v1/chat/**",
                                 "/ws/**"
                         ).permitAll()

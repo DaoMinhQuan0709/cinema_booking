@@ -1,5 +1,6 @@
 package com.cinema.booking.config;
 
+import com.cinema.booking.dto.request.MoMoIpnRequest;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -55,5 +56,31 @@ public class MoMoConfig {
         } catch (Exception ex) {
             return "";
         }
+    }
+
+    /**
+     * Kiem tra chu ky so MoMo IPN (Signature Verification).
+     */
+    public boolean verifyIpnSignature(MoMoIpnRequest req) {
+        if (req == null || req.getSignature() == null) {
+            return false;
+        }
+
+        String rawSignature = "accessKey=" + this.accessKey +
+                "&amount=" + req.getAmount() +
+                "&extraData=" + (req.getExtraData() != null ? req.getExtraData() : "") +
+                "&message=" + req.getMessage() +
+                "&orderId=" + req.getOrderId() +
+                "&orderInfo=" + req.getOrderInfo() +
+                "&orderType=" + req.getOrderType() +
+                "&partnerCode=" + req.getPartnerCode() +
+                "&payType=" + req.getPayType() +
+                "&requestId=" + req.getRequestId() +
+                "&responseTime=" + req.getResponseTime() +
+                "&resultCode=" + req.getResultCode() +
+                "&transId=" + req.getTransId();
+
+        String calculatedSignature = hmacSHA256(this.secretKey, rawSignature);
+        return calculatedSignature.equalsIgnoreCase(req.getSignature());
     }
 }

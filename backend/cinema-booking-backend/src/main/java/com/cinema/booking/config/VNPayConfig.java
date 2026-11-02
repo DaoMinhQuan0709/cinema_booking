@@ -7,7 +7,9 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 /**
  * Cau hinh va tien ich ky so cho cong thanh toan VNPay (HMAC-SHA512).
@@ -55,6 +57,50 @@ public class VNPayConfig {
             return sb.toString();
         } catch (Exception ex) {
             return "";
+        }
+    }
+
+    /**
+     * Kiem tra chu ky so VNPay IPN (Signature Verification).
+     */
+    public boolean verifyIpnChecksum(Map<String, String> params) {
+        String secureHash = params.get("vnp_SecureHash");
+        if (secureHash == null || secureHash.isEmpty()) {
+            return false;
+        }
+
+        Map<String, String> vnp_Params = new HashMap<>();
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (key != null && key.startsWith("vnp_") && !key.equals("vnp_SecureHash") && !key.equals("vnp_SecureHashType")) {
+                if (value != null && !value.isEmpty()) {
+                    vnp_Params.put(key, value);
+                }
+            }
+        }
+
+        List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
+        Collections.sort(fieldNames);
+
+        StringBuilder hashData = new StringBuilder();
+        try {
+            Iterator<String> itr = fieldNames.iterator();
+            while (itr.hasNext()) {
+                String fieldName = itr.next();
+                String fieldValue = vnp_Params.get(fieldName);
+                hashData.append(fieldName);
+                hashData.append('=');
+                hashData.append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
+                if (itr.hasNext()) {
+                    hashData.append('&');
+                }
+            }
+
+            String calculatedHash = hmacSHA512(this.hashSecret, hashData.toString());
+            return calculatedHash.equalsIgnoreCase(secureHash);
+        } catch (Exception e) {
+            return false;
         }
     }
 
