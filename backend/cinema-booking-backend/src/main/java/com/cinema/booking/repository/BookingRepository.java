@@ -43,4 +43,60 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     boolean existsPendingBookingByUserAndShowtime(
             @Param("userId") Long userId,
             @Param("showtimeId") Long showtimeId);
+
+    @Query("SELECT COALESCE(SUM(b.totalAmount), 0) FROM Booking b " +
+           "WHERE b.status = 'CONFIRMED' " +
+           "AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start) " +
+           "AND (cast(:end as timestamp) IS NULL OR b.createdAt <= :end) " +
+           "AND (:cinemaId IS NULL OR b.showtime.auditorium.cinema.id = :cinemaId) " +
+           "AND (:movieId IS NULL OR b.showtime.movie.id = :movieId)")
+    java.math.BigDecimal calculateTotalRevenue(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("cinemaId") Long cinemaId,
+            @Param("movieId") Long movieId);
+
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.status = 'CONFIRMED' " +
+           "AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start) " +
+           "AND (cast(:end as timestamp) IS NULL OR b.createdAt <= :end) " +
+           "AND (:cinemaId IS NULL OR b.showtime.auditorium.cinema.id = :cinemaId) " +
+           "AND (:movieId IS NULL OR b.showtime.movie.id = :movieId)")
+    long countSuccessfulBookings(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("cinemaId") Long cinemaId,
+            @Param("movieId") Long movieId);
+
+    @Query("SELECT COALESCE(COUNT(bs), 0) FROM BookingSeat bs " +
+           "WHERE bs.booking.status = 'CONFIRMED' " +
+           "AND (cast(:start as timestamp) IS NULL OR bs.booking.createdAt >= :start) " +
+           "AND (cast(:end as timestamp) IS NULL OR bs.booking.createdAt <= :end) " +
+           "AND (:cinemaId IS NULL OR bs.booking.showtime.auditorium.cinema.id = :cinemaId) " +
+           "AND (:movieId IS NULL OR bs.booking.showtime.movie.id = :movieId)")
+    long countTotalTicketsSold(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("cinemaId") Long cinemaId,
+            @Param("movieId") Long movieId);
+
+    @Query("SELECT b.showtime.movie.title, COALESCE(SUM(b.totalAmount), 0), COUNT(b) " +
+           "FROM Booking b " +
+           "WHERE b.status = 'CONFIRMED' " +
+           "AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start) " +
+           "AND (cast(:end as timestamp) IS NULL OR b.createdAt <= :end) " +
+           "GROUP BY b.showtime.movie.title")
+    List<Object[]> calculateRevenueByMovie(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
+
+    @Query("SELECT b.showtime.auditorium.cinema.name, COALESCE(SUM(b.totalAmount), 0), COUNT(b) " +
+           "FROM Booking b " +
+           "WHERE b.status = 'CONFIRMED' " +
+           "AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start) " +
+           "AND (cast(:end as timestamp) IS NULL OR b.createdAt <= :end) " +
+           "GROUP BY b.showtime.auditorium.cinema.name")
+    List<Object[]> calculateRevenueByCinema(
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end);
 }

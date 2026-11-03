@@ -52,4 +52,10 @@ public interface ShowtimeSeatRepository extends JpaRepository<ShowtimeSeat, Long
     List<ShowtimeSeat> findExpiredLockedSeats(
             @Param("status") ShowtimeSeatStatus status,
             @Param("now") LocalDateTime now);
+
+    @Query("SELECT COUNT(ss) FROM ShowtimeSeat ss WHERE ss.showtime.id = :showtimeId")
+    long countTotalSeatsByShowtimeId(@Param("showtimeId") Long showtimeId);
+
+    @Query("SELECT COUNT(ss) FROM ShowtimeSeat ss WHERE ss.showtime.id = :showtimeId AND ss.status = :status")
+    long countSeatsByShowtimeIdAndStatus(@Param("showtimeId") Long showtimeId, @Param("status") ShowtimeSeatStatus status);
 }

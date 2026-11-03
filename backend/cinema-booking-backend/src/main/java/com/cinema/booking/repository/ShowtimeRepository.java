@@ -35,4 +35,15 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, Long> {
            "JOIN FETCH a.cinema c " +
            "WHERE s.id = :id")
     Optional<Showtime> findByIdWithDetails(@Param("id") Long id);
+
+    @Query("SELECT COUNT(s) > 0 FROM Showtime s " +
+           "WHERE s.auditorium.id = :auditoriumId " +
+           "AND (:excludeId IS NULL OR s.id <> :excludeId) " +
+           "AND (s.startTime < :endTime AND s.endTime > :startTime)")
+    boolean existsOverlappingShowtime(
+            @Param("auditoriumId") Long auditoriumId,
+            @Param("startTime") LocalDateTime startTime,
+            @Param("endTime") LocalDateTime endTime,
+            @Param("excludeId") Long excludeId
+    );
 }

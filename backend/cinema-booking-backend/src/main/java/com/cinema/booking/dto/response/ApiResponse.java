@@ -35,6 +35,22 @@ public class ApiResponse<T> {
                 .build();
     }
 
+    public static <T> ApiResponse<T> created(T data) {
+        return ApiResponse.<T>builder()
+                .code(201)
+                .message("Created")
+                .data(data)
+                .build();
+    }
+
+    public static <T> ApiResponse<T> created(String message, T data) {
+        return ApiResponse.<T>builder()
+                .code(201)
+                .message(message)
+                .data(data)
+                .build();
+    }
+
     public static <T> ApiResponse<T> error(int code, String message) {
         return ApiResponse.<T>builder()
                 .code(code)
