@@ -80,8 +80,9 @@ application:
     cleanup-cron-rate-ms: 30000
 
   gemini:
-    api-key: ${GEMINI_API_KEY:}
-    model: gemini-1.5-flash
+    api-key: ${GEMINI_API_KEY:your-gemini-api-key-here}
+    model: ${GEMINI_MODEL:gemini-2.0-flash}
+    api-url: https://generativelanguage.googleapis.com/v1beta/models
 
   payment:
     vnpay:
