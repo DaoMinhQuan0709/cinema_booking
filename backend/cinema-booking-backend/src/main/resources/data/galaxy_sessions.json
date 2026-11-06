@@ -1,0 +1,237 @@
+{
+  "response": {
+    "status": 200,
+    "code": 0,
+    "message": "OK"
+  },
+  "data": {
+    "total": 12,
+    "result": [
+      {
+        "id": "0000001005-308906",
+        "showDate": "2026-11-08",
+        "showTime": "14:30",
+        "screenName": "Phòng Chiếu 1",
+        "caption": "sub",
+        "version": "2d",
+        "movieFormat": "2D Phụ Đề",
+        "movie": {
+          "id": "155326e7-ea5f-47d5-a9fe-cee100a23fc5",
+          "name": "Chị Chị Em Em 3",
+          "age": "18",
+          "duration": 122,
+          "startDate": "2026-10-29 00:00:00",
+          "endDate": "2027-01-03 00:00:00",
+          "imageLandscape": "https://cdn.galaxycine.vn/media/2026/10/7/chi-chi-em-em-3-750_1791359693069.jpg",
+          "imagePortrait": "https://cdn.galaxycine.vn/media/2026/10/7/chi-chi-em-em-3-500_1791359694486.jpg",
+          "slug": "chi-chi-em-em-3",
+          "trailer": "https://www.youtube.com/watch?v=2zJZGyToXv8"
+        },
+        "cinema": {
+          "id": "13ca0671-3301-4341-ab39-15893aec02f6",
+          "code": "0000001005",
+          "name": "Galaxy CineO Coop Quang Trung",
+          "address": "Tầng 3, TTTM Co.opmart Quang Trung - 304A Quang Trung, Phường Thông Tây Hội, TP.HCM",
+          "cityId": "599535ea-1ea2-4393-9b5a-3ba3a807f363"
+        }
+      },
+      {
+        "id": "0000001005-308907",
+        "showDate": "2026-11-08",
+        "showTime": "18:00",
+        "screenName": "Phòng Chiếu 1",
+        "caption": "sub",
+        "version": "2d",
+        "movieFormat": "2D Phụ Đề",
+        "movie": {
+          "id": "155326e7-ea5f-47d5-a9fe-cee100a23fc5",
+          "name": "Chị Chị Em Em 3",
+          "age": "18",
+          "duration": 122,
+          "startDate": "2026-10-29 00:00:00",
+          "endDate": "2027-01-03 00:00:00",
+          "imageLandscape": "https://cdn.galaxycine.vn/media/2026/10/7/chi-chi-em-em-3-750_1791359693069.jpg",
+          "imagePortrait": "https://cdn.galaxycine.vn/media/2026/10/7/chi-chi-em-em-3-500_1791359694486.jpg",
+          "slug": "chi-chi-em-em-3",
+          "trailer": "https://www.youtube.com/watch?v=2zJZGyToXv8"
+        },
+        "cinema": {
+          "id": "13ca0671-3301-4341-ab39-15893aec02f6",
+          "code": "0000001005",
+          "name": "Galaxy CineO Coop Quang Trung",
+          "address": "Tầng 3, TTTM Co.opmart Quang Trung - 304A Quang Trung, Phường Thông Tây Hội, TP.HCM",
+          "cityId": "599535ea-1ea2-4393-9b5a-3ba3a807f363"
+        }
+      },
+      {
+        "id": "1001-261716",
+        "showDate": "2026-11-08",
+        "showTime": "15:00",
+        "screenName": "Phòng Chiếu 2",
+        "caption": "voice",
+        "version": "2d",
+        "movieFormat": "2D Lồng Tiếng",
+        "movie": {
+          "id": "f826d0c7-8d89-47c3-a518-846090e1278c",
+          "name": "Quỷ Ăn Tạng 4: Hổ Tinh",
+          "age": "18",
+          "duration": 111,
+          "startDate": "2026-10-14 00:00:00",
+          "endDate": "2027-01-03 00:00:00",
+          "imageLandscape": "https://cdn.galaxycine.vn/media/2026/10/9/qu-an-tang-4-3_1791530934634.jpg",
+          "imagePortrait": "https://cdn.galaxycine.vn/media/2026/10/9/qu-an-tang-4-2_1791530916192.jpg",
+          "slug": "death-whisperer-saming-the-werebeast",
+          "trailer": "https://www.youtube.com/watch?v=-eVdKQt19k0"
+        },
+        "cinema": {
+          "id": "fb233b0f-edb4-4eb1-ade8-7f8b83ab2457",
+          "code": "1001",
+          "name": "Galaxy Cinema Nguyễn Du",
+          "address": "116 Nguyễn Du, Phường Bến Thành, TP.HCM",
+          "cityId": "599535ea-1ea2-4393-9b5a-3ba3a807f363"
+        }
+      },
+      {
+        "id": "1001-261717",
+        "showDate": "2026-11-08",
+        "showTime": "19:30",
+        "screenName": "Phòng Chiếu 2",
+        "caption": "voice",
+        "version": "2d",
+        "movieFormat": "2D Lồng Tiếng",
+        "movie": {
+          "id": "f826d0c7-8d89-47c3-a518-846090e1278c",
+          "name": "Quỷ Ăn Tạng 4: Hổ Tinh",
+          "age": "18",
+          "duration": 111,
+          "startDate": "2026-10-14 00:00:00",
+          "endDate": "2027-01-03 00:00:00",
+          "imageLandscape": "https://cdn.galaxycine.vn/media/2026/10/9/qu-an-tang-4-3_1791530934634.jpg",
+          "imagePortrait": "https://cdn.galaxycine.vn/media/2026/10/9/qu-an-tang-4-2_1791530916192.jpg",
+          "slug": "death-whisperer-saming-the-werebeast",
+          "trailer": "https://www.youtube.com/watch?v=-eVdKQt19k0"
+        },
+        "cinema": {
+          "id": "fb233b0f-edb4-4eb1-ade8-7f8b83ab2457",
+          "code": "1001",
+          "name": "Galaxy Cinema Nguyễn Du",
+          "address": "116 Nguyễn Du, Phường Bến Thành, TP.HCM",
+          "cityId": "599535ea-1ea2-4393-9b5a-3ba3a807f363"
+        }
+      },
+      {
+        "id": "1029-400101",
+        "showDate": "2026-11-08",
+        "showTime": "16:00",
+        "screenName": "Phòng IMAX 1",
+        "caption": "sub",
+        "version": "imax",
+        "movieFormat": "IMAX 2D Phụ Đề",
+        "movie": {
+          "id": "9199da61-389b-442a-8030-b2fc93127e39",
+          "name": "Godzilla Trừ Không",
+          "age": "16",
+          "duration": 135,
+          "startDate": "2026-11-06 00:00:00",
+          "endDate": "2027-01-15 00:00:00",
+          "imageLandscape": "https://cdn.galaxycine.vn/media/2026/9/10/godzilla-minus-zero-1_1789024065714.jpg",
+          "imagePortrait": "https://cdn.galaxycine.vn/media/2026/9/10/godzilla-minus-zero-3_1789024056336.jpg",
+          "slug": "godzilla-minus-zero",
+          "trailer": "https://www.youtube.com/watch?v=Gc7qKON2X4k"
+        },
+        "cinema": {
+          "id": "5ccb89cd-26dc-46b7-9125-5f898ad5d66c",
+          "code": "1029",
+          "name": "Galaxy CineX Hanoi Centre",
+          "address": "Tầng 3, tòa Nam, TTTM Hanoi Centre – Số 175 Nguyễn Thái Học, Ba Đình, Hà Nội",
+          "cityId": "f4bf5f53-4e80-40c8-b1e0-f11ffa9a636a"
+        }
+      },
+      {
+        "id": "1029-400102",
+        "showDate": "2026-11-08",
+        "showTime": "20:00",
+        "screenName": "Phòng IMAX 1",
+        "caption": "sub",
+        "version": "imax",
+        "movieFormat": "IMAX 2D Phụ Đề",
+        "movie": {
+          "id": "9199da61-389b-442a-8030-b2fc93127e39",
+          "name": "Godzilla Trừ Không",
+          "age": "16",
+          "duration": 135,
+          "startDate": "2026-11-06 00:00:00",
+          "endDate": "2027-01-15 00:00:00",
+          "imageLandscape": "https://cdn.galaxycine.vn/media/2026/9/10/godzilla-minus-zero-1_1789024065714.jpg",
+          "imagePortrait": "https://cdn.galaxycine.vn/media/2026/9/10/godzilla-minus-zero-3_1789024056336.jpg",
+          "slug": "godzilla-minus-zero",
+          "trailer": "https://www.youtube.com/watch?v=Gc7qKON2X4k"
+        },
+        "cinema": {
+          "id": "5ccb89cd-26dc-46b7-9125-5f898ad5d66c",
+          "code": "1029",
+          "name": "Galaxy CineX Hanoi Centre",
+          "address": "Tầng 3, tòa Nam, TTTM Hanoi Centre – Số 175 Nguyễn Thái Học, Ba Đình, Hà Nội",
+          "cityId": "f4bf5f53-4e80-40c8-b1e0-f11ffa9a636a"
+        }
+      },
+      {
+        "id": "1024-500101",
+        "showDate": "2026-11-08",
+        "showTime": "17:15",
+        "screenName": "Phòng Chiếu VIP",
+        "caption": "sub",
+        "version": "2d",
+        "movieFormat": "2D Phụ Đề",
+        "movie": {
+          "id": "c3064926-58ee-4e20-9528-49d850ef622d",
+          "name": "Street Fighter",
+          "age": "16",
+          "duration": 119,
+          "startDate": "2026-10-15 00:00:00",
+          "endDate": "2027-01-03 00:00:00",
+          "imageLandscape": "https://cdn.galaxycine.vn/media/2026/10/13/street-fighter-2_1791879595467.jpg",
+          "imagePortrait": "https://cdn.galaxycine.vn/media/2026/5/5/street-fighter-500_1777950457775.jpg",
+          "slug": "street-fighter",
+          "trailer": "https://www.youtube.com/watch?v=sU3E4FhZ0Wk"
+        },
+        "cinema": {
+          "id": "6bcd3542-1bcf-4d2c-8ab4-63cac086f80a",
+          "code": "1024",
+          "name": "Galaxy CineX Thiso Mall Sala",
+          "address": "Tầng 3, TTTM Thiso Mall Sala - Số 10 Đường Mai Chí Thọ, Phường An Khánh, TP.HCM",
+          "cityId": "599535ea-1ea2-4393-9b5a-3ba3a807f363"
+        }
+      },
+      {
+        "id": "1024-500102",
+        "showDate": "2026-11-08",
+        "showTime": "21:00",
+        "screenName": "Phòng Chiếu VIP",
+        "caption": "sub",
+        "version": "2d",
+        "movieFormat": "2D Phụ Đề",
+        "movie": {
+          "id": "775308d8-86cf-4188-806e-ef86761d6e6f",
+          "name": "The Cat In The Hat",
+          "age": "0",
+          "duration": 107,
+          "startDate": "2026-11-06 00:00:00",
+          "endDate": "2026-03-29 00:00:00",
+          "imageLandscape": "https://cdn.galaxycine.vn/media/2025/7/2/the-cat-in-the-hat-750_1751430437489.jpg",
+          "imagePortrait": "https://cdn.galaxycine.vn/media/2026/6/24/cat-in-the-hat-500_1782273714785.jpg",
+          "slug": "the-cat-in-the-hat",
+          "trailer": "https://www.youtube.com/watch?v=2vO9L3gG9uY"
+        },
+        "cinema": {
+          "id": "6bcd3542-1bcf-4d2c-8ab4-63cac086f80a",
+          "code": "1024",
+          "name": "Galaxy CineX Thiso Mall Sala",
+          "address": "Tầng 3, TTTM Thiso Mall Sala - Số 10 Đường Mai Chí Thọ, Phường An Khánh, TP.HCM",
+          "cityId": "599535ea-1ea2-4393-9b5a-3ba3a807f363"
+        }
+      }
+    ]
+  }
+}
+

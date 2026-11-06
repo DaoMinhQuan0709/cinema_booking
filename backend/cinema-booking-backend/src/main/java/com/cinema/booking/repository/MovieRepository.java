@@ -14,4 +14,6 @@ import java.util.List;
 public interface MovieRepository extends JpaRepository<Movie, Long>, JpaSpecificationExecutor<Movie> {
 
     List<Movie> findByStatus(MovieStatus status);
+
+    java.util.Optional<Movie> findByTitle(String title);
 }
