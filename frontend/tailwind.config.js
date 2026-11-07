@@ -23,7 +23,8 @@ export default {
                 muted: '#9E9EA7'
             },
             fontFamily: {
-                sans: ['Inter', 'Roboto', 'sans-serif'],
+                sans: ['"Be Vietnam Pro"', '"Plus Jakarta Sans"', 'sans-serif'],
+                display: ['"Plus Jakarta Sans"', '"Be Vietnam Pro"', 'sans-serif'],
             }
         },
     },

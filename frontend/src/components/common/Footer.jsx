@@ -137,7 +137,7 @@ export const Footer = () => {
         <div className="pt-6 border-t border-surfaceBorder/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted">
           <p>© {new Date().getFullYear()} PREMIERCINEMA. Toàn bộ bản quyền được bảo lưu.</p>
           <p className="text-[11px] text-neutral-500">
-            Đồ án tốt nghiệp KTPM — Hệ thống Đặt vé xem phim High-Concurrency & Tích hợp Trợ lý AI.
+            Hệ thống Đặt vé xem phim High-Concurrency & Tích hợp Trợ lý AI.
           </p>
         </div>
       </div>

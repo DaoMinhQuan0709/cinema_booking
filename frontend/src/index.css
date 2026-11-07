@@ -3,7 +3,12 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    font-family: "Be Vietnam Pro", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  }
   body {
     @apply bg-background text-white antialiased selection:bg-primary selection:text-white;
+    font-family: "Be Vietnam Pro", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.01em;
   }
 }

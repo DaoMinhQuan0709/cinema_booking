@@ -30,7 +30,7 @@ const HomePagePlaceholder = () => {
 
       <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-white max-w-3xl leading-tight">
         Trải Nghiệm Điện Ảnh Đỉnh Cao Tại{' '}
-        <span className="text-primary">PREMIERCINEMA</span>
+        <span className="text-white">PREMIER</span><span className="text-primary">CINEMA</span>
       </h1>
 
       <p className="mt-4 text-base sm:text-lg text-muted max-w-xl">

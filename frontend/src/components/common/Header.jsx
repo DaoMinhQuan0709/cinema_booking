@@ -52,36 +52,38 @@ export const Header = () => {
   ];
 
   const getNavLinkClass = ({ isActive }) =>
-    `text-sm font-medium transition-colors hover:text-primary ${
-      isActive ? 'text-primary font-semibold' : 'text-muted'
+    `relative py-2 text-sm font-medium tracking-wide transition-all duration-200 hover:text-white ${
+      isActive ? 'text-white font-semibold' : 'text-neutral-400'
+    } after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-primary after:transition-all after:duration-300 ${
+      isActive ? 'after:scale-x-100 after:opacity-100' : 'after:scale-x-0 after:opacity-0 hover:after:scale-x-100 hover:after:opacity-70'
     }`;
 
   const isAdmin = user?.role === USER_ROLE.ADMIN;
 
   return (
     <header className="sticky top-0 z-40 w-full bg-background/95 backdrop-blur-md border-b border-surfaceBorder transition-all">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-18">
+      <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-14">
+        <div className="flex items-center justify-between h-20">
           {/* Logo thuong hieu */}
           <Link
             to="/"
-            className="flex items-center gap-2.5 group text-white focus:outline-none"
+            className="flex items-center gap-3 mr-8 lg:mr-14 group text-white focus:outline-none shrink-0"
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+            <div className="w-11 h-11 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary group-hover:scale-105 transition-transform shadow-lg shadow-primary/10">
               <Film className="w-6 h-6 text-primary" />
             </div>
             <div className="flex flex-col">
-              <span className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-white via-white to-neutral-400 bg-clip-text text-transparent">
+              <span className="text-xl sm:text-2xl font-black tracking-wider bg-gradient-to-r from-white via-white to-neutral-300 bg-clip-text text-transparent">
                 PREMIER<span className="text-primary">CINEMA</span>
               </span>
-              <span className="text-[10px] tracking-widest text-muted uppercase -mt-1">
+              <span className="text-[10px] tracking-widest text-muted uppercase -mt-0.5 font-medium">
                 Cinematic Booking
               </span>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-8 lg:gap-11">
             {navLinks.map((link) => (
               <NavLink key={link.path} to={link.path} className={getNavLinkClass}>
                 {link.name}
@@ -90,12 +92,12 @@ export const Header = () => {
           </nav>
 
           {/* User Actions (Desktop) */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-6 ml-auto pl-6">
             {!isAuthenticated ? (
               <button
                 type="button"
                 onClick={() => openAuthModal('login')}
-                className="px-5 py-2.5 rounded-lg bg-primary hover:bg-primaryHover text-white text-sm font-semibold tracking-wide transition-all shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primaryHover text-white text-sm font-semibold tracking-wide transition-all shadow-lg shadow-primary/25 hover:shadow-primary/40 active:scale-95 cursor-pointer"
               >
                 Đăng nhập
               </button>
