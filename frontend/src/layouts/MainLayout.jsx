@@ -1,11 +1,12 @@
 import { Outlet } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
+import AuthModal from '../features/auth/AuthModal';
 
 /**
  * MainLayout bọc khung giao diện dùng chung cho toàn bộ phân hệ khách hàng.
- * Bao gồm: Header cố định phía trên, nội dung động thay đổi theo route (Outlet)
- * và Footer ở dưới cùng.
+ * Bao gồm: Header cố định phía trên, nội dung động thay đổi theo route (Outlet),
+ * Footer ở dưới cùng và AuthModal toàn cục.
  */
 export const MainLayout = () => {
   return (
@@ -20,6 +21,9 @@ export const MainLayout = () => {
 
       {/* Footer chan trang */}
       <Footer />
+
+      {/* Modal Dang nhap / Dang ky toan cuc */}
+      <AuthModal />
     </div>
   );
 };
