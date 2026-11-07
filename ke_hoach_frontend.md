@@ -160,7 +160,7 @@ frontend/
 
 ### 4. Trang Chọn Bắp Nước & Thanh Toán (`/checkout/:bookingCode`)
 *   **Đồng hồ đếm ngược 10 phút (Countdown Timer):**
-    *   Đếm ngược thời gian giữ chỗ thực tế từ `expiresAt`. Khi hết giờ, hiển thị Modal *"Hết thời gian giữ vé"* và tự động điều hướng về trang chủ.
+    *   Đếm ngược thời gian giữ chỗ thực tế từ `expiresAt`. Khi hết giờ, hiển thị Modal *"Hết thời gian giữ vé"* và tự động điều hướng về trang chủ
 *   **Danh mục Bắp Nước (Combo Concession):**
     *   Thẻ combo (ảnh, tên combo, mô tả, đơn giá, nút tăng/giảm số lượng `+` `-`).
 *   **Phương thức thanh toán:**
