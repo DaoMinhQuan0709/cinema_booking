@@ -59,7 +59,7 @@ function forceLogout() {
   tokenStorage.clearSession();
   if (typeof window !== 'undefined') {
     // authStore (Buoc 2) se lang nghe su kien nay de reset state va dieu huong ve /login
-    window.dispatchEvent(new CustomEvent('cinemax:auth-expired'));
+    window.dispatchEvent(new CustomEvent('premier_cinema:auth-expired'));
   }
 }
 

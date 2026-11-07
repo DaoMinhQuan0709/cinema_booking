@@ -52,7 +52,7 @@ Giao diện hướng tới trải nghiệm rạp chiếu phim hiện đại, san
 
 ```
 frontend/
-├── public/                    # Favicon, logo Cinemax, assets tĩnh
+├── public/                    # Favicon, logo PremierCinema, assets tĩnh
 ├── src/
 │   ├── assets/                # Ảnh minh họa, logo SVG
 │   ├── components/            # UI Components nguyên tử dùng chung

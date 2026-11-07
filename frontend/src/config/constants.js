@@ -8,9 +8,9 @@ export const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'http://localhost
 
 // Key luu tru trong localStorage (xem tokenStorage.js)
 export const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'cinemax_access_token',
-  REFRESH_TOKEN: 'cinemax_refresh_token',
-  USER: 'cinemax_user',
+  ACCESS_TOKEN: 'premier_cinema_access_token',
+  REFRESH_TOKEN: 'premier_cinema_refresh_token',
+  USER: 'premier_cinema_user',
 };
 
 // Khop enum showtime_seat_status ben backend (ARCHITECTURE.md)
