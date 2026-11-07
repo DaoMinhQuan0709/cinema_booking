@@ -1,4 +1,4 @@
-# KẾ HOẠCH PHÁT TRIỂN FRONTEND - PREMIERCINEM (WEBSITE ĐẶT VÉ XEM PHIM CAO CẤP)
+# KẾ HOẠCH PHÁT TRIỂN FRONTEND - PREMIERCINEMA (WEBSITE ĐẶT VÉ XEM PHIM CAO CẤP)
 **Dự án:** Hệ thống Đặt vé xem phim High-Concurrency & Tích hợp Trợ lý AI  
 **Mục đích tài liệu:** Đặc tả kỹ thuật đầy đủ (Single Source of Truth) để kỹ sư Frontend / AI Agent triển khai giao diện và kết nối 100% chính xác với Backend Spring Boot hiện có.
 
