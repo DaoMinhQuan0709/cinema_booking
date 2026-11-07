@@ -129,7 +129,7 @@ frontend/
 ## V. ĐẶC TẢ CHI TIẾT CÁC MÀN HÌNH CHÍNH (SCREEN SPECS)
 
 ### 1. Trang Chủ (Landing & Home Page - `/`)
-*   **Header / Navbar:** Logo Cinemax, menu điều hướng (Phim, Rạp, Giá vé, Khuyến mãi), thanh tìm kiếm phim, Nút Đăng nhập / Dropdown Profile (Avatar, Lịch sử vé, Nút Admin nếu `role === 'ADMIN'`).
+*   **Header / Navbar:** Logo PremierCinema, menu điều hướng (Phim, Rạp, Giá vé, Khuyến mãi), thanh tìm kiếm phim, Nút Đăng nhập / Dropdown Profile (Avatar, Lịch sử vé, Nút Admin nếu `role === 'ADMIN'`).
 *   **Hero Carousel / Banner:** Hiển thị 3-5 phim bom tấn nổi bật nhất (ảnh ngang chất lượng cao), nút xem nhanh Trailer popup và nút "Đặt Vé".
 *   **Tabs Lọc Phim:** Tab "Phim Đang Chiếu" (`NOW_SHOWING`) và Tab "Phim Sắp Chiếu" (`COMING_SOON`).
 *   **Movie Card Component:** Ảnh poster dọc tỷ lệ 2:3, nhãn độ tuổi (P, C13, C16, C18 viền đỏ nổi bật), thời lượng phim, tên phim, sao đánh giá, nút "Mua vé" dẫn tới trang chi tiết.

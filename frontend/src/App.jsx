@@ -9,7 +9,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<div className="p-8 text-2xl font-bold">Trang chủ Cinemax</div>} />
+          <Route path="/" element={<div className="p-8 text-2xl font-bold">Trang chủ PremierCinema</div>} />
           {/* Các route tiếp theo sẽ được nhúng vào đây */}
         </Routes>
       </BrowserRouter>
