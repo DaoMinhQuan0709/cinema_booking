@@ -16,4 +16,14 @@ public class GalaxySyncProperties {
     private String clientId = "";
     private int connectTimeoutMs = 10_000;
     private int readTimeoutMs = 30_000;
+    private Details details = new Details();
+
+    @Getter
+    @Setter
+    public static class Details {
+        private boolean enabled = true;
+        private int batchSize = 20;
+        private long refreshMs = 21_600_000;
+        private long retryMs = 300_000;
+    }
 }

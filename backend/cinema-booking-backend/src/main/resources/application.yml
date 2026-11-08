@@ -17,6 +17,13 @@ application:
     client-id: ${GALAXY_CLIENT_ID:}
     connect-timeout-ms: 10000
     read-timeout-ms: 30000
+    details:
+      enabled: ${GALAXY_DETAILS_SYNC_ENABLED:true}
+      interval-ms: ${GALAXY_DETAILS_INTERVAL_MS:60000}
+      initial-delay-ms: ${GALAXY_DETAILS_INITIAL_DELAY_MS:20000}
+      batch-size: ${GALAXY_DETAILS_BATCH_SIZE:20}
+      refresh-ms: ${GALAXY_DETAILS_REFRESH_MS:21600000}
+      retry-ms: ${GALAXY_DETAILS_RETRY_MS:300000}
 
 ---
 # Development profile

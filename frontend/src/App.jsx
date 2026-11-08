@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
@@ -6,8 +6,9 @@ import { Film, Sparkles, Ticket } from 'lucide-react';
 import MainLayout from './layouts/MainLayout';
 import { useAuthStore } from './features/auth/authStore';
 import { MovieShowcase } from './features/movies/MovieShowcase';
-import { MovieDetail } from './features/movies/MovieDetail';
-import { MovieCatalog } from './features/movies/MovieCatalog';
+
+const MovieDetail = lazy(() => import('./features/movies/MovieDetail'));
+const MovieCatalog = lazy(() => import('./features/movies/MovieCatalog'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,7 +24,9 @@ const queryClient = new QueryClient({
  * Sap chieu, du lieu that tu GET /movies).
  */
 const HomePage = () => {
-  const { openAuthModal, isAuthenticated, user } = useAuthStore();
+  const openAuthModal = useAuthStore(state => state.openAuthModal);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const user = useAuthStore(state => state.user);
 
   return (
     <div className="flex-1 flex flex-col">

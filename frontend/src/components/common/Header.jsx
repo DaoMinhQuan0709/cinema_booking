@@ -20,7 +20,10 @@ import { USER_ROLE } from '../../config/constants';
  */
 export const Header = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, openAuthModal } = useAuthStore();
+  const user = useAuthStore(state => state.user);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const logout = useAuthStore(state => state.logout);
+  const openAuthModal = useAuthStore(state => state.openAuthModal);
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

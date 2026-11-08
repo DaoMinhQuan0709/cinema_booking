@@ -44,6 +44,16 @@ mục đang xem. Trang `/movies` hiển thị toàn bộ phim đang chiếu/sắ
 tìm tên không dấu và sắp xếp. Trạng thái mục, tìm kiếm, sắp xếp lưu trong URL
 (`status`, `q`, `sort`) để có thể chia sẻ và dùng nút quay lại của trình duyệt.
 
+Trang chủ chỉ lấy một trang 15 phim/mục; cột gợi ý chỉ lấy 4 phim để chọn tối đa
+3 phim khác. Cache preview tách khỏi danh sách đầy đủ để không làm thiếu phim ở
+`/movies`. Trang danh sách và trang chi tiết được tải theo route bằng React lazy.
+
+Trang chi tiết dùng ảnh ngang làm banner mở trailer, poster, thông tin đạo diễn/
+diễn viên/quốc gia/thể loại từ backend và tối đa 3 phim đang chiếu ở cột bên phải.
+Điện thoại chuyển thành một cột. Thiếu trường thì ẩn dòng tương ứng; ảnh lỗi có
+fallback. Trailer YouTube chỉ nhúng khi bấm; modal hỗ trợ Escape và trả focus về
+nút mở. Phần chọn suất chiếu tiếp tục dẫn đến `/booking/:showtimeId`.
+
 Trang chủ, danh sách và trang chi tiết hiển thị dữ liệu thật từ backend, có modal xác thực
 và chọn suất chiếu. Route `/booking/:showtimeId` hiện là trang chờ; kiểm tra đăng
 nhập sẽ được triển khai cùng màn hình chọn ghế. Các route lịch chiếu toàn quốc,

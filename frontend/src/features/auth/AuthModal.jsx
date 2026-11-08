@@ -9,7 +9,10 @@ import RegisterForm from './RegisterForm';
  * Quản lý lớp phủ mờ (Backdrop), phím ESC, khóa cuộn trang và thanh Tabs điều hướng.
  */
 export const AuthModal = () => {
-  const { isAuthModalOpen, closeAuthModal, authModalMode, switchAuthModalMode } = useAuthStore();
+  const isAuthModalOpen = useAuthStore(state => state.isAuthModalOpen);
+  const closeAuthModal = useAuthStore(state => state.closeAuthModal);
+  const authModalMode = useAuthStore(state => state.authModalMode);
+  const switchAuthModalMode = useAuthStore(state => state.switchAuthModalMode);
 
   // Khóa cuộn trang khi modal đang mở
   useEffect(() => {

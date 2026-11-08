@@ -241,6 +241,18 @@ class GalaxyDataImporterTests {
     }
 
     @Test
+    void overlappingCatalogsReuseTheMovieLookupAndKeepComingSoonPriority() throws Exception {
+        ArrayNode sessions = snapshot("advance-sale");
+        var movie = sessions.get(0).path("movie");
+        ArrayNode showing = mapper.createArrayNode().add(movie.deepCopy());
+        ArrayNode upcoming = mapper.createArrayNode().add(movie.deepCopy());
+        importer.importData(sessions, upcoming, showing, 0, true);
+        verify(movies, times(1)).findByGalaxyMovieId("movie-1");
+        verify(movies, times(1)).save(any());
+        assertEquals(MovieStatus.COMING_SOON, movieStore.get("movie-1").getStatus());
+    }
+
+    @Test
     void catalogIncludesMoviesWithoutSessionsAndWithdrawsOldListings() throws Exception {
         ArrayNode sessions = snapshot("session-1");
         var listed = sessions.get(0).path("movie").deepCopy();
@@ -251,6 +263,27 @@ class GalaxyDataImporterTests {
         assertEquals(MovieStatus.ENDED, movieStore.get("movie-1").getStatus());
         importer.importData(sessions, mapper.createArrayNode(), mapper.createArrayNode(), 0, true);
         assertEquals(MovieStatus.ENDED, movieStore.get("listed-without-session").getStatus());
+    }
+
+    @Test
+    void catalogKeepsSlugLandscapeAndPreviouslyEnrichedMetadata() throws Exception {
+        ArrayNode sessions = snapshot("session-1");
+        var source = (com.fasterxml.jackson.databind.node.ObjectNode) sessions.get(0).path("movie");
+        source.put("slug", "test-movie");
+        source.put("imageLandscape", "https://cdn.example/banner.jpg");
+        importer.importData(sessions, null, 0, false);
+        Movie movie = movieStore.get("movie-1");
+        assertEquals("test-movie", movie.getGalaxySlug());
+        assertEquals("https://cdn.example/banner.jpg", movie.getLandscapeUrl());
+        movie.setDirectors(List.of("Saved director"));
+        movie.setGenre("Hài, Tâm Lý");
+        source.remove("slug");
+        source.remove("imageLandscape");
+        importer.importData(sessions, null, 0, false);
+        assertEquals("test-movie", movie.getGalaxySlug());
+        assertEquals("https://cdn.example/banner.jpg", movie.getLandscapeUrl());
+        assertEquals(List.of("Saved director"), movie.getDirectors());
+        assertEquals("Hài, Tâm Lý", movie.getGenre());
     }
 
     private ArrayNode snapshot(String... ids) throws Exception {

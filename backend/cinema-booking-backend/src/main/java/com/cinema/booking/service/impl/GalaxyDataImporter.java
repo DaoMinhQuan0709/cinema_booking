@@ -105,20 +105,20 @@ public class GalaxyDataImporter {
             String id = node.path("id").asText();
             if (!movies.containsKey(id)) {
                 MovieStatus fallback = nowShowing == null ? MovieStatus.NOW_SHOWING : MovieStatus.ENDED;
-                movies.put(id, upsertMovie(node, fallback));
+                movies.put(id, upsertMovie(node, fallback, movies));
             }
         }
         if (nowShowing != null) {
             for (JsonNode node : nowShowing) {
                 String id = node.path("id").asText();
-                movies.put(id, upsertMovie(node, MovieStatus.NOW_SHOWING));
+                movies.put(id, upsertMovie(node, MovieStatus.NOW_SHOWING, movies));
                 catalogIds.add(id);
             }
         }
         if (comingSoon != null) {
             for (JsonNode node : comingSoon) {
                 String id = node.path("id").asText();
-                movies.put(id, upsertMovie(node, MovieStatus.COMING_SOON));
+                movies.put(id, upsertMovie(node, MovieStatus.COMING_SOON, movies));
                 catalogIds.add(id);
             }
         }
@@ -201,14 +201,24 @@ public class GalaxyDataImporter {
                 .build();
     }
 
-    private Movie upsertMovie(JsonNode node, MovieStatus status) {
+    private Movie upsertMovie(JsonNode node, MovieStatus status, Map<String, Movie> importedMovies) {
         String externalId = node.path("id").asText();
         String title = node.path("name").asText().trim();
-        Movie movie = movieRepository.findByGalaxyMovieId(externalId)
-                .orElseGet(() -> movieRepository.findByTitle(title)
-                        .filter(old -> old.getGalaxyMovieId() == null).orElseGet(Movie::new));
+        Movie movie = importedMovies.get(externalId);
+        boolean alreadyImported = movie != null;
+        if (!alreadyImported) {
+            movie = movieRepository.findByGalaxyMovieId(externalId)
+                    .orElseGet(() -> movieRepository.findByTitle(title)
+                            .filter(old -> old.getGalaxyMovieId() == null).orElseGet(Movie::new));
+        }
         Movie values = buildMovieFromNode(node, status);
         movie.setGalaxyMovieId(externalId);
+        if (node.path("slug").isTextual() && !node.path("slug").asText().isBlank()) {
+            movie.setGalaxySlug(node.path("slug").asText().trim());
+        }
+        if (node.path("imageLandscape").isTextual() && !node.path("imageLandscape").asText().isBlank()) {
+            movie.setLandscapeUrl(node.path("imageLandscape").asText().trim());
+        }
         movie.setTitle(title);
         movie.setDurationMinutes(values.getDurationMinutes());
         movie.setReleaseDate(values.getReleaseDate());
@@ -218,7 +228,8 @@ public class GalaxyDataImporter {
         if (!values.getDescription().isBlank()) movie.setDescription(values.getDescription());
         if (values.getGenre() != null) movie.setGenre(values.getGenre());
         movie.setStatus(status);
-        return movieRepository.save(movie);
+        // Reuse the managed entity when the same movie occurs in several catalog endpoints.
+        return alreadyImported ? movie : movieRepository.save(movie);
     }
 
     private Cinema upsertCinema(JsonNode node) {

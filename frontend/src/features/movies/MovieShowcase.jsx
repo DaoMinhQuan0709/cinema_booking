@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { useNowShowingMovies, useComingSoonMovies } from './hooks/useMovies';
+import { useMoviePreview } from './hooks/useMovies';
 import { MovieList } from './MovieList';
 
 const TABS = [
@@ -18,8 +18,8 @@ const TABS = [
 export const MovieShowcase = () => {
   const [activeTab, setActiveTab] = useState('NOW_SHOWING');
 
-  const nowShowing = useNowShowingMovies();
-  const comingSoon = useComingSoonMovies();
+  const nowShowing = useMoviePreview('NOW_SHOWING');
+  const comingSoon = useMoviePreview('COMING_SOON');
 
   const current = activeTab === 'NOW_SHOWING' ? nowShowing : comingSoon;
   const isNowShowing = activeTab === 'NOW_SHOWING';

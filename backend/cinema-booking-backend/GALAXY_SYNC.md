@@ -59,8 +59,10 @@ Ví dụ: đồng bộ 2.000 suất mới tạo khoảng 2.000 bản ghi `showti
 bản ghi `showtime_seats`. Các bộ đếm ghế trong response đồng bộ giữ giá trị 0
 để tương thích API cũ.
 
-Backend lấy trực tiếp hai API `sessions2?includeCinema=true&includeMovie=true` và
-`movies/comming`. Lần chạy tự động đầu tiên bắt đầu sau 10 giây; mỗi lần hoàn tất,
+Backend lấy trực tiếp ba API `sessions2?includeCinema=true&includeMovie=true`,
+`movies/showing` và `movies/comming`. Hai danh sách phim quyết định phân loại
+đang chiếu/sắp chiếu; phim có suất bán trước vẫn có thể là sắp chiếu.
+Lần chạy tự động đầu tiên bắt đầu sau 10 giây; mỗi lần hoàn tất,
 backend đợi 5 phút trước lần tiếp theo. Độ trễ cập nhật còn phụ thuộc thời gian
 Galaxy phản hồi và thời gian nhập dữ liệu. Bộ đồng bộ không tự dùng file JSON
 thay thế khi kết nối online thất bại.
@@ -75,6 +77,49 @@ khoảng chờ dài nhất là 12 giờ từ 18h đến 6h hôm sau. Nếu áp d
 cố định, cần đặt timezone `Asia/Ho_Chi_Minh`. Lịch hiện tại vẫn dùng `fixedDelay`.
 
 ## Cấu hình và chạy
+
+### Dữ liệu chi tiết phim
+
+`GalaxyMovieDetailsScheduler` chạy riêng với luồng catalog. API chi tiết
+`GET /api/v2/mobile/movies/{slug}` bổ sung ảnh ngang, quốc gia, tên đạo diễn,
+diễn viên, thể loại từ `categories`, mô tả và trailer. Slug và ảnh ngang cũng
+được lưu từ danh sách phim. Dữ liệu nghệ sĩ lưu thành mảng tên JSONB trên phim.
+
+Mặc định, tác vụ bắt đầu sau 20 giây rồi đợi 1 phút sau mỗi lượt; tối đa 20 phim
+mỗi lượt, gọi tuần tự. Phim chưa có chi tiết được đưa vào hàng đợi, làm mới sau
+6 giờ. Lần thử được ghi trước HTTP để lỗi không bị gọi lại liên tục; chờ tối thiểu
+5 phút trước khi thử lại và ưu tiên phim có lần thử cũ hơn để tránh tắc hàng đợi.
+Response cần đúng ID Galaxy, object/mảng đúng kiểu. Lỗi ở một phim giữ dữ liệu
+cũ và không rollback catalog. HTTP và việc ghi metadata nằm ngoài transaction
+catalog; `@DynamicUpdate` trên `Movie` tránh ghi đè các cột không thay đổi khi
+catalog và metadata cùng cập nhật.
+
+Truy vấn tìm phim đến hạn chỉ lấy ID nội bộ, ID Galaxy và slug, tránh tải lại
+JSON nghệ sĩ/mô tả vào bộ nhớ cho công việc chưa cần những trường đó. Khi cùng
+một phim xuất hiện ở sessions, đang chiếu và sắp chiếu trong một lượt catalog,
+importer dùng lại entity đã đọc; không tìm và merge lặp cho mỗi nguồn.
+
+Các biến tùy chọn trong `application.yml`:
+
+| Biến | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| `GALAXY_DETAILS_SYNC_ENABLED` | `true` | Bật tác vụ bổ sung; vẫn tuân theo `GALAXY_SYNC_ENABLED` |
+| `GALAXY_DETAILS_INTERVAL_MS` | `60000` | Khoảng đợi sau mỗi lượt |
+| `GALAXY_DETAILS_INITIAL_DELAY_MS` | `20000` | Khoảng đợi sau khởi động |
+| `GALAXY_DETAILS_BATCH_SIZE` | `20` | Phim mỗi lượt, giới hạn 1–100 |
+| `GALAXY_DETAILS_REFRESH_MS` | `21600000` | Thời hạn làm mới, tối thiểu 1 phút |
+| `GALAXY_DETAILS_RETRY_MS` | `300000` | Khoảng chờ thử lại, tối thiểu 1 phút |
+
+`GET /api/v1/movies/{id}` trả thêm `landscapeUrl`, `country`, `directors`, `actors`;
+không gọi Galaxy khi khách mở trang. Lần đồng bộ đầu cần vài lượt để bổ sung hết
+catalog; dữ liệu mới hiển thị dần. Trang chi tiết đọc lại API nội bộ mỗi phút khi
+đang mở. Mô tả nguồn chuyển thành văn bản; trailer chỉ nhúng sau khi bấm và chỉ
+chấp nhận URL YouTube hợp lệ.
+
+Dev dùng `ddl-auto=update` khi khởi động lại. Production cần chạy bản mới của
+`src/main/resources/db/manual/galaxy-sync.sql` trước deploy; script có thể chạy lại.
+Tác vụ không đọc/ghi `seats`, `showtime_seats` hoặc booking. Trạng thái freshness
+catalog không đại diện cho thời điểm cập nhật metadata của từng phim.
 
 ### Chạy bằng VS Code
 
@@ -214,7 +259,7 @@ cần xem câu SQL; điều này không ảnh hưởng lịch đồng bộ hoặ
 ### Kiểm thử tự động
 
 ```powershell
-.\mvnw.cmd '-Dtest=GalaxyApiClientTests,GalaxyDataImporterTests,GalaxySyncServiceTests,GalaxySyncSchedulerTests,GalaxySessionTransportTests,LocalSeatInventoryTests,SeatLockServiceTests,ShowtimeServiceTests,AdminReportServiceTests' test
+.\mvnw.cmd '-Dtest=GalaxyApiClientTests,GalaxyDataImporterTests,GalaxySyncServiceTests,GalaxySyncSchedulerTests,GalaxySessionTransportTests,GalaxyMovieDetailsTests,GalaxyMovieDetailsServiceTests,MovieDetailsMappingTests,CinemaServiceTests,LocalSeatInventoryTests,SeatLockServiceTests,ShowtimeServiceTests,AdminReportServiceTests' test
 ```
 
 Các test sử dụng HTTP giả lập, HTTP server loopback và repository mock: cookie
@@ -233,5 +278,7 @@ Kiểm tra chỉ đọc trực tiếp Galaxy bằng đúng HTTP client của bac
 ```
 
 Test này lấy `GALAXY_CLIENT_ID` từ môi trường, xác nhận nhận đủ snapshot theo
-`data.total`, không nhập DB. Nó chỉ chạy khi chủ động đặt `galaxy.live=true`.
+`data.total` và đọc/ánh xạ một object phim chi tiết, không nhập DB. Nó chỉ chạy
+khi chủ động đặt `galaxy.live=true`. `MovieDetailsMappingTests` kiểm tra mapping
+JSONB/HQL bằng dialect PostgreSQL với connection provider không kết nối database.
 Tổng số suất chiếu thay đổi theo thời điểm gọi, không được cố định theo mẫu JSON.

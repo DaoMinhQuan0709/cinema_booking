@@ -5,8 +5,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.util.concurrent.Executor;
-
 /**
  * Cau hinh Spring Async xu ly cac tac vu nen (Cong viec 5.3):
  * - Sinh anh QR Code (ZXing)
@@ -17,7 +15,7 @@ import java.util.concurrent.Executor;
 public class AsyncConfig {
 
     @Bean(name = "ticketTaskExecutor")
-    public Executor ticketTaskExecutor() {
+    public ThreadPoolTaskExecutor ticketTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(5);
         executor.setMaxPoolSize(20);
@@ -25,7 +23,6 @@ public class AsyncConfig {
         executor.setThreadNamePrefix("ticket-async-");
         executor.setWaitForTasksToCompleteOnShutdown(true);
         executor.setAwaitTerminationSeconds(30);
-        executor.initialize();
         return executor;
     }
 }

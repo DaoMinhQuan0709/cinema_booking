@@ -30,8 +30,6 @@ class AdminReportServiceTests {
         assertEquals(25.0, result.getBreakdown().get(1).getOccupancyRate());
         assertEquals(0L, result.getBreakdown().get(2).getTotalSeats());
         verify(seats, times(1)).countSeatsByShowtimeIds(anyCollection(), eq(ShowtimeSeatStatus.BOOKED));
-        verify(seats, never()).countTotalSeatsByShowtimeId(anyLong());
-        verify(seats, never()).countSeatsByShowtimeIdAndStatus(anyLong(), any());
     }
 
     @Test

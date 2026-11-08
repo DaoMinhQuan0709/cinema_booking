@@ -44,6 +44,30 @@ public class GalaxyApiClient {
     }
 
     private JsonNode fetchList(String path, String overrideClientId) {
+        JsonNode data = fetchData(path, overrideClientId);
+        JsonNode result = data.path("result");
+        // A partial/paginated response must never withdraw records absent from that page.
+        if (!result.isArray() || !data.path("total").isIntegralNumber() || !data.path("total").canConvertToInt()
+                || data.path("total").asInt(-1) != result.size()) {
+            throw failure("Galaxy chưa trả danh sách đầy đủ (data.total khác số phần tử data.result hoặc sai định dạng). "
+                    + "Không cập nhật dữ liệu; cần kiểm tra tham số phân trang của API.");
+        }
+        return result;
+    }
+
+    public JsonNode fetchMovieDetails(String slug, String galaxyMovieId) {
+        if (slug == null || !slug.matches("[A-Za-z0-9][A-Za-z0-9_-]{0,254}")) {
+            throw failure("Slug phim Galaxy không hợp lệ.");
+        }
+        JsonNode data = fetchData("/api/v2/mobile/movies/" + slug, null);
+        if (!data.isObject() || galaxyMovieId == null || !data.path("id").isTextual()
+                || !galaxyMovieId.equals(data.path("id").asText())) {
+            throw failure("Chi tiết phim Galaxy sai định dạng hoặc không khớp ID nguồn. Giữ nguyên dữ liệu cũ.");
+        }
+        return data;
+    }
+
+    private JsonNode fetchData(String path, String overrideClientId) {
         String clientId = StringUtils.hasText(overrideClientId) ? overrideClientId.trim() : properties.getClientId();
         try {
             for (int attempt = 0; attempt < MAX_SESSION_ATTEMPTS; attempt++) {
@@ -79,7 +103,7 @@ public class GalaxyApiClient {
                                     + response.getHeaders().getContentType()
                                     + "). Kiểm tra URL API và clientId; không thể đồng bộ từ trang chuyển hướng hoặc trang chặn truy cập.");
                         }
-                        return parseCompleteList(body);
+                        return parseData(body);
                     });
                 if (result != null) return result;
             }
@@ -99,7 +123,7 @@ public class GalaxyApiClient {
         }
     }
 
-    private JsonNode parseCompleteList(String body) {
+    private JsonNode parseData(String body) {
         JsonNode root;
         try {
             root = objectMapper.readTree(body);
@@ -111,15 +135,7 @@ public class GalaxyApiClient {
                         || root.path("response").path("status").asInt(200) != 200))) {
             throw failure("Galaxy báo lỗi trong nội dung phản hồi. Kiểm tra clientId và quyền truy cập API.");
         }
-        JsonNode data = root.path("data");
-        JsonNode result = data.path("result");
-        // A partial/paginated response must never withdraw records absent from that page.
-        if (!result.isArray() || !data.path("total").isIntegralNumber() || !data.path("total").canConvertToInt()
-                || data.path("total").asInt(-1) != result.size()) {
-            throw failure("Galaxy chưa trả danh sách đầy đủ (data.total khác số phần tử data.result hoặc sai định dạng). "
-                    + "Không cập nhật dữ liệu; cần kiểm tra tham số phân trang của API.");
-        }
-        return result;
+        return root.path("data");
     }
 
     private AppException failure(String message) {

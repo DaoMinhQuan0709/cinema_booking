@@ -7,6 +7,7 @@ import { movieService } from '../../../services/movieService';
 export const movieKeys = {
     all: ['movies'],
     list: (params) => [...movieKeys.all, 'list', params],
+    preview: (params) => [...movieKeys.all, 'preview', params],
     detail: (id) => [...movieKeys.all, 'detail', String(id)],
 };
 
@@ -14,6 +15,22 @@ function useMovieList(queryParams) {
     return useQuery({
         queryKey: movieKeys.list(queryParams),
         queryFn: () => movieService.getAllMovies(queryParams),
+        staleTime: 5 * 60 * 1000,
+        refetchInterval: 5 * 60 * 1000,
+    });
+}
+
+/** Fetch only one page for home previews and related movies. */
+export function useMoviePreview(status, size = 15) {
+    const params = {
+        status,
+        page: 0,
+        size,
+        sort: status === 'COMING_SOON' ? 'releaseDate,asc' : 'releaseDate,desc',
+    };
+    return useQuery({
+        queryKey: movieKeys.preview(params),
+        queryFn: () => movieService.getMovies(params),
         staleTime: 5 * 60 * 1000,
         refetchInterval: 5 * 60 * 1000,
     });
@@ -51,5 +68,7 @@ export function useMovieDetail(id) {
         queryKey: movieKeys.detail(id),
         queryFn: () => movieService.getMovieById(id),
         enabled: Boolean(id),
+        staleTime: 60 * 1000,
+        refetchInterval: 60 * 1000,
     });
 }

@@ -39,11 +39,6 @@ public interface ShowtimeSeatRepository extends JpaRepository<ShowtimeSeat, Long
     List<ShowtimeSeat> findAllByIdIn(List<Long> ids);
 
     /**
-     * Tim tat ca ghe cua mot suat chieu voi trang thai cu the.
-     */
-    List<ShowtimeSeat> findByShowtimeIdAndStatus(Long showtimeId, ShowtimeSeatStatus status);
-
-    /**
      * Tim tat ca ghe dang bi LOCKED ma thoi gian locked_until da qua (dung cho Cronjob 4.3 quet ghe mo coi).
      */
     @Query("SELECT ss FROM ShowtimeSeat ss " +
@@ -53,12 +48,6 @@ public interface ShowtimeSeatRepository extends JpaRepository<ShowtimeSeat, Long
     List<ShowtimeSeat> findExpiredLockedSeats(
             @Param("status") ShowtimeSeatStatus status,
             @Param("now") LocalDateTime now);
-
-    @Query("SELECT COUNT(ss) FROM ShowtimeSeat ss WHERE ss.showtime.id = :showtimeId")
-    long countTotalSeatsByShowtimeId(@Param("showtimeId") Long showtimeId);
-
-    @Query("SELECT COUNT(ss) FROM ShowtimeSeat ss WHERE ss.showtime.id = :showtimeId AND ss.status = :status")
-    long countSeatsByShowtimeIdAndStatus(@Param("showtimeId") Long showtimeId, @Param("status") ShowtimeSeatStatus status);
 
     @Query("SELECT ss.showtime.id, COUNT(ss), SUM(CASE WHEN ss.status = :status THEN 1 ELSE 0 END) " +
            "FROM ShowtimeSeat ss WHERE ss.showtime.id IN :showtimeIds GROUP BY ss.showtime.id")

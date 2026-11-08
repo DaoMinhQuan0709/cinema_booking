@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
@@ -16,7 +17,9 @@ export const MainLayout = () => {
 
       {/* Noi dung chinh cua tung trang */}
       <main className="flex-1 w-full flex flex-col">
-        <Outlet />
+        <Suspense fallback={<p role="status" className="px-6 py-16 text-center text-sm text-muted">Đang tải trang…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
 
       {/* Footer chan trang */}

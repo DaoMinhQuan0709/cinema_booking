@@ -23,7 +23,7 @@ export const movieService = {
         return data;
     },
 
-    // Collect every API page for the complete catalog, shared with the home preview.
+    // Collect every API page for the full catalog; previews use getMovies directly.
     getAllMovies: async (params = {}) => {
         const first = await movieService.getMovies({ ...params, page: 0 });
         const content = [...first.content];

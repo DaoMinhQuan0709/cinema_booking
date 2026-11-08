@@ -49,6 +49,39 @@ class GalaxyApiClientTests {
     }
 
     @Test
+    void fetchesDetailObjectAndChecksTheSourceId() {
+        server.expect(requestTo("https://galaxy.test/api/v2/mobile/movies/test-movie"))
+                .andExpect(header("clientId", "configured-client"))
+                .andRespond(withSuccess("{\"data\":{\"id\":\"movie-1\",\"directors\":[]}}", MediaType.APPLICATION_JSON));
+        assertEquals("movie-1", client.fetchMovieDetails("test-movie", "movie-1").path("id").asText());
+        server.verify();
+    }
+
+    @Test
+    void rejectsWrongMovieBeforeItsMetadataCanBeSaved() {
+        server.expect(requestTo("https://galaxy.test/api/v2/mobile/movies/test-movie"))
+                .andRespond(withSuccess("{\"data\":{\"id\":\"another-movie\"}}", MediaType.APPLICATION_JSON));
+        assertThrows(AppException.class, () -> client.fetchMovieDetails("test-movie", "movie-1"));
+        server.verify();
+    }
+
+    @Test
+    void rejectsUntrustedPathsWithoutSendingARequest() {
+        for (String slug : new String[]{"../sessions2", "https://other.test", "movie?x=1", "movie/other", ""}) {
+            assertThrows(AppException.class, () -> client.fetchMovieDetails(slug, "movie-1"));
+        }
+        server.verify();
+    }
+
+    @Test
+    void rejectsHtmlDetailResponsesUsingTheSameTransportChecksAsLists() {
+        server.expect(requestTo("https://galaxy.test/api/v2/mobile/movies/test-movie"))
+                .andRespond(withSuccess("<html>Unavailable</html>", MediaType.TEXT_HTML));
+        assertThrows(AppException.class, () -> client.fetchMovieDetails("test-movie", "movie-1"));
+        server.verify();
+    }
+
+    @Test
     void requestClientIdOverridesConfiguration() {
         server.expect(requestTo(SESSIONS)).andExpect(header("clientId", "browser-client"))
                 .andRespond(withSuccess(EMPTY, MediaType.APPLICATION_JSON));
