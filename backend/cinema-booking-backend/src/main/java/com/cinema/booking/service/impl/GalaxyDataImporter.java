@@ -55,6 +55,20 @@ public class GalaxyDataImporter {
     @Transactional
     public GalaxySyncResponse importData(JsonNode sessions, JsonNode comingSoon, int limitShowtimes,
                                          boolean authoritative) {
+        return importData(sessions, comingSoon, null, limitShowtimes, authoritative);
+    }
+
+    @Transactional
+    public GalaxySyncResponse importData(JsonNode sessions, JsonNode comingSoon, JsonNode nowShowing,
+                                         int limitShowtimes, boolean authoritative) {
+        if (nowShowing != null) {
+            if (!nowShowing.isArray()) throw new BadRequestException("Invalid now-showing catalog.");
+            Set<String> ids = new HashSet<>();
+            for (JsonNode node : nowShowing) {
+                validateMovie(node);
+                if (!ids.add(node.path("id").asText())) throw new BadRequestException("Duplicate now-showing movie ID.");
+            }
+        }
         if (limitShowtimes < 0) throw new BadRequestException("limitShowtimes phải >= 0 (0 = tất cả).");
         validateSessions(sessions);
         if (comingSoon != null) {
@@ -84,18 +98,28 @@ public class GalaxyDataImporter {
         }
         int syncedShowtimes = 0, skipped = 0;
 
-        if (comingSoon != null) {
-            for (JsonNode node : comingSoon) {
-                Movie movie = upsertMovie(node, MovieStatus.COMING_SOON);
-                movies.put(movie.getGalaxyMovieId(), movie);
-            }
-        }
-        // Import the entire movie catalog independently of the optional showtime limit.
+        // Session availability includes advance sales and does not define catalog status.
+        Set<String> catalogIds = new HashSet<>();
         for (JsonNode session : sessions) {
             JsonNode node = session.path("movie");
             String id = node.path("id").asText();
-            if (!movies.containsKey(id) || movies.get(id).getStatus() != MovieStatus.NOW_SHOWING) {
+            if (!movies.containsKey(id)) {
+                MovieStatus fallback = nowShowing == null ? MovieStatus.NOW_SHOWING : MovieStatus.ENDED;
+                movies.put(id, upsertMovie(node, fallback));
+            }
+        }
+        if (nowShowing != null) {
+            for (JsonNode node : nowShowing) {
+                String id = node.path("id").asText();
                 movies.put(id, upsertMovie(node, MovieStatus.NOW_SHOWING));
+                catalogIds.add(id);
+            }
+        }
+        if (comingSoon != null) {
+            for (JsonNode node : comingSoon) {
+                String id = node.path("id").asText();
+                movies.put(id, upsertMovie(node, MovieStatus.COMING_SOON));
+                catalogIds.add(id);
             }
         }
         int processed = 0;
@@ -162,7 +186,7 @@ public class GalaxyDataImporter {
                 }
             }
             for (Movie movie : movieRepository.findByGalaxyMovieIdIsNotNull()) {
-                if (!movies.containsKey(movie.getGalaxyMovieId()) && movie.getStatus() != MovieStatus.ENDED) {
+                if (!(nowShowing == null ? movies.keySet() : catalogIds).contains(movie.getGalaxyMovieId()) && movie.getStatus() != MovieStatus.ENDED) {
                     movie.setStatus(MovieStatus.ENDED);
                     ended++;
                 }
@@ -189,7 +213,7 @@ public class GalaxyDataImporter {
         movie.setDurationMinutes(values.getDurationMinutes());
         movie.setReleaseDate(values.getReleaseDate());
         movie.setPosterUrl(values.getPosterUrl());
-        movie.setTrailerUrl(values.getTrailerUrl());
+        if (!values.getTrailerUrl().isBlank()) movie.setTrailerUrl(values.getTrailerUrl());
         movie.setAgeRating(values.getAgeRating());
         if (!values.getDescription().isBlank()) movie.setDescription(values.getDescription());
         if (values.getGenre() != null) movie.setGenre(values.getGenre());

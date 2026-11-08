@@ -32,6 +32,15 @@ class GalaxyApiClientTests {
     }
 
     @Test
+    void fetchesDedicatedNowShowingCatalog() {
+        server.expect(requestTo("https://galaxy.test/api/v2/mobile/movies/showing"))
+                .andExpect(header("clientId", "configured-client"))
+                .andRespond(withSuccess(EMPTY, MediaType.APPLICATION_JSON));
+        assertTrue(client.fetchNowShowing(null).isArray());
+        server.verify();
+    }
+
+    @Test
     void acceptsJsonEvenWhenGalaxyLabelsItAsHtml() {
         server.expect(requestTo(SESSIONS)).andExpect(header("clientId", "configured-client"))
                 .andRespond(withSuccess(EMPTY, MediaType.TEXT_HTML));

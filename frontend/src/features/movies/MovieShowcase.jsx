@@ -42,11 +42,10 @@ export const MovieShowcase = () => {
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
-                activeTab === tab.key
+              className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold transition-all ${activeTab === tab.key
                   ? 'bg-primary text-white shadow-md shadow-primary/20'
                   : 'text-neutral-400 hover:text-white'
-              }`}
+                }`}
             >
               {tab.label}
             </button>
@@ -54,6 +53,11 @@ export const MovieShowcase = () => {
         </div>
       </div>
 
+      {current.isError && (
+        <button type="button" onClick={() => current.refetch()} className="mb-4 text-primary">
+          Không tải được danh sách phim. Thử lại
+        </button>
+      )}
       <MovieList
         movies={current.data?.content ?? []}
         isLoading={current.isLoading}

@@ -23,6 +23,17 @@ export const movieService = {
         return data;
     },
 
+    // Collect every API page so the showcase has no display limit.
+    getAllMovies: async (params = {}) => {
+        const first = await movieService.getMovies({ ...params, page: 0 });
+        const content = [...first.content];
+        for (let page = 1; page < first.totalPages; page += 1) {
+            const next = await movieService.getMovies({ ...params, page });
+            content.push(...next.content);
+        }
+        return { ...first, content };
+    },
+
     /**
      * Lay chi tiet 1 phim theo ID (kem trailer, mo ta day du).
      * @param {number|string} id

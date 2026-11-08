@@ -231,6 +231,28 @@ class GalaxyDataImporterTests {
         verify(manager, never()).commit(any());
     }
 
+    @Test
+    void advanceSalesDoNotOverrideComingSoonCatalog() throws Exception {
+        ArrayNode sessions = snapshot("advance-sale");
+        ArrayNode upcoming = mapper.createArrayNode().add(sessions.get(0).path("movie").deepCopy());
+        importer.importData(sessions, upcoming, mapper.createArrayNode(), 0, true);
+        assertEquals(MovieStatus.COMING_SOON, movieStore.get("movie-1").getStatus());
+        assertTrue(showtimeStore.get("advance-sale").isActive());
+    }
+
+    @Test
+    void catalogIncludesMoviesWithoutSessionsAndWithdrawsOldListings() throws Exception {
+        ArrayNode sessions = snapshot("session-1");
+        var listed = sessions.get(0).path("movie").deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) listed).put("id", "listed-without-session");
+        ArrayNode showing = mapper.createArrayNode().add(listed);
+        importer.importData(sessions, mapper.createArrayNode(), showing, 0, true);
+        assertEquals(MovieStatus.NOW_SHOWING, movieStore.get("listed-without-session").getStatus());
+        assertEquals(MovieStatus.ENDED, movieStore.get("movie-1").getStatus());
+        importer.importData(sessions, mapper.createArrayNode(), mapper.createArrayNode(), 0, true);
+        assertEquals(MovieStatus.ENDED, movieStore.get("listed-without-session").getStatus());
+    }
+
     private ArrayNode snapshot(String... ids) throws Exception {
         ArrayNode array = mapper.createArrayNode();
         for (int i = 0; i < ids.length; i++) {

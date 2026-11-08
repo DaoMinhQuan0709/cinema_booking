@@ -13,8 +13,9 @@ export const movieKeys = {
 function useMovieList(queryParams) {
     return useQuery({
         queryKey: movieKeys.list(queryParams),
-        queryFn: () => movieService.getMovies(queryParams),
+        queryFn: () => movieService.getAllMovies(queryParams),
         staleTime: 5 * 60 * 1000,
+        refetchInterval: 5 * 60 * 1000,
     });
 }
 
@@ -24,7 +25,7 @@ function useMovieList(queryParams) {
  * @param {Object} [params] co the ghi de size/sort/genre/keyword...
  */
 export function useNowShowingMovies(params = {}) {
-    const queryParams = { status: 'NOW_SHOWING', size: 12, sort: 'releaseDate,desc', ...params };
+    const queryParams = { status: 'NOW_SHOWING', size: 100, sort: 'releaseDate,desc', ...params };
 
     return useMovieList(queryParams);
 }
@@ -35,7 +36,7 @@ export function useNowShowingMovies(params = {}) {
  * @param {Object} [params]
  */
 export function useComingSoonMovies(params = {}) {
-    const queryParams = { status: 'COMING_SOON', size: 12, sort: 'releaseDate,asc', ...params };
+    const queryParams = { status: 'COMING_SOON', size: 100, sort: 'releaseDate,asc', ...params };
 
     return useMovieList(queryParams);
 }

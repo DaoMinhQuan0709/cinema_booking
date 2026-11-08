@@ -31,6 +31,15 @@ class GalaxySyncServiceTests {
     }
 
     @Test
+    void failedNowShowingFetchDoesNotApplyPartialSnapshot() {
+        when(client.fetchSessions(null)).thenReturn(mapper.createArrayNode());
+        when(client.fetchComingSoon(null)).thenReturn(mapper.createArrayNode());
+        when(client.fetchNowShowing(null)).thenThrow(new AppException(502, "unavailable"));
+        assertThrows(AppException.class, () -> service.syncGalaxyData(null, 0));
+        verifyNoInteractions(importer);
+    }
+
+    @Test
     void failedFetchDoesNotTouchDatabaseOrFallBackToLocalFile() {
         when(client.fetchSessions(null)).thenThrow(new AppException(502, "Galaxy HTML"));
         assertThrows(AppException.class, () -> service.syncGalaxyData(null, 0));
@@ -53,7 +62,8 @@ class GalaxySyncServiceTests {
         var empty = mapper.createArrayNode();
         when(client.fetchSessions(null)).thenReturn(empty);
         when(client.fetchComingSoon(null)).thenReturn(empty);
-        when(importer.importData(empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
+        when(client.fetchNowShowing(null)).thenReturn(empty);
+        when(importer.importData(empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
         service.syncGalaxyData(null, 0);
         var lastSuccess = service.getStatus().lastSuccessAt();
         assertNotNull(lastSuccess);
@@ -67,7 +77,8 @@ class GalaxySyncServiceTests {
         var empty = mapper.createArrayNode();
         when(client.fetchSessions(null)).thenReturn(empty);
         when(client.fetchComingSoon(null)).thenReturn(empty);
-        when(importer.importData(empty, empty, 100, false)).thenReturn(GalaxySyncResponse.builder().build());
+        when(client.fetchNowShowing(null)).thenReturn(empty);
+        when(importer.importData(empty, empty, empty, 100, false)).thenReturn(GalaxySyncResponse.builder().build());
         service.syncGalaxyData(null, 100);
         assertNull(service.getStatus().lastSuccessAt());
     }
@@ -83,7 +94,8 @@ class GalaxySyncServiceTests {
             return empty;
         });
         when(client.fetchComingSoon(null)).thenReturn(empty);
-        when(importer.importData(empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
+        when(client.fetchNowShowing(null)).thenReturn(empty);
+        when(importer.importData(empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
         try (var executor = Executors.newSingleThreadExecutor()) {
             var running = executor.submit(() -> service.syncGalaxyData(null, 0));
             try {
