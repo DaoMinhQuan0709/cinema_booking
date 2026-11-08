@@ -135,8 +135,12 @@ export const useAuthStore = create((set) => ({
 
 // Lang nghe su kien phien het han tu axiosInstance (khi refresh token that bai)
 if (typeof window !== 'undefined') {
-  window.addEventListener('premier_cinema:auth-expired', () => {
+  const handleAuthExpired = () => {
     useAuthStore.getState().logout({ silent: true });
+  };
+  window.addEventListener('premier_cinema:auth-expired', handleAuthExpired);
+  import.meta.hot?.dispose(() => {
+    window.removeEventListener('premier_cinema:auth-expired', handleAuthExpired);
   });
 }
 

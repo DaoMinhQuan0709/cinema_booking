@@ -2,6 +2,7 @@ package com.cinema.booking.controller;
 
 import com.cinema.booking.dto.response.ApiResponse;
 import com.cinema.booking.dto.response.GalaxySyncResponse;
+import com.cinema.booking.dto.response.GalaxySyncStatusResponse;
 import com.cinema.booking.service.GalaxySyncService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,14 +16,19 @@ public class AdminDataSyncController {
     private final GalaxySyncService galaxySyncService;
 
     /**
-     * Cach 1: Dong bo Online tu Galaxy Cinema API (Truyen clientId tu browser Network tab).
+     * Online sync. 0 imports the complete snapshot; clientId defaults to server configuration.
      */
     @PostMapping("/galaxy")
     public ResponseEntity<ApiResponse<GalaxySyncResponse>> syncGalaxy(
             @RequestParam(required = false) String clientId,
-            @RequestParam(defaultValue = "100") int limitShowtimes) {
+            @RequestParam(defaultValue = "0") int limitShowtimes) {
         GalaxySyncResponse response = galaxySyncService.syncGalaxyData(clientId, limitShowtimes);
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/galaxy/status")
+    public ResponseEntity<ApiResponse<GalaxySyncStatusResponse>> getGalaxySyncStatus() {
+        return ResponseEntity.ok(ApiResponse.success(galaxySyncService.getStatus()));
     }
 
     /**

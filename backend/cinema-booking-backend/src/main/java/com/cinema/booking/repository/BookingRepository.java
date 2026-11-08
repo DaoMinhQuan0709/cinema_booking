@@ -3,6 +3,7 @@ package com.cinema.booking.repository;
 import com.cinema.booking.entity.Booking;
 import com.cinema.booking.enums.BookingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,6 +17,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     Optional<Booking> findByBookingCode(String bookingCode);
 
+    boolean existsByShowtimeId(Long showtimeId);
+
+    @EntityGraph(attributePaths = {"showtime.movie", "showtime.auditorium.cinema"})
     List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     /**

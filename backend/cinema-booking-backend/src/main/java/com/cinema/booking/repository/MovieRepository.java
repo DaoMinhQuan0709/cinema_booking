@@ -2,8 +2,6 @@ package com.cinema.booking.repository;
 
 import com.cinema.booking.entity.Movie;
 import com.cinema.booking.enums.MovieStatus;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -16,4 +14,8 @@ public interface MovieRepository extends JpaRepository<Movie, Long>, JpaSpecific
     List<Movie> findByStatus(MovieStatus status);
 
     java.util.Optional<Movie> findByTitle(String title);
+
+    java.util.Optional<Movie> findByGalaxyMovieId(String galaxyMovieId);
+
+    List<Movie> findByGalaxyMovieIdIsNotNull();
 }

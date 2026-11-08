@@ -8,6 +8,16 @@ spring:
   profiles:
     active: dev
 
+application:
+  galaxy:
+    enabled: ${GALAXY_SYNC_ENABLED:true}
+    interval-ms: ${GALAXY_SYNC_INTERVAL_MS:300000}
+    initial-delay-ms: ${GALAXY_SYNC_INITIAL_DELAY_MS:10000}
+    base-url: ${GALAXY_API_BASE_URL:https://www.galaxycine.vn}
+    client-id: ${GALAXY_CLIENT_ID:}
+    connect-timeout-ms: 10000
+    read-timeout-ms: 30000
+
 ---
 # Development profile
 spring:
@@ -30,7 +40,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: ${SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: true

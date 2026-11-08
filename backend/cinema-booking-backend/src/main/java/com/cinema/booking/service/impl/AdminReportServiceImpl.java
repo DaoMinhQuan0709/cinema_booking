@@ -20,6 +20,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -85,13 +87,22 @@ public class AdminReportServiceImpl implements AdminReportService {
 
         List<Showtime> showtimes = showtimeRepository.findShowtimes(movieId, cinemaId, startOfDay, endOfDay);
 
+        Map<Long, Object[]> seatCounts = new HashMap<>();
+        if (!showtimes.isEmpty()) {
+            List<Long> showtimeIds = showtimes.stream().map(Showtime::getId).toList();
+            for (Object[] row : showtimeSeatRepository.countSeatsByShowtimeIds(showtimeIds, ShowtimeSeatStatus.BOOKED)) {
+                seatCounts.put(((Number) row[0]).longValue(), row);
+            }
+        }
+
         long grandTotalSeats = 0;
         long grandTotalBooked = 0;
         List<OccupancyReportResponse.OccupancyItem> breakdown = new ArrayList<>();
 
         for (Showtime st : showtimes) {
-            long totalSeats = showtimeSeatRepository.countTotalSeatsByShowtimeId(st.getId());
-            long bookedSeats = showtimeSeatRepository.countSeatsByShowtimeIdAndStatus(st.getId(), ShowtimeSeatStatus.BOOKED);
+            Object[] counts = seatCounts.get(st.getId());
+            long totalSeats = counts == null ? 0 : ((Number) counts[1]).longValue();
+            long bookedSeats = counts == null ? 0 : ((Number) counts[2]).longValue();
 
             grandTotalSeats += totalSeats;
             grandTotalBooked += bookedSeats;

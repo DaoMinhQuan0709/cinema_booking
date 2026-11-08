@@ -10,6 +10,14 @@ export const movieKeys = {
     detail: (id) => [...movieKeys.all, 'detail', String(id)],
 };
 
+function useMovieList(queryParams) {
+    return useQuery({
+        queryKey: movieKeys.list(queryParams),
+        queryFn: () => movieService.getMovies(queryParams),
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
 /**
  * Danh sach phim DANG CHIEU (Trang chu - Tab "Phim Dang Chieu").
  * Mac dinh sap xep theo ngay khoi chieu moi nhat truoc.
@@ -18,11 +26,7 @@ export const movieKeys = {
 export function useNowShowingMovies(params = {}) {
     const queryParams = { status: 'NOW_SHOWING', size: 12, sort: 'releaseDate,desc', ...params };
 
-    return useQuery({
-        queryKey: movieKeys.list(queryParams),
-        queryFn: () => movieService.getMovies(queryParams),
-        staleTime: 5 * 60 * 1000, // 5 phut - phim dang chieu khong doi lien tuc
-    });
+    return useMovieList(queryParams);
 }
 
 /**
@@ -33,11 +37,7 @@ export function useNowShowingMovies(params = {}) {
 export function useComingSoonMovies(params = {}) {
     const queryParams = { status: 'COMING_SOON', size: 12, sort: 'releaseDate,asc', ...params };
 
-    return useQuery({
-        queryKey: movieKeys.list(queryParams),
-        queryFn: () => movieService.getMovies(queryParams),
-        staleTime: 5 * 60 * 1000,
-    });
+    return useMovieList(queryParams);
 }
 
 /**

@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Cinema Backend (Galaxy Sync)",
+            "request": "launch",
+            "mainClass": "com.cinema.booking.CinemaBookingBackendApplication",
+            "projectName": "cinema-booking-backend",
+            "cwd": "${workspaceFolder}/backend/cinema-booking-backend",
+            "console": "integratedTerminal",
+            "vmArgs": "-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8",
+            "env": {
+                "GALAXY_SYNC_ENABLED": "true",
+                "GALAXY_SYNC_INTERVAL_MS": "300000",
+                "GALAXY_CLIENT_ID": "3da4eba4-94dd-4e74-bc25-38e89a01fe07"
+            }
+        }
+    ]
+}

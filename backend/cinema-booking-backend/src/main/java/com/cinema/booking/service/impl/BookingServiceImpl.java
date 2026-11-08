@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -67,11 +68,15 @@ public class BookingServiceImpl implements BookingService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
 
-        Showtime showtime = showtimeRepository.findById(request.getShowtimeId())
+        Showtime showtime = showtimeRepository.findByIdForBooking(request.getShowtimeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay suat chieu voi ID: " + request.getShowtimeId()));
 
+        if (!showtime.isActive()) {
+            throw new BadRequestException("Suất chiếu không còn được mở bán. Vui lòng chọn suất chiếu khác.");
+        }
+
         // Kiem tra suat chieu da qua gio chua
-        if (showtime.getStartTime().isBefore(LocalDateTime.now())) {
+        if (!showtime.getStartTime().isAfter(LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")))) {
             throw new BadRequestException("Suat chieu da bat dau hoac da ket thuc, khong the dat ve");
         }
 

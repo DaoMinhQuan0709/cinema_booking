@@ -16,4 +16,6 @@ public interface CinemaRepository extends JpaRepository<Cinema, Long> {
     List<Cinema> findByCityIgnoreCaseWithAuditoriums(@Param("city") String city);
 
     java.util.Optional<Cinema> findByName(String name);
+
+    java.util.Optional<Cinema> findByGalaxyCinemaId(String galaxyCinemaId);
 }

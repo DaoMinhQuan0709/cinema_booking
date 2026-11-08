@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -21,8 +22,7 @@ import java.util.Set;
  * Cac thao tac:
  * - lockSeats: Lock nguyen tu danh sach ghe, rollback neu co ghe bi trung
  * - unlockSeats: Nha ghe khi huy don hoac het han
- * - unlockSeat: Nha 1 ghe cu the
- * - isLocked: Kiem tra ghe co dang bi lock
+ * - getLockedSeatIds: Read only the requested seats in one Redis command
  */
 @Service
 @RequiredArgsConstructor
@@ -80,50 +80,27 @@ public class SeatLockService {
      * @param seatIds    Danh sach ShowtimeSeat IDs
      */
     public void unlockSeats(Long showtimeId, List<Long> seatIds) {
-        for (Long seatId : seatIds) {
-            String key = buildKey(showtimeId, seatId);
-            Boolean deleted = redisTemplate.delete(key);
-            if (Boolean.TRUE.equals(deleted)) {
-                log.debug("Redis UNLOCK: key={}", key);
-            }
-        }
+        if (seatIds.isEmpty()) return;
+        List<String> keys = seatIds.stream().map(seatId -> buildKey(showtimeId, seatId)).toList();
+        redisTemplate.delete(keys);
         log.info("Redis UNLOCK {} ghe cho showtimeId={}", seatIds.size(), showtimeId);
     }
 
-    /**
-     * Nha lock 1 ghe cu the.
-     */
-    public void unlockSeat(Long showtimeId, Long seatId) {
-        String key = buildKey(showtimeId, seatId);
-        redisTemplate.delete(key);
-        log.debug("Redis UNLOCK single: key={}", key);
-    }
-
-    /**
-     * Kiem tra ghe co dang bi lock tren Redis.
-     */
-    public boolean isLocked(Long showtimeId, Long seatId) {
-        String key = buildKey(showtimeId, seatId);
-        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
-    }
-
-    /**
-     * Lay userId dang giu ghe (null neu chua bi lock).
-     */
-    public String getLockedByUserId(Long showtimeId, Long seatId) {
-        String key = buildKey(showtimeId, seatId);
-        return redisTemplate.opsForValue().get(key);
-    }
-
-    /**
-     * Xoa tat ca key lock cua mot suat chieu (dung khi cleanup).
-     */
-    public void unlockAllForShowtime(Long showtimeId) {
-        String pattern = KEY_PREFIX + showtimeId + ":*";
-        Set<String> keys = redisTemplate.keys(pattern);
-        if (keys != null && !keys.isEmpty()) {
-            redisTemplate.delete(keys);
-            log.info("Redis UNLOCK ALL {} keys for showtimeId={}", keys.size(), showtimeId);
+    /** Reads known seat keys with MGET instead of scanning the entire Redis keyspace. */
+    public Set<Long> getLockedSeatIds(Long showtimeId, List<Long> seatIds) {
+        if (seatIds.isEmpty()) return Set.of();
+        List<String> keys = seatIds.stream().map(seatId -> buildKey(showtimeId, seatId)).toList();
+        try {
+            List<String> owners = redisTemplate.opsForValue().multiGet(keys);
+            if (owners == null) return Set.of();
+            Set<Long> locked = new HashSet<>();
+            for (int index = 0; index < owners.size(); index++) {
+                if (owners.get(index) != null) locked.add(seatIds.get(index));
+            }
+            return locked;
+        } catch (RuntimeException ex) {
+            log.warn("Cannot read Redis seat holds for showtimeId={}: {}", showtimeId, ex.getMessage());
+            return Set.of();
         }
     }
 

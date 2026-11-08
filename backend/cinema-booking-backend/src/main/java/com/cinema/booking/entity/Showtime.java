@@ -22,6 +22,14 @@ public class Showtime {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "galaxy_session_id", unique = true, length = 100)
+    private String galaxySessionId;
+
+    // Soft withdrawal preserves bookings and their seat references.
+    @Column(name = "is_active", nullable = false, columnDefinition = "boolean default true")
+    @Builder.Default
+    private boolean active = true;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "movie_id", nullable = false)
     private Movie movie;

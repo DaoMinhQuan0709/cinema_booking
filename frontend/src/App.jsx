@@ -21,7 +21,9 @@ const queryClient = new QueryClient({
  * Sap chieu, du lieu that tu GET /movies).
  */
 const HomePage = () => {
-  const { openAuthModal, isAuthenticated, user } = useAuthStore();
+  const openAuthModal = useAuthStore((state) => state.openAuthModal);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
 
   return (
     <div className="flex-1 flex flex-col">

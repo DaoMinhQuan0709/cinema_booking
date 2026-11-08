@@ -13,19 +13,18 @@ import com.cinema.booking.exception.ResourceNotFoundException;
 import com.cinema.booking.repository.AuditoriumRepository;
 import com.cinema.booking.repository.MovieRepository;
 import com.cinema.booking.repository.ShowtimeRepository;
-import com.cinema.booking.repository.ShowtimeSeatRepository;
 import com.cinema.booking.service.ShowtimeService;
+import com.cinema.booking.service.LocalSeatInventoryService;
+import com.cinema.booking.service.SeatLockService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Collections;
-import java.util.HashSet;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,10 +35,10 @@ import java.util.stream.Collectors;
 public class ShowtimeServiceImpl implements ShowtimeService {
 
     private final ShowtimeRepository showtimeRepository;
-    private final ShowtimeSeatRepository showtimeSeatRepository;
     private final MovieRepository movieRepository;
     private final AuditoriumRepository auditoriumRepository;
-    private final StringRedisTemplate redisTemplate;
+    private final SeatLockService seatLockService;
+    private final LocalSeatInventoryService localSeatInventoryService;
 
     @Override
     @Transactional(readOnly = true)
@@ -51,6 +50,9 @@ public class ShowtimeServiceImpl implements ShowtimeService {
             endOfDay = date.atTime(LocalTime.MAX);
         }
 
+        // Galaxy showDate/showTime are local cinema times in Vietnam, even on a UTC host.
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        startOfDay = startOfDay == null || startOfDay.isBefore(now) ? now : startOfDay;
         List<Showtime> showtimes = showtimeRepository.findShowtimes(movieId, cinemaId, startOfDay, endOfDay);
         return showtimes.stream().map(this::mapToShowtimeResponse).collect(Collectors.toList());
     }
@@ -64,15 +66,17 @@ public class ShowtimeServiceImpl implements ShowtimeService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ShowtimeSeatsMapResponse getShowtimeSeats(Long showtimeId) {
+        List<ShowtimeSeat> showtimeSeats = localSeatInventoryService.getOrCreateSeats(showtimeId);
         Showtime showtime = showtimeRepository.findByIdWithDetails(showtimeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy suất chiếu với ID: " + showtimeId));
 
-        List<ShowtimeSeat> showtimeSeats = showtimeSeatRepository.findByShowtimeIdWithSeat(showtimeId);
-
-        // Quét các key Redis giữ chỗ 10 phút: pattern seat_lock:{showtimeId}:*
-        Set<Long> lockedSeatIdsOnRedis = getLockedSeatIdsFromRedis(showtimeId);
+        List<Long> availableSeatIds = showtimeSeats.stream()
+                .filter(seat -> seat.getStatus() == ShowtimeSeatStatus.AVAILABLE)
+                .map(ShowtimeSeat::getId)
+                .toList();
+        Set<Long> lockedSeatIdsOnRedis = seatLockService.getLockedSeatIds(showtimeId, availableSeatIds);
 
         List<ShowtimeSeatResponse> seatResponses = showtimeSeats.stream().map(ss -> {
             ShowtimeSeatStatus effectiveStatus = ss.getStatus();
@@ -125,30 +129,6 @@ public class ShowtimeServiceImpl implements ShowtimeService {
         Showtime savedShowtime = showtimeRepository.save(showtime);
         log.info("Created new showtime with ID: {}", savedShowtime.getId());
         return mapToShowtimeResponse(savedShowtime);
-    }
-
-    private Set<Long> getLockedSeatIdsFromRedis(Long showtimeId) {
-        try {
-            String pattern = "seat_lock:" + showtimeId + ":*";
-            Set<String> keys = redisTemplate.keys(pattern);
-            if (keys == null || keys.isEmpty()) {
-                return Collections.emptySet();
-            }
-
-            Set<Long> seatIds = new HashSet<>();
-            for (String key : keys) {
-                String[] parts = key.split(":");
-                if (parts.length >= 3) {
-                    try {
-                        seatIds.add(Long.parseLong(parts[2]));
-                    } catch (NumberFormatException ignored) {}
-                }
-            }
-            return seatIds;
-        } catch (Exception e) {
-            log.warn("Lỗi khi quét Redis keys giữ chỗ cho showtimeId {}: {}", showtimeId, e.getMessage());
-            return Collections.emptySet();
-        }
     }
 
     private ShowtimeResponse mapToShowtimeResponse(Showtime showtime) {

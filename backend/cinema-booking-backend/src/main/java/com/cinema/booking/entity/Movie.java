@@ -24,6 +24,9 @@ public class Movie {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "galaxy_movie_id", unique = true, length = 100)
+    private String galaxyMovieId;
+
     @Column(nullable = false, length = 255)
     private String title;
 

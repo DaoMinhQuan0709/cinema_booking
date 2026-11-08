@@ -1,16 +1,45 @@
-# React + Vite
+# PremierCinema frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React, Vite và Tailwind CSS. Trạng thái xác thực dùng Zustand, dữ liệu phim dùng
+TanStack Query, REST dùng Axios và cập nhật ghế dùng STOMP/SockJS.
 
-Currently, two official plugins are available:
+## Chạy tại máy phát triển
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Từ thư mục `frontend`, cài dependency bằng `npm ci`, sao chép `.env.example`
+thành `.env` nếu cần tùy chỉnh URL, rồi chạy `npm run dev`.
+Backend mặc định phục vụ REST tại `http://localhost:8080/api/v1` và WebSocket
+tại `http://localhost:8080/ws`. Trên PowerShell chặn `npm.ps1`, dùng `npm.cmd`.
 
-## React Compiler
+```powershell
+npm.cmd ci
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+npm.cmd run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Chỉ sao chép file môi trường khi chưa có cấu hình riêng. Không đưa khóa bí mật
+vào biến `VITE_*` vì các giá trị này được đưa vào mã JavaScript gửi đến trình duyệt.
 
-## Expanding the ESLint configuration
+## Kiểm tra
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```powershell
+npm.cmd run lint
+npm.cmd run build
+npm.cmd run preview
+```
+
+`build` xuất bản dựng vào `dist/`; `preview` xem bản dựng đó tại máy phát triển.
+
+## Cấu trúc
+
+- `src/features/auth`: đăng nhập, đăng ký, modal và auth store.
+- `src/features/movies`: thẻ phim, danh sách và query hooks.
+- `src/services`: các lời gọi API theo module.
+- `src/config`: Axios, lưu token, cấu hình và kết nối WebSocket.
+- `src/layouts`, `src/components/common`: khung trang, header và footer.
+
+Hiện trang chủ hiển thị phim thật từ backend và có modal xác thực. Các route
+lịch chiếu, cụm rạp và lịch sử vé vẫn là trang chờ triển khai. Mã kết nối booking,
+payment, admin và chatbot được giữ để phục vụ các bước frontend tiếp theo.
+
+Xem [hướng dẫn backend/Galaxy](../backend/cinema-booking-backend/GALAXY_SYNC.md)
+để khởi động backend và hiểu ranh giới giữa catalog Galaxy và kho ghế nội bộ.

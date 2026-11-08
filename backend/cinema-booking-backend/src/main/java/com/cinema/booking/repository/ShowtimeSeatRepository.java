@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -58,4 +59,9 @@ public interface ShowtimeSeatRepository extends JpaRepository<ShowtimeSeat, Long
 
     @Query("SELECT COUNT(ss) FROM ShowtimeSeat ss WHERE ss.showtime.id = :showtimeId AND ss.status = :status")
     long countSeatsByShowtimeIdAndStatus(@Param("showtimeId") Long showtimeId, @Param("status") ShowtimeSeatStatus status);
+
+    @Query("SELECT ss.showtime.id, COUNT(ss), SUM(CASE WHEN ss.status = :status THEN 1 ELSE 0 END) " +
+           "FROM ShowtimeSeat ss WHERE ss.showtime.id IN :showtimeIds GROUP BY ss.showtime.id")
+    List<Object[]> countSeatsByShowtimeIds(@Param("showtimeIds") Collection<Long> showtimeIds,
+                                         @Param("status") ShowtimeSeatStatus status);
 }

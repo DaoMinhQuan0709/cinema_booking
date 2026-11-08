@@ -20,7 +20,6 @@ public class SchedulerConfig {
         scheduler.setThreadNamePrefix("cinema-scheduler-");
         scheduler.setWaitForTasksToCompleteOnShutdown(true);
         scheduler.setAwaitTerminationSeconds(30);
-        scheduler.initialize();
         return scheduler;
     }
 }
