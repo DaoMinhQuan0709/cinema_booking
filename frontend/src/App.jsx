@@ -6,6 +6,7 @@ import { Film, Sparkles, Ticket } from 'lucide-react';
 import MainLayout from './layouts/MainLayout';
 import { useAuthStore } from './features/auth/authStore';
 import { MovieShowcase } from './features/movies/MovieShowcase';
+import { MovieDetail } from './features/movies/MovieDetail';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -21,9 +22,7 @@ const queryClient = new QueryClient({
  * Sap chieu, du lieu that tu GET /movies).
  */
 const HomePage = () => {
-  const openAuthModal = useAuthStore((state) => state.openAuthModal);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const user = useAuthStore((state) => state.user);
+  const { openAuthModal, isAuthenticated, user } = useAuthStore();
 
   return (
     <div className="flex-1 flex flex-col">
@@ -97,6 +96,7 @@ export const App = () => {
           <Route path="/" element={<MainLayout />}>
             <Route index element={<HomePage />} />
             <Route path="movies" element={<PlaceholderPage title="Danh sách Phim Đang Chiếu & Sắp Chiếu" />} />
+            <Route path="movies/:id" element={<MovieDetail />} />
             <Route path="showtimes" element={<PlaceholderPage title="Lịch Chiếu Toàn Quốc" />} />
             <Route path="cinemas" element={<PlaceholderPage title="Hệ Thống Cụm Rạp & Bảng Giá Vé" />} />
             <Route path="profile/bookings" element={<PlaceholderPage title="Lịch Sử Vé Đã Đặt Của Bạn" />} />
