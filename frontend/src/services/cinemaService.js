@@ -9,10 +9,11 @@ export const cinemaService = {
   /**
    * @param {Object} [params]
    * @param {string} [params.city]
+   * @param {Object} [options] Axios options (skipErrorToast)
    * @returns {Promise<object[]>}
    */
-  getCinemas: async (params = {}) => {
-    const { data } = await axiosInstance.get('/cinemas', { params });
+  getCinemas: async (params = {}, options = {}) => {
+    const { data } = await axiosInstance.get('/cinemas', { ...options, params });
     return data;
   },
 

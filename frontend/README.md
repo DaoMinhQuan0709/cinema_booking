@@ -35,6 +35,8 @@ npm.cmd run preview
 - `src/features/auth`: đăng nhập, đăng ký, modal và auth store.
 - `src/features/movies`: thẻ phim, danh sách, trang chi tiết, trailer, bộ chọn
   lịch chiếu theo ngày/thành phố/rạp và query hooks.
+- `src/features/showtimes`: trang lịch chiếu toàn bộ phim, bộ lọc và nhóm suất
+  theo phim/rạp, xử lý ngày giờ Việt Nam và query lịch theo ngày.
 - `src/services`: các lời gọi API theo module.
 - `src/config`: Axios, lưu token, cấu hình và kết nối WebSocket.
 - `src/layouts`, `src/components/common`: khung trang, header và footer.
@@ -70,8 +72,24 @@ khóa cả cặp; không ghép qua lối đi. Giữ các ID hiện có để b�
 `showtimeId` là ID số nội bộ từ `GET /api/v1/showtimes`, không phải ID Galaxy như
 `1011-226432`. Vào trang chi tiết phim và bấm giờ chiếu để nhận đúng liên kết.
 URL sai/thiếu ID được báo ngay, không gọi API; backend trả 400 cho tham số sai
-kiểu. Route lịch chiếu toàn quốc,
-cụm rạp và lịch sử vé vẫn là trang chờ triển khai. Mã kết nối booking,
+kiểu.
+
+Trang `/showtimes` hiển thị tất cả phim có suất mở bán trong ngày, chia thành
+từng phim → rạp → giờ chiếu. Thanh ngày gồm hôm nay và 6 ngày tiếp theo, tính
+theo giờ Việt Nam kể cả khi trình duyệt ở múi giờ khác. Bộ lọc thành phố/rạp/phim
+lưu trong URL (`date`, `city`, `cinemaId`, `movieId`) để Back/Forward và quay lại
+từ trang chọn ghế giữ được ngữ cảnh. Poster/tên phim mở chi tiết; giờ chiếu mở
+`/booking/:showtimeId` với ID nội bộ.
+
+Mỗi ngày chỉ gọi `GET /showtimes?date=YYYY-MM-DD`; không tải riêng từng phim
+hoặc sơ đồ ghế. Dữ liệu được cache/làm mới mỗi phút khi trang đang hoạt động,
+loại các suất đã bắt đầu; độ mới nguồn vẫn phụ thuộc chu kỳ đồng bộ backend.
+Phim sắp chiếu có suất bán trước cũng xuất hiện. Bộ lọc không hợp lệ chỉ tự
+reset sau phản hồi thành công; lỗi API rạp chỉ tạm vô hiệu hóa bộ lọc thành phố,
+không ngăn xem lịch. Có skeleton, trạng thái không có suất, retry và giữ dữ liệu
+cũ nếu làm mới thất bại. Route được lazy-load như các trang phim/chọn ghế.
+
+Route cụm rạp và lịch sử vé vẫn là trang chờ triển khai. Mã kết nối booking,
 payment, admin và chatbot được giữ để phục vụ các bước frontend tiếp theo.
 
 Xem [hướng dẫn backend/Galaxy](../backend/cinema-booking-backend/GALAXY_SYNC.md)

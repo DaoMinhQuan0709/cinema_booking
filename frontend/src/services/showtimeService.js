@@ -14,10 +14,11 @@ export const showtimeService = {
    * @param {number|string} [params.movieId]
    * @param {number|string} [params.cinemaId]
    * @param {string} [params.date] dinh dang YYYY-MM-DD (gio dia phuong)
+   * @param {Object} [options] Axios options (signal, skipErrorToast)
    * @returns {Promise<object[]>}
    */
-  getShowtimes: async (params = {}) => {
-    const { data } = await axiosInstance.get('/showtimes', { params });
+  getShowtimes: async (params = {}, options = {}) => {
+    const { data } = await axiosInstance.get('/showtimes', { ...options, params });
     return data;
   },
 

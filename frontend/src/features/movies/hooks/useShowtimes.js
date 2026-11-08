@@ -32,10 +32,10 @@ export function useShowtimes({ movieId, date, cinemaId } = {}) {
  * Toan bo cum rap (dung de tra cuu thanh pho cua tung rap, vi ShowtimeResponse
  * khong tra ve city). Du lieu it thay doi nen cache 30 phut.
  */
-export function useCinemas(params = {}) {
+export function useCinemas(params = {}, requestOptions = {}) {
   return useQuery({
     queryKey: cinemaKeys.list(params),
-    queryFn: () => cinemaService.getCinemas(params),
+    queryFn: () => cinemaService.getCinemas(params, requestOptions),
     staleTime: 30 * 60 * 1000,
   });
 }

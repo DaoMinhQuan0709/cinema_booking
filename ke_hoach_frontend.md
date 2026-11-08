@@ -143,6 +143,20 @@ frontend/
     *   Lọc theo Cụm rạp / Thành phố (TP.HCM, Hà Nội, Đà Nẵng...).
     *   Danh sách khung giờ chiếu (VD: `14:30`, `18:00`, `20:30` - kèm nhãn phòng 2D Phụ đề / IMAX). Nhấp vào giờ chiếu chuyển hướng ngay tới trang chọn ghế.
 
+### 2.1. Trang Lịch Chiếu (`/showtimes`) — đã triển khai
+
+*   Xem tất cả phim có suất mở bán trong ngày, kể cả phim sắp chiếu đang bán trước.
+*   Chọn hôm nay và 6 ngày tiếp theo theo giờ Việt Nam; lọc thành phố, rạp và phim.
+*   Gom theo phim → rạp → giờ, có poster, liên kết chi tiết và giá cơ bản từng suất.
+*   Lưu ngày/bộ lọc trong URL; Back/Forward và quay lại từ booking giữ lựa chọn.
+*   Mỗi ngày chỉ tải `GET /showtimes?date=YYYY-MM-DD`, tra thành phố qua `/cinemas`;
+    cache/làm mới một phút, loại suất đã bắt đầu và hủy request ngày không còn xem.
+*   Có skeleton, không có suất, lỗi/retry; API rạp lỗi không ngăn chọn suất.
+*   Chỉ đọc catalog, không gọi API sơ đồ ghế khi xem lịch; giờ chiếu dẫn đến
+    `/booking/:showtimeId` bằng ID số nội bộ. Hỗ trợ desktop/mobile và lazy-load.
+
+Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-design.md`.
+
 ### 3. Trang Chọn Ghế & Giữ Ghế Thời Gian Thực (`/booking/:showtimeId`) - **TRỌNG TÂM KỸ THUẬT**
 
 > Tiến độ phần dựng sơ đồ: đã có SVG màn hình, ma trận uốn cong, màu/trạng thái,
