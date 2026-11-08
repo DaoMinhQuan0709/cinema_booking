@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +20,16 @@ import java.util.Map;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Object>> handleArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String message = "Tham số '" + ex.getName() + "' không hợp lệ.";
+        if (ex.getRequiredType() == Long.class) {
+            message = "Tham số '" + ex.getName() + "' phải là ID số nguyên của hệ thống.";
+        }
+        log.warn("Invalid request parameter: {}", ex.getName());
+        return ResponseEntity.badRequest().body(ApiResponse.error(400, message));
+    }
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Object>> handleAppException(AppException ex) {

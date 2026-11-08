@@ -55,8 +55,22 @@ fallback. Trailer YouTube chỉ nhúng khi bấm; modal hỗ trợ Escape và tr
 nút mở. Phần chọn suất chiếu tiếp tục dẫn đến `/booking/:showtimeId`.
 
 Trang chủ, danh sách và trang chi tiết hiển thị dữ liệu thật từ backend, có modal xác thực
-và chọn suất chiếu. Route `/booking/:showtimeId` hiện là trang chờ; kiểm tra đăng
-nhập sẽ được triển khai cùng màn hình chọn ghế. Các route lịch chiếu toàn quốc,
+và chọn suất chiếu. Route `/booking/:showtimeId` có màn hình SVG và ma trận ghế
+uốn cong, chú thích loại/trạng thái, chọn tối đa 8 ghế, bỏ chọn và tạm tính.
+Màn hình/ma trận cuộn cùng nhau trên điện thoại và giữ đúng vị trí lối đi.
+Ghế BOOKED/LOCKED không chọn được; ghế đổi sang không khả dụng khi tải lại sẽ
+bị bỏ khỏi lựa chọn. Đổi suất cũng đặt lại lựa chọn. Đây là phần chọn trên giao
+diện; WebSocket, đăng nhập khi giữ ghế và `POST /bookings` triển khai ở phần sau.
+
+Hai vị trí COUPLE liền kề theo cặp 1–2, 3–4... hiển thị thành một ghế đôi rộng
+hai ô. Bấm chọn/bỏ chọn tác động cả hai ID, tính là 2 chỗ trong giới hạn 8 và
+cộng giá của hai vị trí từ API. Một bên đã bán/đang giữ hoặc thiếu một bên sẽ
+khóa cả cặp; không ghép qua lối đi. Giữ các ID hiện có để bảo toàn dữ liệu ghế.
+
+`showtimeId` là ID số nội bộ từ `GET /api/v1/showtimes`, không phải ID Galaxy như
+`1011-226432`. Vào trang chi tiết phim và bấm giờ chiếu để nhận đúng liên kết.
+URL sai/thiếu ID được báo ngay, không gọi API; backend trả 400 cho tham số sai
+kiểu. Route lịch chiếu toàn quốc,
 cụm rạp và lịch sử vé vẫn là trang chờ triển khai. Mã kết nối booking,
 payment, admin và chatbot được giữ để phục vụ các bước frontend tiếp theo.
 

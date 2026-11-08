@@ -9,6 +9,7 @@ import { MovieShowcase } from './features/movies/MovieShowcase';
 
 const MovieDetail = lazy(() => import('./features/movies/MovieDetail'));
 const MovieCatalog = lazy(() => import('./features/movies/MovieCatalog'));
+const SeatSelectionPage = lazy(() => import('./features/booking/SeatSelectionPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -101,7 +102,8 @@ export const App = () => {
             <Route index element={<HomePage />} />
             <Route path="movies" element={<MovieCatalog />} />
             <Route path="movies/:id" element={<MovieDetail />} />
-            <Route path="booking/:showtimeId" element={<PlaceholderPage title="Chọn Ghế & Giữ Chỗ Thời Gian Thực" />} />
+            <Route path="booking/:showtimeId" element={<SeatSelectionPage />} />
+            <Route path="booking" element={<SeatSelectionPage />} />
             <Route path="showtimes" element={<PlaceholderPage title="Lịch Chiếu Toàn Quốc" />} />
             <Route path="cinemas" element={<PlaceholderPage title="Hệ Thống Cụm Rạp & Bảng Giá Vé" />} />
             <Route path="profile/bookings" element={<PlaceholderPage title="Lịch Sử Vé Đã Đặt Của Bạn" />} />

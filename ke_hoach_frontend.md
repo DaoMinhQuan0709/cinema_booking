@@ -144,6 +144,14 @@ frontend/
     *   Danh sách khung giờ chiếu (VD: `14:30`, `18:00`, `20:30` - kèm nhãn phòng 2D Phụ đề / IMAX). Nhấp vào giờ chiếu chuyển hướng ngay tới trang chọn ghế.
 
 ### 3. Trang Chọn Ghế & Giữ Ghế Thời Gian Thực (`/booking/:showtimeId`) - **TRỌNG TÂM KỸ THUẬT**
+
+> Tiến độ phần dựng sơ đồ: đã có SVG màn hình, ma trận uốn cong, màu/trạng thái,
+> chọn tối đa 8 ghế, bỏ chọn và tạm tính; hỗ trợ cuộn ngang trên điện thoại.
+> Ghế đôi ghép hai vị trí liền kề thành khối rộng 2 ô, chọn/bỏ chọn cùng nhau
+> và tính là 2 chỗ trong giới hạn 8; một bên không khả dụng sẽ khóa cả cặp.
+> Route dùng `showtimes.id` nội bộ dạng số. Phần giữ ghế/WebSocket/đếm ngược
+> trong các mục bên dưới là công việc tiếp theo.
+
 *   **Màn hình chiếu cong (Curved Screen):** Đồ họa SVG vòm cong với dòng chữ sáng *"MÀN HÌNH"*.
 *   **Ma trận ghế (Seat Matrix):**
     *   Render theo hàng A, B, C... và số ghế 1, 2, 3...

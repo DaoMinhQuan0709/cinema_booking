@@ -7,7 +7,6 @@ import axiosInstance from '../config/axiosInstance';
  * cinemaId, cinemaName, auditoriumId, auditoriumName, startTime, endTime, basePrice }
  *
  * Luu y: backend tu loai bo cac suat da bat dau (chi tra suat con mo ban).
- * Ham getShowtimeSeats (GET /showtimes/{id}/seats) se them o buoc Man hinh chon ghe.
  */
 export const showtimeService = {
   /**
@@ -28,6 +27,18 @@ export const showtimeService = {
    */
   getShowtimeById: async (id) => {
     const { data } = await axiosInstance.get(`/showtimes/${id}`);
+    return data;
+  },
+
+  /**
+   * So do ghe + trang thai ghe cua 1 suat chieu (da gop trang thai giu cho tu Redis).
+   * Khop ShowtimeSeatsMapResponse: { showtimeId, auditoriumId, auditoriumName,
+   * totalRows, totalCols, seats: [{ showtimeSeatId, seatId, rowChar, seatNumber,
+   * seatType, price, status }] }
+   * @param {number|string} id
+   */
+  getShowtimeSeats: async (id) => {
+    const { data } = await axiosInstance.get(`/showtimes/${id}/seats`);
     return data;
   },
 };
