@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import { useNowShowingMovies, useComingSoonMovies } from './hooks/useMovies';
 import { MovieList } from './MovieList';
 
@@ -59,14 +61,26 @@ export const MovieShowcase = () => {
         </button>
       )}
       <MovieList
-        movies={current.data?.content ?? []}
+        movies={current.data?.content.slice(0, 15) ?? []}
         isLoading={current.isLoading}
+        skeletonCount={15}
         emptyMessage={
           isNowShowing
             ? 'Hiện chưa có phim đang chiếu nào được cập nhật.'
             : 'Hiện chưa có phim sắp chiếu nào được cập nhật.'
         }
       />
+      {current.data?.content.length >= 15 && (
+        <div className="mt-10 flex justify-center">
+          <Link
+            to={`/movies?status=${activeTab}`}
+            className="group inline-flex items-center gap-3 rounded-xl border border-primary px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+          >
+            Xem thêm
+            <ArrowRight aria-hidden="true" className="h-4 w-4 transition-transform group-hover:translate-x-1 motion-reduce:transition-none" />
+          </Link>
+        </div>
+      )}
     </section>
   );
 };

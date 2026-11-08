@@ -7,6 +7,7 @@ import MainLayout from './layouts/MainLayout';
 import { useAuthStore } from './features/auth/authStore';
 import { MovieShowcase } from './features/movies/MovieShowcase';
 import { MovieDetail } from './features/movies/MovieDetail';
+import { MovieCatalog } from './features/movies/MovieCatalog';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,7 +96,7 @@ export const App = () => {
           {/* MainLayout boc toan bo route khach hang */}
           <Route path="/" element={<MainLayout />}>
             <Route index element={<HomePage />} />
-            <Route path="movies" element={<PlaceholderPage title="Danh sách Phim Đang Chiếu & Sắp Chiếu" />} />
+            <Route path="movies" element={<MovieCatalog />} />
             <Route path="movies/:id" element={<MovieDetail />} />
             <Route path="booking/:showtimeId" element={<PlaceholderPage title="Chọn Ghế & Giữ Chỗ Thời Gian Thực" />} />
             <Route path="showtimes" element={<PlaceholderPage title="Lịch Chiếu Toàn Quốc" />} />

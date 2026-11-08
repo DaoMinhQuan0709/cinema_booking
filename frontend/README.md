@@ -39,7 +39,12 @@ npm.cmd run preview
 - `src/config`: Axios, lưu token, cấu hình và kết nối WebSocket.
 - `src/layouts`, `src/components/common`: khung trang, header và footer.
 
-Trang chủ và trang chi tiết hiển thị dữ liệu thật từ backend, có modal xác thực
+Trang chủ hiển thị tối đa 15 phim mỗi mục; nút “Xem thêm” mở `/movies` tại đúng
+mục đang xem. Trang `/movies` hiển thị toàn bộ phim đang chiếu/sắp chiếu, hỗ trợ
+tìm tên không dấu và sắp xếp. Trạng thái mục, tìm kiếm, sắp xếp lưu trong URL
+(`status`, `q`, `sort`) để có thể chia sẻ và dùng nút quay lại của trình duyệt.
+
+Trang chủ, danh sách và trang chi tiết hiển thị dữ liệu thật từ backend, có modal xác thực
 và chọn suất chiếu. Route `/booking/:showtimeId` hiện là trang chờ; kiểm tra đăng
 nhập sẽ được triển khai cùng màn hình chọn ghế. Các route lịch chiếu toàn quốc,
 cụm rạp và lịch sử vé vẫn là trang chờ triển khai. Mã kết nối booking,
