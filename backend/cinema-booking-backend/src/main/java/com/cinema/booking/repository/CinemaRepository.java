@@ -11,8 +11,11 @@ import java.util.List;
 @Repository
 public interface CinemaRepository extends JpaRepository<Cinema, Long> {
 
+    @Query("SELECT DISTINCT c FROM Cinema c LEFT JOIN FETCH c.auditoriums")
+    List<Cinema> findAllWithAuditoriums();
+
     @Query("SELECT DISTINCT c FROM Cinema c LEFT JOIN FETCH c.auditoriums WHERE " +
-           "(:city IS NULL OR LOWER(c.city) = LOWER(:city))")
+           "LOWER(c.city) = LOWER(:city)")
     List<Cinema> findByCityIgnoreCaseWithAuditoriums(@Param("city") String city);
 
     java.util.Optional<Cinema> findByName(String name);

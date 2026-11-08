@@ -97,6 +97,7 @@ export const App = () => {
             <Route index element={<HomePage />} />
             <Route path="movies" element={<PlaceholderPage title="Danh sách Phim Đang Chiếu & Sắp Chiếu" />} />
             <Route path="movies/:id" element={<MovieDetail />} />
+            <Route path="booking/:showtimeId" element={<PlaceholderPage title="Chọn Ghế & Giữ Chỗ Thời Gian Thực" />} />
             <Route path="showtimes" element={<PlaceholderPage title="Lịch Chiếu Toàn Quốc" />} />
             <Route path="cinemas" element={<PlaceholderPage title="Hệ Thống Cụm Rạp & Bảng Giá Vé" />} />
             <Route path="profile/bookings" element={<PlaceholderPage title="Lịch Sử Vé Đã Đặt Của Bạn" />} />

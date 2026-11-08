@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.List;
@@ -26,7 +27,9 @@ public class CinemaServiceImpl implements CinemaService {
     @Override
     @Transactional(readOnly = true)
     public List<CinemaResponse> getCinemas(String city) {
-        List<Cinema> cinemas = cinemaRepository.findByCityIgnoreCaseWithAuditoriums(city);
+        List<Cinema> cinemas = StringUtils.hasText(city)
+                ? cinemaRepository.findByCityIgnoreCaseWithAuditoriums(city.trim())
+                : cinemaRepository.findAllWithAuditoriums();
         return cinemas.stream().map(this::mapToCinemaResponse).collect(Collectors.toList());
     }
 

@@ -23,6 +23,7 @@ vào biến `VITE_*` vì các giá trị này được đưa vào mã JavaScript
 
 ```powershell
 npm.cmd run lint
+npm.cmd test
 npm.cmd run build
 npm.cmd run preview
 ```
@@ -32,13 +33,16 @@ npm.cmd run preview
 ## Cấu trúc
 
 - `src/features/auth`: đăng nhập, đăng ký, modal và auth store.
-- `src/features/movies`: thẻ phim, danh sách và query hooks.
+- `src/features/movies`: thẻ phim, danh sách, trang chi tiết, trailer, bộ chọn
+  lịch chiếu theo ngày/thành phố/rạp và query hooks.
 - `src/services`: các lời gọi API theo module.
 - `src/config`: Axios, lưu token, cấu hình và kết nối WebSocket.
 - `src/layouts`, `src/components/common`: khung trang, header và footer.
 
-Hiện trang chủ hiển thị phim thật từ backend và có modal xác thực. Các route
-lịch chiếu, cụm rạp và lịch sử vé vẫn là trang chờ triển khai. Mã kết nối booking,
+Trang chủ và trang chi tiết hiển thị dữ liệu thật từ backend, có modal xác thực
+và chọn suất chiếu. Route `/booking/:showtimeId` hiện là trang chờ; kiểm tra đăng
+nhập sẽ được triển khai cùng màn hình chọn ghế. Các route lịch chiếu toàn quốc,
+cụm rạp và lịch sử vé vẫn là trang chờ triển khai. Mã kết nối booking,
 payment, admin và chatbot được giữ để phục vụ các bước frontend tiếp theo.
 
 Xem [hướng dẫn backend/Galaxy](../backend/cinema-booking-backend/GALAXY_SYNC.md)

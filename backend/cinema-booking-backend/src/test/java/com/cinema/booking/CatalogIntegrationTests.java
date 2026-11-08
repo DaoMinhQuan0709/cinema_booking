@@ -126,6 +126,11 @@ class CatalogIntegrationTests {
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data[0].name").value("CGV Landmark 81"));
 
+        // An absent city must not bind null into PostgreSQL LOWER(...).
+        mockMvc.perform(get("/api/v1/cinemas").contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray());
+
         // Test GET /api/v1/products
         mockMvc.perform(get("/api/v1/products")
                         .contentType(MediaType.APPLICATION_JSON))

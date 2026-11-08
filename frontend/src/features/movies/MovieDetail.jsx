@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Film, Play } from 'lucide-react';
 import { useMovieDetail } from './hooks/useMovies';
 import { TrailerModal } from './TrailerModal';
+import { ShowtimeSelector } from './ShowtimeSelector';
 
 const AGE_RATING_STYLE = {
   P: 'border-emerald-500 text-emerald-400 bg-emerald-500/10',
@@ -44,7 +45,7 @@ const DetailSkeleton = () => (
 /**
  * Trang chi tiet 1 phim (/movies/:id): banner mo, poster, the loai, thoi luong,
  * ngay khoi chieu, do tuoi, mo ta va nut xem Trailer (mo TrailerModal).
- * Phan chon suat chieu se duoc noi tiep o buoc sau.
+ * Phia duoi la ShowtimeSelector (chon ngay / thanh pho / rap / gio chieu).
  */
 export const MovieDetail = () => {
   const { id } = useParams();
@@ -168,12 +169,9 @@ export const MovieDetail = () => {
           </div>
         </div>
 
-        {/* Chon suat chieu - se hoan thien o buoc sau */}
+        {/* Chon suat chieu */}
         <div className="mt-14 border-t border-surfaceBorder pt-10">
-          <h2 className="text-xl font-bold text-white sm:text-2xl">Lịch Chiếu</h2>
-          <p className="mt-2 text-sm text-muted">
-            Phần chọn ngày, rạp và suất chiếu sẽ được hoàn thiện ở bước tiếp theo.
-          </p>
+          <ShowtimeSelector movieId={movie.id} />
         </div>
       </div>
 
