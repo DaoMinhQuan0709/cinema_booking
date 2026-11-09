@@ -163,8 +163,10 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
 > chọn tối đa 8 ghế, bỏ chọn và tạm tính; hỗ trợ cuộn ngang trên điện thoại.
 > Ghế đôi ghép hai vị trí liền kề thành khối rộng 2 ô, chọn/bỏ chọn cùng nhau
 > và tính là 2 chỗ trong giới hạn 8; một bên không khả dụng sẽ khóa cả cặp.
-> Route dùng `showtimes.id` nội bộ dạng số. Phần giữ ghế/WebSocket/đếm ngược
-> trong các mục bên dưới là công việc tiếp theo.
+> Route dùng `showtimes.id` nội bộ dạng số. Đã tích hợp WebSocket STOMP và nút
+> “Tiếp tục” gọi API giữ ghế, yêu cầu đăng nhập, xử lý 409, xác nhận mã/thời hạn,
+> hủy giữ chỗ và khôi phục bằng API khi tải lại trang. Countdown, checkout và
+> thanh toán ở mục 4 là công việc tiếp theo.
 
 *   **Màn hình chiếu cong (Curved Screen):** Đồ họa SVG vòm cong với dòng chữ sáng *"MÀN HÌNH"*.
 *   **Ma trận ghế (Seat Matrix):**
@@ -178,7 +180,12 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
     *   Thông tin phim, rạp, phòng chiếu, giờ chiếu.
     *   Danh sách ghế đang chọn (VD: `VIP: F5, F6`).
     *   Tạm tính tổng tiền vé.
-    *   Nút bấm **"Tiếp Tục"**: Gọi API `POST /api/v1/bookings` để thực hiện khóa ghế 10 phút. Nếu bị trùng ghế do người khác bấm trước -> Bắt lỗi `409` và hiển thị Toast *"Ghế bạn chọn vừa có người nhanh tay hơn giữ chỗ!"*.
+    *   Nút bấm **"Tiếp Tục"**: Gọi API `POST /api/v1/bookings` để thực hiện khóa ghế 10 phút. Nếu bị trùng ghế do người khác bấm trước -> Bắt lỗi `409` và hiển thị Toast *"Ghế bạn chọn vừa có người giữ chỗ!"*.
+    *   **Đã triển khai:** nút khóa khi chưa chọn ghế/đang gửi; mở modal nếu chưa đăng nhập;
+        gửi đủ hai vị trí ghế đôi, chặn bấm lặp và không tự retry POST. Khi giữ thành công,
+        hiển thị mã đơn, hạn giữ và tổng tiền backend; phân biệt ghế “Đang giữ cho bạn”,
+        có nút hủy để chọn lại. HTTP 409 hiện toast một lần và tải lại sơ đồ. Mã đơn
+        lưu theo tài khoản/suất trong tab và được xác thực lại qua API khi tải lại trang.
 
 ### 4. Trang Chọn Bắp Nước & Thanh Toán (`/checkout/:bookingCode`)
 *   **Đồng hồ đếm ngược 10 phút (Countdown Timer):**

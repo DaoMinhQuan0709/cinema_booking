@@ -1,14 +1,18 @@
 # PremierCinema frontend
 
 React, Vite và Tailwind CSS. Trạng thái xác thực dùng Zustand, dữ liệu phim dùng
-TanStack Query, REST dùng Axios và cập nhật ghế dùng STOMP/SockJS.
+TanStack Query, REST dùng Axios và cập nhật ghế dùng STOMP qua WebSocket gốc.
 
 ## Chạy tại máy phát triển
 
 Từ thư mục `frontend`, cài dependency bằng `npm ci`, sao chép `.env.example`
 thành `.env` nếu cần tùy chỉnh URL, rồi chạy `npm run dev`.
-Backend mặc định phục vụ REST tại `http://localhost:8080/api/v1` và WebSocket
-tại `http://localhost:8080/ws`. Trên PowerShell chặn `npm.ps1`, dùng `npm.cmd`.
+Backend mặc định phục vụ REST tại `http://localhost:8080/api/v1` và STOMP tại
+`ws://localhost:8080/ws`. Cấu hình `VITE_WS_BASE_URL` dạng http/https cũ vẫn
+được tự chuyển sang ws/wss, nên không cần đổi file `.env` hiện có. Client dùng
+endpoint WebSocket gốc đã đăng ký ở backend, giữ reconnect/subscription và
+không chạy listener `unload` của SockJS. Trên PowerShell chặn `npm.ps1`, dùng
+`npm.cmd`.
 
 ```powershell
 npm.cmd ci
@@ -18,6 +22,10 @@ npm.cmd run dev
 
 Chỉ sao chép file môi trường khi chưa có cấu hình riêng. Không đưa khóa bí mật
 vào biến `VITE_*` vì các giá trị này được đưa vào mã JavaScript gửi đến trình duyệt.
+
+API tạo đơn giữ ghế cần Redis đang chạy. Xem phần khởi động Redis trong
+[hướng dẫn backend](../backend/cinema-booking-backend/GALAXY_SYNC.md#redis-cho-luồng-giữ-ghế)
+nếu đọc được sơ đồ ghế nhưng không tạo được đơn.
 
 ## Kiểm tra
 
@@ -37,6 +45,8 @@ npm.cmd run preview
   lịch chiếu theo ngày/thành phố/rạp và query hooks.
 - `src/features/showtimes`: trang lịch chiếu toàn bộ phim, bộ lọc và nhóm suất
   theo phim/rạp, xử lý ngày giờ Việt Nam và query lịch theo ngày.
+- `src/features/booking`: ma trận ghế, WebSocket, nút giữ chỗ, khôi phục/hủy
+  đơn đang giữ và kiểm tra payload booking.
 - `src/services`: các lời gọi API theo module.
 - `src/config`: Axios, lưu token, cấu hình và kết nối WebSocket.
 - `src/layouts`, `src/components/common`: khung trang, header và footer.
@@ -61,8 +71,28 @@ và chọn suất chiếu. Route `/booking/:showtimeId` có màn hình SVG và m
 uốn cong, chú thích loại/trạng thái, chọn tối đa 8 ghế, bỏ chọn và tạm tính.
 Màn hình/ma trận cuộn cùng nhau trên điện thoại và giữ đúng vị trí lối đi.
 Ghế BOOKED/LOCKED không chọn được; ghế đổi sang không khả dụng khi tải lại sẽ
-bị bỏ khỏi lựa chọn. Đổi suất cũng đặt lại lựa chọn. Đây là phần chọn trên giao
-diện; WebSocket, đăng nhập khi giữ ghế và `POST /bookings` triển khai ở phần sau.
+bị bỏ khỏi lựa chọn. Đổi suất cũng đặt lại lựa chọn. WebSocket subscribe topic
+`/topic/showtimes/{id}/seats`, vá HOLD/RELEASE/BOOKED vào cache; mỗi lần kết nối
+lại sẽ tải sơ đồ để đồng bộ các sự kiện đã bỏ lỡ.
+
+Nút “Tiếp tục” ở sidebar gọi `POST /bookings` với `showtimeId`, các
+`showtimeSeatIds` đã chọn và `products: []`. Khách chưa đăng nhập được mở
+AuthModal, giữ nguyên lựa chọn; đăng nhập xong bấm tiếp để gửi yêu cầu. Nút và
+sơ đồ khóa trong lúc gửi, chống bấm lặp và không tự retry POST. HTTP 409 hiện
+đúng một toast “Ghế bạn chọn vừa có người giữ chỗ!”, tải lại sơ đồ và bỏ các
+lựa chọn không còn khả dụng. Các lỗi khác hiển thị thông báo phù hợp.
+
+Thành công hiển thị mã đơn, các ghế đang giữ, tổng tiền và hạn giữ từ backend
+ngay tại trang chọn ghế. Ghế của mình có màu đỏ/viền sáng và nhãn “Đang giữ cho
+bạn”; HOLD đến trước phản hồi POST không bị báo nhầm thành người khác chọn.
+Hai ID của ghế đôi luôn được gửi cùng nhau. Giá xác nhận lấy từ BookingResponse.
+
+Tab chỉ lưu mã giữ chỗ theo tài khoản/suất trong sessionStorage. Tải lại trang
+sẽ gọi `GET /bookings/{code}` để kiểm tra quyền, trạng thái và thời hạn trước
+khi khôi phục; lỗi kiểm tra có nút thử lại và tạm chặn đặt trùng. “Hủy giữ ghế
+để chọn lại” gọi `DELETE /bookings/{code}/cancel`. Hết `expiresAt` hoặc nhận
+RELEASE cho ghế đang giữ sẽ bỏ xác nhận và cập nhật lại giao diện. Countdown,
+trang checkout, bắp nước và thanh toán thuộc bước tiếp theo.
 
 Hai vị trí COUPLE liền kề theo cặp 1–2, 3–4... hiển thị thành một ghế đôi rộng
 hai ô. Bấm chọn/bỏ chọn tác động cả hai ID, tính là 2 chỗ trong giới hạn 8 và

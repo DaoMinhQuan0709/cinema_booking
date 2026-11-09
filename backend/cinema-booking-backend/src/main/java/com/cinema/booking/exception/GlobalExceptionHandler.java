@@ -4,6 +4,7 @@ import com.cinema.booking.dto.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -65,6 +66,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(409, "Ghế bạn chọn vừa được cập nhật bởi một người dùng khác. Vui lòng thử lại."));
+    }
+
+    @ExceptionHandler(RedisConnectionFailureException.class)
+    public ResponseEntity<ApiResponse<Object>> handleRedisConnectionFailure(RedisConnectionFailureException ex) {
+        log.error("Redis connection failed; the seat hold service is unavailable", ex);
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.error(503, "Dịch vụ giữ ghế tạm thời không khả dụng. Vui lòng thử lại sau."));
     }
 
     @ExceptionHandler(BadCredentialsException.class)

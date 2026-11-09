@@ -121,6 +121,26 @@ Dev dùng `ddl-auto=update` khi khởi động lại. Production cần chạy b�
 Tác vụ không đọc/ghi `seats`, `showtime_seats` hoặc booking. Trạng thái freshness
 catalog không đại diện cho thời điểm cập nhật metadata của từng phim.
 
+### Redis cho luồng giữ ghế
+
+Đọc catalog/sơ đồ ghế và tạo đơn có yêu cầu hạ tầng khác nhau: nếu Redis dừng,
+API sơ đồ ghế vẫn có thể dùng trạng thái database; `POST /api/v1/bookings`
+cần Redis để lấy khóa tầng 1. Không bỏ qua khóa Redis khi dịch vụ này bị lỗi.
+Backend trả HTTP 503 khi mất kết nối Redis, trong khi ghế đã có người giữ vẫn
+trả HTTP 409.
+
+Mở Docker Desktop, rồi chạy từ thư mục `backend/cinema-booking-backend`:
+
+```powershell
+docker compose up -d redis
+docker compose exec -T redis redis-cli ping
+```
+
+Lệnh kiểm tra cần trả `PONG`. File `compose.yaml` dùng Redis 7, cổng
+`127.0.0.1:6379`, khớp cấu hình dev mặc định. Container tự khởi động lại khi
+Docker hoạt động trở lại, trừ khi bạn chủ động dừng container. Nếu dùng Redis
+riêng, cấu hình `REDIS_HOST`, `REDIS_PORT` cho chính tiến trình backend.
+
 ### Chạy bằng VS Code
 
 Mở thư mục gốc `E:\JAVA\cinema_booking` trong VS Code. Cấu hình

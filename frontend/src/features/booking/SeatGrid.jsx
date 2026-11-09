@@ -10,13 +10,14 @@ const TYPE_CLASS = {
   COUPLE: 'bg-seat-couple text-white hover:brightness-110',
 };
 
-function seatClass(seat, isSelected) {
+function seatClass(seat, isSelected, isHeld) {
   const base =
-    'relative flex h-7 w-full items-center justify-center gap-1 rounded-t-lg rounded-b-sm text-[10px] font-semibold transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white motion-reduce:transition-none sm:h-8 sm:text-[11px]';
+    'relative flex h-7 w-full items-center justify-center gap-1 rounded-t-lg rounded-b-sm text-[10px] font-semibold transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed motion-reduce:transition-none sm:h-8 sm:text-[11px]';
 
   if (seat.status === SEAT_STATUS.BOOKED) {
     return `${base} cursor-not-allowed border border-surfaceBorder bg-seat-booked text-neutral-600`;
   }
+  if (isHeld) return `${base} bg-seat-selected text-white ring-2 ring-white/60`;
   if (seat.status === SEAT_STATUS.LOCKED) {
     return `${base} cursor-not-allowed bg-seat-locked/70 text-white/90`;
   }
@@ -27,29 +28,30 @@ function seatClass(seat, isSelected) {
   return `${base} cursor-pointer ${TYPE_CLASS[seat.seatType] ?? TYPE_CLASS.STANDARD}`;
 }
 
-function seatTitle(seat) {
+function seatTitle(seat, isHeld) {
   const type = SEAT_TYPE_LABEL[seat.seatType] ?? seat.seatType;
   const label = `${seat.label} - ${type}${seat.span === 2 ? ' (2 chỗ)' : ''}`;
   if (seat.status === SEAT_STATUS.BOOKED) return `${label} (đã bán)`;
+  if (isHeld) return `${label} (đang giữ cho bạn)`;
   if (seat.status === SEAT_STATUS.LOCKED) return `${label} (đang có người giữ)`;
   if (seat.incomplete) return `${label} (chưa đủ cặp)`;
   return label;
 }
 
-const Seat = memo(function Seat({ seat, isSelected, onToggle, style }) {
-  const unavailable = seat.status !== SEAT_STATUS.AVAILABLE;
+const Seat = memo(function Seat({ seat, isSelected, isHeld, disabled, onToggle, style }) {
+  const unavailable = disabled || isHeld || seat.status !== SEAT_STATUS.AVAILABLE;
   return (
     <button
       type="button"
       disabled={unavailable}
-      aria-pressed={isSelected}
-      aria-label={seatTitle(seat)}
-      title={seatTitle(seat)}
+      aria-pressed={isSelected || isHeld}
+      aria-label={seatTitle(seat, isHeld)}
+      title={seatTitle(seat, isHeld)}
       onClick={() => onToggle(seat)}
       style={style}
-      className={seatClass(seat, isSelected)}
+      className={seatClass(seat, isSelected, isHeld)}
     >
-      {seat.status === SEAT_STATUS.LOCKED ? <Lock aria-hidden="true" className="h-3 w-3" /> : seat.numberLabel}
+      {seat.status === SEAT_STATUS.LOCKED && !isHeld ? <Lock aria-hidden="true" className="h-3 w-3" /> : seat.numberLabel}
     </button>
   );
 });
@@ -66,7 +68,7 @@ const Seat = memo(function Seat({ seat, isSelected, onToggle, style }) {
  * @param {Set<number>} props.selectedIds tap showtimeSeatId dang duoc chon
  * @param {(seat: object) => void} props.onToggle
  */
-export const SeatGrid = ({ seats = [], totalCols, selectedIds, onToggle }) => {
+export const SeatGrid = ({ seats = [], totalCols, selectedIds, heldIds, disabled = false, onToggle }) => {
   const rows = useMemo(() => groupSeatsByRow(seats), [seats]);
 
   const cols = useMemo(() => getSeatColumnCount(seats, totalCols), [seats, totalCols]);
@@ -114,6 +116,8 @@ export const SeatGrid = ({ seats = [], totalCols, selectedIds, onToggle }) => {
                       key={column}
                       seat={unit}
                       isSelected={members.every(member => selectedIds.has(member.showtimeSeatId))}
+                      isHeld={members.every(member => heldIds?.has(member.showtimeSeatId))}
+                      disabled={disabled}
                       onToggle={onToggle}
                       style={style}
                     />

@@ -1,4 +1,85 @@
-/.agents
-/ARCHITECTURE.md
-/ke_hoach_backend.md
-/ke_hoach_frontend.md
+# Local agent and credential state
+/.agents/
+/.codex/
+/.aws/
+
+# Environment files; keep shareable examples and templates
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.template
+!.env.*.template
+
+# Local Spring configuration currently contains credential defaults
+/backend/cinema-booking-backend/src/main/resources/application.yml
+application-local.yml
+application-local.yaml
+application-local.properties
+application-*.local.yml
+application-*.local.yaml
+application-*.local.properties
+
+# Private keys and keystores
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Dependencies, build output and caches
+node_modules/
+target/
+build/
+dist/
+dist-ssr/
+.m2/
+.gradle/
+.vite/
+.cache/
+coverage/
+*.class
+*.tsbuildinfo
+
+# Logs and temporary files
+logs/
+*.log
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.tmp
+*.temp
+.tmp-*
+*.swp
+*.swo
+*~
+
+# Eclipse / Spring Tool Suite workspace and generated project state
+.metadata/
+.settings/
+.classpath
+.project
+.factorypath
+.apt_generated/
+.springBeans
+.sts4-cache/
+
+# IDE state; keep the reviewed, shared VS Code configuration
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini

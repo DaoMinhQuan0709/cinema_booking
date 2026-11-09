@@ -10,7 +10,7 @@ const ITEMS = [
 ];
 
 /** Chu thich mau ghe. Mau lay tu token seat.* trong tailwind.config.js. */
-export const SeatLegend = () => (
+export const SeatLegend = ({ hasOwnHold = false }) => (
   <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-neutral-300">
     {ITEMS.map((item) => (
       <li key={item.label} className="inline-flex items-center gap-2">
@@ -20,6 +20,7 @@ export const SeatLegend = () => (
         {item.label}
       </li>
     ))}
+    {hasOwnHold && <li className="inline-flex items-center gap-2"><span className="h-5 w-5 rounded-t-md rounded-b-sm bg-seat-selected ring-2 ring-white/60" />Đang giữ cho bạn</li>}
   </ul>
 );
 

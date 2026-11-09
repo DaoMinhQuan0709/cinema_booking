@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Armchair, CalendarClock, MapPin, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Armchair, CalendarClock, CheckCircle2, MapPin, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { MAX_SEATS_PER_BOOKING, SEAT_STATUS } from '../../config/constants';
 import { SeatLegend } from '../../components/common/SeatLegend';
@@ -10,6 +10,8 @@ import { SEAT_TYPE_LABEL, buildSeatUnits, getSeatColumnCount, groupSeatsByRow, s
 import { isInternalShowtimeId } from '../../utils/showtimeId';
 import { SeatGrid } from './SeatGrid';
 import { useShowtimeDetail, useShowtimeSeats } from './hooks/useShowtimeSeats';
+import { useBookingHold } from './hooks/useBookingHold';
+import { formatHoldExpiry } from './bookingHold';
 
 const EMPTY_SEATS = [];
 
@@ -45,7 +47,8 @@ const PageSkeleton = () => (
  * Man hinh chon ghe (/booking/:showtimeId).
  * PHAN 1: ma tran ghe uon cong, chon/bo chon ghe (toi da 8 cho).
  * PHAN 2: WebSocket STOMP - ghe doi mau real-time khi nguoi khac giu/ban/nha ghe.
- * Cac phan tiep theo: POST /bookings giu ghe 10 phut, dong ho dem nguoc.
+ * PHAN 3: POST /bookings giu ghe 10 phut, xu ly 409 va xac nhan giu cho.
+ * Dem nguoc/checkout/thanh toan se duoc tich hop o phan sau.
  */
 const SeatSelection = ({ showtimeId }) => {
   const detailQuery = useShowtimeDetail(showtimeId);
@@ -59,6 +62,10 @@ const SeatSelection = ({ showtimeId }) => {
   }, [seats, seatMap?.totalCols]);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [previousUnits, setPreviousUnits] = useState(seatUnits);
+  const { booking, isCreating, isCancelling, isRestoring, restoreError, retryRestore, submittedIds, holdSeats, cancelHold, isOwnHoldSeat, handleSeatUpdate } = useBookingHold(showtimeId);
+  const isSubmitting = isCreating || isCancelling || isRestoring;
+  const selectionDisabled = isSubmitting || restoreError || Boolean(booking);
+  const heldIds = useMemo(() => new Set(booking?.seats.map(seat => seat.showtimeSeatId) ?? []), [booking]);
 
   // A refreshed map can withdraw a selected seat. Do not reselect it if it later becomes free.
   if (previousUnits !== seatUnits) {
@@ -70,8 +77,10 @@ const SeatSelection = ({ showtimeId }) => {
   // Message WebSocket da duoc vá vao cache (seatsQuery.data) truoc khi callback nay chay;
   // o day chi bao cho nguoi dung biet neu ghe ho DANG CHON vua bi nguoi khac lay mat.
   const notifySeatTaken = (message) => {
+    handleSeatUpdate(message);
     if (message.status === SEAT_STATUS.AVAILABLE) return;
-    const taken = seats.filter(seat => selectedIds.has(seat.showtimeSeatId) && message.seatIds.includes(seat.showtimeSeatId));
+    const taken = seats.filter(seat => selectedIds.has(seat.showtimeSeatId)
+      && message.seatIds.includes(seat.showtimeSeatId) && !isOwnHoldSeat(seat.showtimeSeatId));
     if (taken.length) {
       toast.warning(`Ghế ${taken.map(seatLabel).join(', ')} vừa có người khác chọn. Vui lòng chọn ghế khác.`, { id: 'seat-taken' });
     }
@@ -86,17 +95,30 @@ const SeatSelection = ({ showtimeId }) => {
     () => seatUnits.filter(unit => unit.status === SEAT_STATUS.AVAILABLE && unit.seats.every(seat => selectedIds.has(seat.showtimeSeatId))),
     [seatUnits, selectedIds]
   );
-  const selectedCount = selectedUnits.reduce((count, unit) => count + unit.seats.length, 0);
-  const total = selectedUnits.reduce((sum, unit) => sum + unit.price, 0);
+  const summaryUnits = useMemo(() => {
+    if (!booking && !isCreating) return selectedUnits;
+    const ids = booking ? heldIds : new Set(submittedIds);
+    const prices = new Map(booking?.seats.map(seat => [seat.showtimeSeatId, seat.price]) ?? []);
+    return seatUnits.filter(unit => unit.seats.every(seat => ids.has(seat.showtimeSeatId)))
+      .map(unit => ({ ...unit, price: unit.seats.reduce((sum, seat) => sum + Number(prices.get(seat.showtimeSeatId) ?? seat.price), 0) }));
+  }, [booking, isCreating, selectedUnits, heldIds, submittedIds, seatUnits]);
+  const selectedCount = summaryUnits.reduce((count, unit) => count + unit.seats.length, 0);
+  const total = booking?.totalAmount ?? summaryUnits.reduce((sum, unit) => sum + unit.price, 0);
 
   const handleToggle = useCallback((seat) => {
+    if (selectionDisabled) return;
     const result = toggleSeatSelection(selectedIds, seat, MAX_SEATS_PER_BOOKING);
     if (result.limitReached) {
       toast.warning(`Bạn chỉ được chọn tối đa ${MAX_SEATS_PER_BOOKING} chỗ mỗi lần đặt.`, { id: 'seat-selection-limit' });
       return;
     }
     setSelectedIds(result.ids);
-  }, [selectedIds]);
+  }, [selectedIds, selectionDisabled]);
+
+  async function handleContinue() {
+    const held = await holdSeats(showtime.id, selectedUnits);
+    if (held) setSelectedIds(new Set());
+  }
 
   const isFetching = seatsQuery.isFetching || detailQuery.isFetching;
   const refresh = () => Promise.allSettled([seatsQuery.refetch(), detailQuery.refetch()]);
@@ -132,10 +154,11 @@ const SeatSelection = ({ showtimeId }) => {
             <span aria-hidden="true" className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'animate-pulse bg-neutral-600'}`} />
             {isConnected ? 'Cập nhật trực tiếp' : 'Đang kết nối…'}
           </span>
-          <button type="button" onClick={refresh} disabled={isFetching} className="inline-flex items-center gap-2 rounded-lg border border-surfaceBorder px-3 py-2 text-sm text-neutral-300 hover:text-white disabled:opacity-50"><RefreshCw aria-hidden="true" className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />Làm mới</button>
+          <button type="button" onClick={refresh} disabled={isFetching || isSubmitting} className="inline-flex items-center gap-2 rounded-lg border border-surfaceBorder px-3 py-2 text-sm text-neutral-300 hover:text-white disabled:opacity-50"><RefreshCw aria-hidden="true" className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />Làm mới</button>
         </div>
       </div>
       {(seatsQuery.isError || detailQuery.isError) && <p role="alert" className="mb-5 rounded-lg border border-primary/30 p-3 text-sm text-neutral-300">Chưa làm mới được dữ liệu. Vui lòng kiểm tra kết nối và thử lại.</p>}
+      {restoreError && <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 p-4 text-sm text-neutral-300"><p>Chưa kiểm tra được đơn giữ ghế trước đó. Vui lòng thử lại trước khi đặt tiếp.</p><button type="button" onClick={retryRestore} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white hover:bg-primaryHover">Thử lại thông tin giữ chỗ</button></div>}
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         {/* Khu vuc so do ghe */}
@@ -145,15 +168,17 @@ const SeatSelection = ({ showtimeId }) => {
               seats={seats}
               totalCols={seatMap.totalCols}
               selectedIds={selectedIds}
+              heldIds={heldIds}
+              disabled={selectionDisabled}
               onToggle={handleToggle}
             />
           </div>
           <div className="mt-6 border-t border-surfaceBorder pt-5">
-            <SeatLegend />
+            <SeatLegend hasOwnHold={Boolean(booking)} />
           </div>
         </section>
 
-        {/* Cot phai: thong tin suat chieu va ghe dang chon (dong ho + nut Tiep tuc se bo sung o phan sau) */}
+        {/* Thong tin suat chieu, tam tinh va ket qua giu ghe */}
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-2xl border border-surfaceBorder bg-surface p-5">
             {showtime && (
@@ -171,15 +196,15 @@ const SeatSelection = ({ showtimeId }) => {
             )}
 
             <div className="pt-4">
-              {selectedCount > 0 && <button type="button" onClick={() => setSelectedIds(new Set())} className="mb-3 rounded text-xs text-muted hover:text-white">Bỏ chọn tất cả</button>}
+              {selectedCount > 0 && !booking && <button type="button" onClick={() => setSelectedIds(new Set())} disabled={isSubmitting} className="mb-3 rounded text-xs text-muted hover:text-white disabled:opacity-50">Bỏ chọn tất cả</button>}
               <h2 className="text-sm font-semibold text-white">
-                Chỗ đã chọn ({selectedCount}/{MAX_SEATS_PER_BOOKING})
+                {booking ? 'Chỗ đang giữ' : 'Chỗ đã chọn'} ({selectedCount}/{MAX_SEATS_PER_BOOKING})
               </h2>
               {selectedCount === 0 ? (
                 <p className="mt-2 text-xs text-muted">Chưa chọn ghế nào. Hãy bấm vào ghế trống trên sơ đồ.</p>
               ) : (
                 <ul className="mt-3 space-y-1.5">
-                  {selectedUnits.map((unit) => (
+                  {summaryUnits.map((unit) => (
                     <li key={unit.seats[0].showtimeSeatId} className="flex items-center justify-between text-sm">
                       <span className="text-neutral-200">
                         <strong className="text-white">{unit.label}</strong>{' '}
@@ -194,10 +219,26 @@ const SeatSelection = ({ showtimeId }) => {
               )}
 
               <div className="mt-4 flex items-center justify-between border-t border-surfaceBorder pt-4">
-                <span className="text-sm text-muted">Tạm tính</span>
+                <span className="text-sm text-muted">{booking ? 'Tổng tiền vé' : 'Tạm tính'}</span>
                 <span className="text-lg font-black text-primary">{formatCurrency(total)}</span>
               </div>
-              <p className="mt-3 text-xs leading-relaxed text-muted">Việc chọn ghế ở đây chưa thực hiện giữ chỗ.</p>
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={!selectedCount || selectionDisabled || isFetching}
+                aria-busy={isCreating || isRestoring}
+                className="mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primaryHover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary disabled:cursor-not-allowed disabled:bg-surfaceBorder disabled:text-muted"
+              >
+                {isRestoring || isCreating ? <><RefreshCw aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" />{isRestoring ? 'Đang kiểm tra giữ chỗ…' : 'Đang giữ ghế…'}</> : booking ? <><CheckCircle2 aria-hidden="true" className="h-4 w-4" />Đã giữ ghế</> : <>Tiếp tục<ArrowRight aria-hidden="true" className="h-4 w-4" /></>}
+              </button>
+              {booking ? (
+                <div role="status" className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+                  <p className="text-sm font-semibold text-white">Ghế đang được giữ cho bạn</p>
+                  <p className="mt-2 text-xs leading-relaxed text-muted">Mã đặt chỗ: <strong className="break-all font-mono text-white">{booking.bookingCode}</strong></p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">Hạn giữ: <time dateTime={booking.expiresAt} className="font-medium text-white">{formatHoldExpiry(booking.expiresAt)}</time></p>
+                  <button type="button" onClick={cancelHold} disabled={isSubmitting} className="mt-3 min-h-10 w-full rounded-lg border border-surfaceBorder px-3 py-2 text-xs font-semibold text-neutral-300 hover:border-neutral-500 hover:text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{isCancelling ? 'Đang hủy giữ ghế…' : 'Hủy giữ ghế để chọn lại'}</button>
+                </div>
+              ) : <p className="mt-3 text-xs leading-relaxed text-muted">Bấm “Tiếp tục” để giữ các ghế đã chọn trong 10 phút. Bạn cần đăng nhập để giữ chỗ.</p>}
             </div>
           </div>
         </aside>

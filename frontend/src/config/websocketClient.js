@@ -1,11 +1,10 @@
-// The browser bundle provides its own global shim; the lib entry assumes Node's global.
-import SockJS from 'sockjs-client/dist/sockjs.js';
 import { Client } from '@stomp/stompjs';
 import { WS_BASE_URL } from './constants';
 import { tokenStorage } from './tokenStorage';
+import { toStompWebSocketUrl } from './websocketUrl';
 
 /**
- * Client STOMP dung chung cho toan app, ket noi qua SockJS toi endpoint
+ * Client STOMP dung chung cho toan app, ket noi WebSocket goc toi endpoint
  * /ws cua backend (xem WebSocketConfig.java). Dung singleton de tranh
  * mo nhieu ket noi WebSocket song song.
  *
@@ -34,7 +33,8 @@ function attach(entry, client) {
 
 function createClient() {
   const client = new Client({
-    webSocketFactory: () => new SockJS(WS_BASE_URL),
+    // Native /ws is already registered by WebSocketConfig; no legacy unload listener.
+    brokerURL: toStompWebSocketUrl(WS_BASE_URL, window.location.href),
     reconnectDelay: 5000,
     heartbeatIncoming: 10000,
     heartbeatOutgoing: 10000,
