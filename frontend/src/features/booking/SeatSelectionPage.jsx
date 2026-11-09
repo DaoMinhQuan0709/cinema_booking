@@ -4,8 +4,9 @@ import { ArrowLeft, Armchair, CalendarClock, MapPin, RefreshCw } from 'lucide-re
 import { toast } from 'sonner';
 import { MAX_SEATS_PER_BOOKING, SEAT_STATUS } from '../../config/constants';
 import { SeatLegend } from '../../components/common/SeatLegend';
+import { useWebSocketSeatLock } from '../../hooks/useWebSocketSeatLock';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { SEAT_TYPE_LABEL, buildSeatUnits, getSeatColumnCount, groupSeatsByRow, toggleSeatSelection } from '../../utils/seatHelper';
+import { SEAT_TYPE_LABEL, buildSeatUnits, getSeatColumnCount, groupSeatsByRow, seatLabel, toggleSeatSelection } from '../../utils/seatHelper';
 import { isInternalShowtimeId } from '../../utils/showtimeId';
 import { SeatGrid } from './SeatGrid';
 import { useShowtimeDetail, useShowtimeSeats } from './hooks/useShowtimeSeats';
@@ -41,9 +42,10 @@ const PageSkeleton = () => (
 );
 
 /**
- * Man hinh chon ghe (/booking/:showtimeId) - PHAN 1: ma tran ghe uon cong.
- * Hien tai chi quan ly viec chon/bo chon ghe tren giao dien (toi da 8 ghe).
- * Cac phan tiep theo: WebSocket real-time, POST /bookings giu ghe 10 phut, dong ho dem nguoc.
+ * Man hinh chon ghe (/booking/:showtimeId).
+ * PHAN 1: ma tran ghe uon cong, chon/bo chon ghe (toi da 8 cho).
+ * PHAN 2: WebSocket STOMP - ghe doi mau real-time khi nguoi khac giu/ban/nha ghe.
+ * Cac phan tiep theo: POST /bookings giu ghe 10 phut, dong ho dem nguoc.
  */
 const SeatSelection = ({ showtimeId }) => {
   const detailQuery = useShowtimeDetail(showtimeId);
@@ -64,6 +66,17 @@ const SeatSelection = ({ showtimeId }) => {
     const availableIds = new Set(seatUnits.filter(unit => unit.status === SEAT_STATUS.AVAILABLE).flatMap(unit => unit.seats.map(seat => seat.showtimeSeatId)));
     setSelectedIds(previous => new Set([...previous].filter(id => availableIds.has(id))));
   }
+
+  // Message WebSocket da duoc vá vao cache (seatsQuery.data) truoc khi callback nay chay;
+  // o day chi bao cho nguoi dung biet neu ghe ho DANG CHON vua bi nguoi khac lay mat.
+  const notifySeatTaken = (message) => {
+    if (message.status === SEAT_STATUS.AVAILABLE) return;
+    const taken = seats.filter(seat => selectedIds.has(seat.showtimeSeatId) && message.seatIds.includes(seat.showtimeSeatId));
+    if (taken.length) {
+      toast.warning(`Ghế ${taken.map(seatLabel).join(', ')} vừa có người khác chọn. Vui lòng chọn ghế khác.`, { id: 'seat-taken' });
+    }
+  };
+  const { isConnected } = useWebSocketSeatLock(showtimeId, { onSeatUpdate: notifySeatTaken });
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -114,7 +127,13 @@ const SeatSelection = ({ showtimeId }) => {
 
       <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
         <div><h1 className="text-2xl font-bold text-white">Chọn ghế của bạn</h1><p className="mt-2 text-sm text-muted">Chọn tối đa {MAX_SEATS_PER_BOOKING} chỗ. Ghế đôi chiếm 2 chỗ. Vuốt ngang để xem trọn sơ đồ.</p></div>
-        <button type="button" onClick={refresh} disabled={isFetching} className="inline-flex items-center gap-2 rounded-lg border border-surfaceBorder px-3 py-2 text-sm text-neutral-300 hover:text-white disabled:opacity-50"><RefreshCw aria-hidden="true" className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />Làm mới</button>
+        <div className="flex items-center gap-4">
+          <span role="status" className="inline-flex items-center gap-1.5 text-xs text-muted">
+            <span aria-hidden="true" className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'animate-pulse bg-neutral-600'}`} />
+            {isConnected ? 'Cập nhật trực tiếp' : 'Đang kết nối…'}
+          </span>
+          <button type="button" onClick={refresh} disabled={isFetching} className="inline-flex items-center gap-2 rounded-lg border border-surfaceBorder px-3 py-2 text-sm text-neutral-300 hover:text-white disabled:opacity-50"><RefreshCw aria-hidden="true" className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />Làm mới</button>
+        </div>
       </div>
       {(seatsQuery.isError || detailQuery.isError) && <p role="alert" className="mb-5 rounded-lg border border-primary/30 p-3 text-sm text-neutral-300">Chưa làm mới được dữ liệu. Vui lòng kiểm tra kết nối và thử lại.</p>}
 

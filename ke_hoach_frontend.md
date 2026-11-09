@@ -173,7 +173,7 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
     *   Xử lý click: Cho phép chọn tối đa 8 ghế/lần; khi chọn đổi sang màu Đỏ rực.
 *   **Kết nối Real-time WebSocket (STOMP):**
     *   Subscribe kênh `/topic/showtimes/${showtimeId}/seats`.
-    *   Khi nhận message có ghế vừa bị người khác lock hoặc mua: Ghế đó lập tức đổi sang màu tím khóa / xám bán và bị disable ngay trên màn hình mà **không cần người dùng F5 tải lại trang**.
+    *   Khi nhận message có ghế vừa bị người khác lock hoặc mua: Ghế đó lập tức đổi sang màu tím khóa / xám bán và bị disable ngay trên màn hình mà không cần người dùng F5 tải lại trang.
 *   **Sidebar Thông tin vé & Đồng hồ (Sticky Right):**
     *   Thông tin phim, rạp, phòng chiếu, giờ chiếu.
     *   Danh sách ghế đang chọn (VD: `VIP: F5, F6`).
