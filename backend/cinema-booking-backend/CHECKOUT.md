@@ -200,6 +200,82 @@ Trang này không tự gọi lại endpoint IPN để ép xác nhận đơn. V�
 đã trả tiền nhưng chưa có IPN, cần kiểm tra/đối soát giao dịch; không yêu cầu
 khách thanh toán lại. QR và trang callback MoMo vẫn là phần tiếp theo.
 
+### Thẻ test thành công nhưng trang vẫn chờ xác nhận
+
+**IPN (Instant Payment Notification)** là thông báo máy chủ VNPay gửi trực
+tiếp tới backend để xác nhận giao dịch. Có hai luồng riêng sau khi nhập OTP:
+
+```text
+VNPay → trình duyệt → localhost:5173/payment/vnpay-callback
+                     Hiển thị kết quả
+
+Máy chủ VNPay → HTTPS public → localhost:8080/api/v1/payments/vnpay-ipn
+                              Xác minh, cập nhật thanh toán và chốt ghế
+```
+
+Thẻ test “Thành công” xác định kết quả phía Sandbox; nó không tự thiết lập
+địa chỉ IPN của merchant. Khi chưa nhận/xử lý được IPN hợp lệ, database vẫn
+có payment `PENDING` dù trang nhận được kết quả có chữ ký `00/00`.
+
+Để nhận IPN khi phát triển trên Windows:
+
+1. Giữ backend chạy ở cổng 8080. Cài ngrok và kết nối tài khoản theo
+   [hướng dẫn chính thức](https://ngrok.com/docs/gateway/endpoints/agent-cli-quickstart).
+   Sau khi cài, mở PowerShell và chạy một lần với authtoken của **ngrok**:
+
+   ```powershell
+   ngrok config add-authtoken '<authtoken từ tài khoản ngrok>'
+   ```
+
+2. Chạy tunnel và giữ Terminal này mở trong suốt buổi kiểm thử:
+
+   ```powershell
+   ngrok http 8080
+   ```
+
+   Lấy địa chỉ **HTTPS** ở dòng `Forwarding`, ví dụ
+   `https://ten-cua-ban.ngrok-free.app`. Dùng đúng domain ngrok thực tế cấp.
+3. Ghép địa chỉ đó với endpoint backend để có **IPN URL**:
+
+   ```text
+   https://ten-cua-ban.ngrok-free.app/api/v1/payments/vnpay-ipn
+   ```
+
+   Khai báo URL này cho **merchant Sandbox mới** ở phía VNPay. Nếu tài khoản
+   không có mục chỉnh IPN, liên hệ [hỗ trợ kỹ thuật VNPay](https://sandbox.vnpayment.vn/apis/contact/)
+   với TmnCode, môi trường Sandbox và IPN URL; không gửi HashSecret.
+   Địa chỉ này cần được VNPay lưu vào cấu hình merchant. Thêm một dòng
+   `ipn-url` vào `application.yml` không đăng ký nó với VNPay; code VNPay
+   hiện tại cũng không đọc thuộc tính đó. Giữ `return-url` hiện tại để
+   trình duyệt quay lại frontend trên máy.
+4. Kiểm tra kết nối qua domain public, **không kèm tham số thanh toán**:
+
+   ```powershell
+   Invoke-RestMethod 'https://ten-cua-ban.ngrok-free.app/api/v1/payments/vnpay-ipn'
+   ```
+
+   Kết quả mong đợi là HTTP 200 với `RspCode: 97`, `Message: Invalid Checksum`.
+   Đây là phản hồi đúng cho lần thử không có chữ ký: chứng minh request đã
+   tới backend và không cần đăng nhập, nhưng chưa chứng minh VNPay đã lưu
+   IPN URL. HTML, trang yêu cầu đăng nhập, 404 hoặc 502 nghĩa là chưa tới
+   đúng endpoint. Không thêm lớp đăng nhập tương tác trước đường dẫn IPN.
+5. Sau khi VNPay xác nhận cấu hình, kiểm thử bằng **một đơn Sandbox riêng**.
+   Kiểm tra request IPN trong trình kiểm tra request của ngrok và Terminal
+   backend (`GET /api/v1/payments/vnpay-ipn`). Request thật phải có chữ ký
+   hợp lệ; `RspCode: 00` là đã xử lý, `02` là đã xử lý trước đó. Đối chiếu
+   payment `SUCCESS`, booking `CONFIRMED` và ghế `BOOKED`; khi không còn giữ
+   được ghế, có thể cần xử lý hoàn tiền thay vì cấp vé.
+
+Với **đơn đã thanh toán trước khi cấu hình IPN**, không trả tiền lần nữa cho
+đơn đó. Cập nhật IPN URL không bảo đảm VNPay tự gửi lại thông báo cũ; cần
+kiểm tra lịch sử/gửi lại IPN qua công cụ chính thức nếu được hỗ trợ, hoặc
+nhờ VNPay hỗ trợ đối soát. Không sửa SQL thành `SUCCESS` và không sao chép
+tham số Return URL sang endpoint IPN để giả lập thông báo máy chủ.
+
+Mỗi buổi thử cần backend và tunnel cùng chạy. Nếu domain tunnel thay đổi,
+cập nhật IPN URL ở VNPay trước khi thử tiếp. Nút “Kiểm tra trạng thái” chỉ
+đọc kết quả hiện có; nó không yêu cầu VNPay gửi IPN.
+
 ## Kiểm thử
 
 Các test PostgreSQL dùng service/repository thật với schema `checkout_test_*`
