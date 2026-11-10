@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test",
     "test:checkout-browser": "node scripts/checkout-browser-check.mjs",
+    "test:chatbot-browser": "node scripts/chatbot-browser-check.mjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
@@ -19,7 +20,9 @@
     "lucide-react": "^1.70.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.5",
+    "remark-gfm": "^4.0.1",
     "sockjs-client": "^1.6.1",
     "sonner": "^2.0.8",
     "zustand": "^5.1.0"

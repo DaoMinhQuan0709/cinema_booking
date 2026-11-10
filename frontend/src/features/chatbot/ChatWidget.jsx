@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bot, MessageCircle, X } from 'lucide-react';
+import { Bot, LoaderCircle, MessageCircle, SendHorizontal, X } from 'lucide-react';
+import ChatMessageItem from './ChatMessageItem';
 import ChatSuggestions from './ChatSuggestions';
+import { useCineBot } from './useCineBot';
 
 /**
  * Widget tro ly ao CineBot noi o goc duoi ben phai.
- * Gom nut noi, cua so hoi thoai va cau hoi goi y dien vao o nhap.
- * Cac phan tiep theo: gui/nhan tin nhan (POST /api/v1/chat/ask), trang thai dang tra loi, xu ly loi.
+ * Gom cau hoi goi y, gui/nhan tin nhan qua backend va trang thai dang tra loi.
  *
- * - Cua so luon duoc giu trong DOM (an bang visibility) de sau nay lich su hoi thoai
+ * - Cua so luon duoc giu trong DOM (an bang visibility) de lich su hoi thoai
  *   khong bi mat moi lan dong/mo.
  * - Dong bang nut X, nut tren header hoac phim Escape; focus tra ve nut noi.
  * - Trang /checkout co thanh thanh toan co dinh o day man hinh dien thoai,
@@ -17,10 +18,11 @@ import ChatSuggestions from './ChatSuggestions';
 export const ChatWidget = () => {
   const { pathname } = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [draftMessage, setDraftMessage] = useState('');
+  const { draftMessage, setDraftMessage, messages, isSending, error, sendMessage } = useCineBot();
   const launcherRef = useRef(null);
   const panelRef = useRef(null);
   const messageInputRef = useRef(null);
+  const conversationRef = useRef(null);
 
   const hasBottomBar = pathname.startsWith('/checkout/');
   const bottomClass = hasBottomBar
@@ -32,14 +34,41 @@ export const ChatWidget = () => {
     if (isOpen) panelRef.current?.focus();
   }, [isOpen]);
 
+  useEffect(() => {
+    const conversation = conversationRef.current;
+    if (isOpen && conversation && (messages.length || error)) {
+      const scrollToLatest = () => { conversation.scrollTop = conversation.scrollHeight; };
+      scrollToLatest();
+      // Markdown duoc tai rieng va co the doi chieu cao sau khi cau tra loi xuat hien.
+      const observer = new ResizeObserver(scrollToLatest);
+      observer.observe(conversation.firstElementChild);
+      return () => observer.disconnect();
+    }
+  }, [messages, isSending, error, isOpen]);
+
   const close = () => {
     setIsOpen(false);
     launcherRef.current?.focus();
   };
 
   const selectSuggestion = (question) => {
+    if (isSending) return;
     setDraftMessage(question);
     messageInputRef.current?.focus();
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (!draftMessage.trim() || isSending) return;
+    messageInputRef.current?.focus();
+    void sendMessage();
+  };
+
+  const handleComposerKeyDown = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) {
+      event.preventDefault();
+      event.currentTarget.form?.requestSubmit();
+    }
   };
 
   const handleKeyDown = (event) => {
@@ -87,33 +116,62 @@ export const ChatWidget = () => {
         </header>
 
         {/* Noi dung hoi thoai */}
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4" aria-live="polite">
-          <div className="flex items-start gap-2.5">
-            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Bot aria-hidden="true" className="h-4 w-4" />
+        <div ref={conversationRef} className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4">
+          <div role="log" aria-label="Hội thoại với CineBot" aria-live="polite" aria-relevant="additions text" className="space-y-4">
+            <div className="flex items-start gap-2.5">
+              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Bot aria-hidden="true" className="h-4 w-4" />
+              </div>
+              <p className="max-w-[85%] rounded-2xl rounded-tl-sm border border-surfaceBorder bg-background px-3.5 py-2.5 text-sm leading-relaxed text-neutral-200">
+                Xin chào! Mình là CineBot. Mình có thể giúp bạn tìm phim, xem lịch chiếu và hỏi giá vé.
+              </p>
             </div>
-            <p className="max-w-[85%] rounded-2xl rounded-tl-sm border border-surfaceBorder bg-background px-3.5 py-2.5 text-sm leading-relaxed text-neutral-200">
-              Xin chào! Mình là CineBot. Mình có thể giúp bạn tìm phim, xem lịch chiếu và hỏi giá vé.
-            </p>
+
+            {messages.map(message => <ChatMessageItem key={message.id} message={message} />)}
           </div>
 
-          <ChatSuggestions onSelect={selectSuggestion} />
+          {messages.length === 0 && <ChatSuggestions onSelect={selectSuggestion} />}
+
+          {isSending && (
+            <div role="status" className="flex items-center gap-2 rounded-xl border border-surfaceBorder bg-background px-3 py-2.5 text-xs text-muted">
+              <LoaderCircle aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-primary motion-reduce:animate-none" />
+              CineBot đang trả lời…
+            </div>
+          )}
+
+          {error && <p role="alert" className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2.5 text-xs leading-relaxed text-neutral-200">{error}</p>}
         </div>
 
-        <div className="shrink-0 border-t border-surfaceBorder bg-background/60 px-4 py-3">
+        <form onSubmit={handleSubmit} className="shrink-0 border-t border-surfaceBorder bg-background/60 px-4 py-3">
           <label htmlFor="cinebot-message" className="mb-2 block text-xs font-semibold text-muted">
             Câu hỏi của bạn
           </label>
-          <textarea
-            id="cinebot-message"
-            ref={messageInputRef}
-            rows={2}
-            value={draftMessage}
-            onChange={(event) => setDraftMessage(event.target.value)}
-            placeholder="Chọn gợi ý hoặc nhập câu hỏi…"
-            className="block w-full resize-none rounded-xl border border-surfaceBorder bg-surface px-3 py-2.5 text-base leading-relaxed text-white placeholder:text-muted focus-visible:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:text-sm"
-          />
-        </div>
+          <div className="flex items-end gap-2">
+            <textarea
+              id="cinebot-message"
+              ref={messageInputRef}
+              rows={2}
+              readOnly={isSending}
+              value={draftMessage}
+              onChange={(event) => setDraftMessage(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
+              aria-describedby="cinebot-compose-help"
+              placeholder={isSending ? 'CineBot đang trả lời…' : 'Nhập câu hỏi của bạn…'}
+              className="block min-w-0 flex-1 resize-none rounded-xl border border-surfaceBorder bg-surface px-3 py-2.5 text-base leading-relaxed text-white placeholder:text-muted focus-visible:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:text-sm"
+            />
+            <button
+              type="submit"
+              disabled={isSending || !draftMessage.trim()}
+              aria-label="Gửi tin nhắn"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition-colors hover:bg-primaryHover focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none"
+            >
+              <SendHorizontal aria-hidden="true" className="h-4 w-4" />
+            </button>
+          </div>
+          <p id="cinebot-compose-help" className="mt-2 text-[10px] text-muted">
+            Enter để gửi · Shift+Enter để xuống dòng
+          </p>
+        </form>
       </section>
 
       {/* Nut noi */}

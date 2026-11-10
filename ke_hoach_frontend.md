@@ -220,6 +220,20 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
 *   Nếu thất bại hoặc hết hạn: Hiển thị thông báo hủy và nút quay lại trang chủ.
 
 ### 6. Widget Trợ Lý AI Chatbot (CineBot - Nổi ở góc màn hình)
+
+> Đã triển khai: widget trong `MainLayout`, ba câu hỏi gợi ý điền vào ô nhập,
+> gửi bằng nút hoặc Enter (Shift+Enter xuống dòng, hỗ trợ IME tiếng Việt),
+> hiển thị tin nhắn và trạng thái đang trả lời. Frontend gọi `/chat/ask`, gửi
+> lịch sử `user`/`model` của các lượt thành công; câu trả lời hỗ trợ Markdown,
+> danh sách và bảng. Giữ hội thoại khi đóng/mở hoặc chuyển trang khách hàng;
+> tải lại trang bắt đầu hội thoại mới. Có chặn gửi lặp, khôi phục câu hỏi khi
+> request lỗi và hủy request khi widget unmount.
+>
+> Kiểm chứng: build, ESLint, unit tests và `npm run test:chatbot-browser` sau
+> `npm run build` trong thư mục `frontend` (Windows/Edge, API giả lập, không gọi Gemini).
+> Chưa kiểm thử câu trả lời Gemini thật. Backend hiện chuyển lỗi Gemini thành
+> `reply` với HTTP 200; chuẩn hóa lỗi này và nút thử lại riêng là phần tiếp theo.
+
 *   Nút bong bóng nổi cố định ở góc dưới cùng bên phải (`fixed bottom-6 right-6`).
 *   Khi bấm mở ra cửa sổ chat hiện đại (giống Messenger / Intercom):
     *   Avatar robot dễ thương, tên "CineBot".
