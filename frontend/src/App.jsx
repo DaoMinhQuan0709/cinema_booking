@@ -11,6 +11,8 @@ const MovieDetail = lazy(() => import('./features/movies/MovieDetail'));
 const MovieCatalog = lazy(() => import('./features/movies/MovieCatalog'));
 const ShowtimesPage = lazy(() => import('./features/showtimes/ShowtimesPage'));
 const SeatSelectionPage = lazy(() => import('./features/booking/SeatSelectionPage'));
+const CheckoutPage = lazy(() => import('./features/booking/CheckoutPage'));
+const VNPayReturnPage = lazy(() => import('./features/booking/VNPayReturnPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -104,6 +106,8 @@ export const App = () => {
             <Route path="movies" element={<MovieCatalog />} />
             <Route path="movies/:id" element={<MovieDetail />} />
             <Route path="booking/:showtimeId" element={<SeatSelectionPage />} />
+            <Route path="checkout/:bookingCode" element={<CheckoutPage />} />
+            <Route path="payment/vnpay-callback" element={<VNPayReturnPage />} />
             <Route path="booking" element={<SeatSelectionPage />} />
             <Route path="showtimes" element={<ShowtimesPage />} />
             <Route path="cinemas" element={<PlaceholderPage title="Hệ Thống Cụm Rạp & Bảng Giá Vé" />} />

@@ -18,10 +18,10 @@ import java.util.*;
 @Getter
 public class VNPayConfig {
 
-    @Value("${application.payment.vnpay.tmn-code:2QXUI4J4}")
+    @Value("${application.payment.vnpay.tmn-code:${VNPAY_TMN_CODE:}}")
     private String tmnCode;
 
-    @Value("${application.payment.vnpay.hash-secret:RAOJPVRPKZSIIKNLQUXRVTXECTMVNXZG}")
+    @Value("${application.payment.vnpay.hash-secret:${VNPAY_HASH_SECRET:}}")
     private String hashSecret;
 
     @Value("${application.payment.vnpay.url:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}")

@@ -29,6 +29,15 @@ import java.util.Map;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final com.cinema.booking.service.PaymentReturnService paymentReturns;
+
+    @PostMapping("/vnpay-return")
+    public ResponseEntity<ApiResponse<com.cinema.booking.dto.response.PaymentResultResponse>> verifyVNPayReturn(
+            @RequestBody Map<String, String> params, @AuthenticationPrincipal UserDetails user) {
+        var result = paymentReturns.verifyVNPay(params, user.getUsername());
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(ApiResponse.success(200, "Đã kiểm tra kết quả thanh toán", result));
+    }
 
     /**
      * POST /api/v1/payments/create-url - Sinh URL thanh toan Sandbox (VNPay / MoMo).
@@ -45,7 +54,9 @@ public class PaymentController {
         PaymentUrlResponse response = paymentService.createPaymentUrl(
                 request, userDetails.getUsername(), servletRequest);
 
-        return ResponseEntity.ok(ApiResponse.success(200, "Tao URL thanh toan thanh cong", response));
+        boolean ready = response.getState() == com.cinema.booking.enums.CheckoutState.READY;
+        return ResponseEntity.status(ready ? 200 : 202).body(ApiResponse.success(ready ? 200 : 202,
+                ready ? "Đã tạo URL thanh toán" : "Vui lòng kiểm tra lại trạng thái thanh toán", response));
     }
 
     /**
@@ -54,7 +65,7 @@ public class PaymentController {
      */
     @GetMapping("/vnpay-ipn")
     public ResponseEntity<VNPayIpnResponse> vnpayIpn(@RequestParam Map<String, String> allParams) {
-        log.info("GET /api/v1/payments/vnpay-ipn - params={}", allParams);
+        log.info("GET /api/v1/payments/vnpay-ipn");
         VNPayIpnResponse response = paymentService.processVNPayIpn(allParams);
         return ResponseEntity.ok(response);
     }

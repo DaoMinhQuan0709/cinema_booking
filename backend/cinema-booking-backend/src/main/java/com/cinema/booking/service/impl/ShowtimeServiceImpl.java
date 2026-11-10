@@ -94,6 +94,7 @@ public class ShowtimeServiceImpl implements ShowtimeService {
                     .seatType(ss.getSeat().getType())
                     .price(ss.getPrice())
                     .status(effectiveStatus)
+                    .version(ss.getVersion())
                     .build();
         }).collect(Collectors.toList());
 

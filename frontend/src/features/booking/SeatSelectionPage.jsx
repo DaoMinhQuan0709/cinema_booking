@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Armchair, CalendarClock, CheckCircle2, MapPin, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { MAX_SEATS_PER_BOOKING, SEAT_STATUS } from '../../config/constants';
@@ -51,6 +51,7 @@ const PageSkeleton = () => (
  * Dem nguoc/checkout/thanh toan se duoc tich hop o phan sau.
  */
 const SeatSelection = ({ showtimeId }) => {
+  const navigate = useNavigate();
   const detailQuery = useShowtimeDetail(showtimeId);
   const seatsQuery = useShowtimeSeats(showtimeId);
   const { data: showtime } = detailQuery;
@@ -117,7 +118,10 @@ const SeatSelection = ({ showtimeId }) => {
 
   async function handleContinue() {
     const held = await holdSeats(showtime.id, selectedUnits);
-    if (held) setSelectedIds(new Set());
+    if (held) {
+      setSelectedIds(new Set());
+      navigate(`/checkout/${encodeURIComponent(held.bookingCode)}`);
+    }
   }
 
   const isFetching = seatsQuery.isFetching || detailQuery.isFetching;
@@ -236,6 +240,7 @@ const SeatSelection = ({ showtimeId }) => {
                   <p className="text-sm font-semibold text-white">Ghế đang được giữ cho bạn</p>
                   <p className="mt-2 text-xs leading-relaxed text-muted">Mã đặt chỗ: <strong className="break-all font-mono text-white">{booking.bookingCode}</strong></p>
                   <p className="mt-1 text-xs leading-relaxed text-muted">Hạn giữ: <time dateTime={booking.expiresAt} className="font-medium text-white">{formatHoldExpiry(booking.expiresAt)}</time></p>
+                  <Link to={`/checkout/${encodeURIComponent(booking.bookingCode)}`} className="mt-3 flex min-h-11 items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white hover:bg-primaryHover">Tiếp tục thanh toán</Link>
                   <button type="button" onClick={cancelHold} disabled={isSubmitting} className="mt-3 min-h-10 w-full rounded-lg border border-surfaceBorder px-3 py-2 text-xs font-semibold text-neutral-300 hover:border-neutral-500 hover:text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{isCancelling ? 'Đang hủy giữ ghế…' : 'Hủy giữ ghế để chọn lại'}</button>
                 </div>
               ) : <p className="mt-3 text-xs leading-relaxed text-muted">Bấm “Tiếp tục” để giữ các ghế đã chọn trong 10 phút. Bạn cần đăng nhập để giữ chỗ.</p>}

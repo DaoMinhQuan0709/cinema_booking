@@ -56,6 +56,9 @@ public class Booking {
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
+    @Column(name = "hold_token", length = 64)
+    private String holdToken;
+
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<BookingSeat> bookingSeats = new ArrayList<>();

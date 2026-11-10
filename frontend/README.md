@@ -124,3 +124,21 @@ payment, admin và chatbot được giữ để phục vụ các bước fronten
 
 Xem [hướng dẫn backend/Galaxy](../backend/cinema-booking-backend/GALAXY_SYNC.md)
 để khởi động backend và hiểu ranh giới giữa catalog Galaxy và kho ghế nội bộ.
+## Checkout
+
+Đã có `/checkout/:bookingCode`. Tạo giữ ghế từ trang booking sẽ chuyển đến
+Checkout; đơn đã khôi phục có nút tiếp tục. Countdown dựa trên serverTime,
+combo chỉ lưu khi bấm thanh toán; backend xác nhận giá trước khi tạo URL.
+Giá thay đổi cần xác nhận, 409 cần tải lại đơn, mất phản hồi không tự POST lại.
+
+Backend cần schema mới và khởi động lại; xem
+[CHECKOUT.md](../backend/cinema-booking-backend/CHECKOUT.md). Đã có trang
+`/payment/vnpay-callback`: backend xác minh chữ ký/quyền xem đơn, frontend
+hiển thị thông tin giao dịch và kiểm tra trạng thái chờ IPN. Chỉ xác nhận vé
+khi DB có booking CONFIRMED/payment SUCCESS; không tin query parameter
+`vnp_ResponseCode=00` đơn lẻ. QR và callback MoMo còn ở bước tiếp theo.
+
+Sau `npm.cmd run build`, có thể chạy `npm.cmd run test:checkout-browser`
+trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra desktop,
+mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
+thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.

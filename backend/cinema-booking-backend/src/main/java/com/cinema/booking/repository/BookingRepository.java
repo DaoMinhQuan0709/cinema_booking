@@ -17,6 +17,16 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     Optional<Booking> findByBookingCode(String bookingCode);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT b FROM Booking b WHERE b.bookingCode = :code")
+    Optional<Booking> findByCodeForUpdate(@Param("code") String code);
+
+    @Query("SELECT b.bookingCode FROM Booking b WHERE b.status = 'PENDING' AND b.expiresAt <= :now ORDER BY b.id")
+    List<String> findExpiredCodes(@Param("now") LocalDateTime now);
+
+    @Query("SELECT COUNT(bs) > 0 FROM BookingSeat bs WHERE bs.showtimeSeat.id = :seatId AND bs.booking.status = 'PENDING' AND bs.booking.expiresAt > :now")
+    boolean hasLiveHold(@Param("seatId") Long seatId, @Param("now") LocalDateTime now);
+
     boolean existsByShowtimeId(Long showtimeId);
 
     @EntityGraph(attributePaths = {"showtime.movie", "showtime.auditorium.cinema"})

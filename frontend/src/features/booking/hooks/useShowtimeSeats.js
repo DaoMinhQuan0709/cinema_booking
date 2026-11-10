@@ -18,6 +18,7 @@ export function useShowtimeSeats(showtimeId) {
     enabled: isInternalShowtimeId(showtimeId),
     retry: retryShowtimeRequest,
     staleTime: 0,
+    refetchInterval: 30 * 1000,
     gcTime: 60 * 1000,
   });
 }

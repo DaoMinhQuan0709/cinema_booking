@@ -135,7 +135,7 @@ export function useBookingHold(showtimeId) {
       setReceipt({ userId: auth.user.id, booking: response });
       patchSeats(ids, 'LOCKED');
       toast.success('Giữ ghế thành công! Bạn có 10 phút để hoàn tất đặt vé.', { id: 'hold-success' });
-      return true;
+      return response;
     } catch (error) {
       if (useAuthStore.getState().isAuthenticated) {
         toast.error(getHoldErrorMessage(error), { id: 'hold-error' });

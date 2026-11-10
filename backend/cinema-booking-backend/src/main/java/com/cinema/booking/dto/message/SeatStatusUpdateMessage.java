@@ -24,4 +24,5 @@ public class SeatStatusUpdateMessage {
     private ShowtimeSeatStatus status;
     private String action; // "HOLD", "RELEASE", "BOOKED"
     private LocalDateTime timestamp;
+    private java.util.Map<Long, Integer> versions;
 }

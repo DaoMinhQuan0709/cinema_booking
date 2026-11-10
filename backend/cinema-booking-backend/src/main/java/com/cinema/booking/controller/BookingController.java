@@ -27,6 +27,14 @@ public class BookingController {
 
     private final BookingService bookingService;
     private final QrCodeService qrCodeService;
+    private final com.cinema.booking.service.BookingProductsService bookingProductsService;
+
+    @PutMapping("/{bookingCode}/products")
+    public ResponseEntity<ApiResponse<BookingResponse>> replaceProducts(@PathVariable String bookingCode,
+            @Valid @RequestBody com.cinema.booking.dto.request.BookingProductsRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(200, "Đã cập nhật combo", bookingProductsService.replace(bookingCode, request, userDetails.getUsername())));
+    }
 
     /**
      * POST /api/v1/bookings - Tao don dat ve moi (Giu ghe 10 phut).

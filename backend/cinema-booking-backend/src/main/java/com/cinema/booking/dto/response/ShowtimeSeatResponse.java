@@ -20,4 +20,5 @@ public class ShowtimeSeatResponse {
     private SeatType seatType;
     private BigDecimal price;
     private ShowtimeSeatStatus status;
+    private Integer version;
 }

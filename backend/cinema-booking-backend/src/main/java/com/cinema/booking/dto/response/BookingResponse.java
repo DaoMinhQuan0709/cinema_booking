@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -23,6 +24,9 @@ public class BookingResponse {
     private BigDecimal totalAmount;
     private LocalDateTime createdAt;
     private LocalDateTime expiresAt;
+    private Instant serverTime;
+    private String checkoutRevision;
+    private CheckoutResponse checkout;
 
     // Thong tin suat chieu
     private ShowtimeInfo showtime;

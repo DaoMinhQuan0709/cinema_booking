@@ -54,6 +54,8 @@ public class BookingServiceImpl implements BookingService {
     private final UserRepository userRepository;
     private final SeatLockService seatLockService;
     private final WebSocketService webSocketService;
+    private final com.cinema.booking.service.CheckoutSupport checkout;
+    private final com.cinema.booking.service.SeatChanges seatChanges;
 
     @Value("${application.booking.hold-seat-duration-seconds:600}")
     private long holdDurationSeconds;
@@ -76,7 +78,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // Kiem tra suat chieu da qua gio chua
-        if (!showtime.getStartTime().isAfter(LocalDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")))) {
+        if (!showtime.getStartTime().isAfter(checkout.now())) {
             throw new BadRequestException("Suat chieu da bat dau hoac da ket thuc, khong the dat ve");
         }
 
@@ -103,8 +105,9 @@ public class BookingServiceImpl implements BookingService {
         // BUOC 2: REDIS FAST-FAIL (Tang 1)
         // SET seat_lock:{showtimeId}:{seatId} {userId} NX EX 600
         // ================================================================
+        String holdToken = UUID.randomUUID().toString();
         boolean redisLockSuccess = seatLockService.lockSeats(
-                showtime.getId(), sortedSeatIds, user.getId());
+                showtime.getId(), sortedSeatIds, holdToken);
 
         if (!redisLockSuccess) {
             log.warn("Buoc 2 - Redis LOCK THAT BAI: Co ghe da bi nguoi khac giu. showtimeId={}, userId={}",
@@ -112,6 +115,7 @@ public class BookingServiceImpl implements BookingService {
             throw new SeatConflictException("Ghe ban chon da co nguoi nhanh tay hon giu cho. Vui long chon ghe khac.");
         }
 
+        seatChanges.releaseOnRollback(showtime.getId(), sortedSeatIds, holdToken);
         log.info("Buoc 2 - Redis LOCK THANH CONG: {} ghe cho userId={}", sortedSeatIds.size(), user.getId());
 
         // ================================================================
@@ -135,19 +139,22 @@ public class BookingServiceImpl implements BookingService {
                 log.warn("Buoc 3 - DB LOCK THAT BAI: Ghe khong AVAILABLE. missing={}", missingSeatIds);
 
                 // Rollback Redis keys
-                seatLockService.unlockSeats(showtime.getId(), sortedSeatIds);
+
                 throw new SeatConflictException(
                         "Mot so ghe khong con trong (IDs: " + missingSeatIds + "). Vui long chon ghe khac.");
             }
 
             log.info("Buoc 3 - DB LOCK THANH CONG: {} ghe AVAILABLE da duoc lock", availableSeats.size());
 
+            if (availableSeats.stream().anyMatch(seat -> !seat.getShowtime().getId().equals(showtime.getId())))
+                throw new BadRequestException("Seat does not belong to this showtime");
             // --- Cap nhat trang thai ghe sang LOCKED ---
-            LocalDateTime lockedUntil = LocalDateTime.now().plusSeconds(holdDurationSeconds);
+            LocalDateTime lockedUntil = checkout.now().plusSeconds(holdDurationSeconds);
             for (ShowtimeSeat seat : availableSeats) {
                 seat.setStatus(ShowtimeSeatStatus.LOCKED);
                 seat.setLockedByUser(user);
                 seat.setLockedUntil(lockedUntil);
+                seat.setLockToken(holdToken);
             }
             showtimeSeatRepository.saveAll(availableSeats);
 
@@ -170,11 +177,11 @@ public class BookingServiceImpl implements BookingService {
                 for (BookingProductItem item : request.getProducts()) {
                     Product product = productMap.get(item.getProductId());
                     if (product == null) {
-                        seatLockService.unlockSeats(showtime.getId(), sortedSeatIds);
+
                         throw new ResourceNotFoundException("Khong tim thay san pham voi ID: " + item.getProductId());
                     }
                     if (!product.getIsAvailable()) {
-                        seatLockService.unlockSeats(showtime.getId(), sortedSeatIds);
+
                         throw new BadRequestException("San pham '" + product.getName() + "' hien khong kha dung");
                     }
 
@@ -199,6 +206,7 @@ public class BookingServiceImpl implements BookingService {
                     .showtime(showtime)
                     .totalAmount(totalAmount)
                     .status(BookingStatus.PENDING)
+                    .holdToken(holdToken)
                     .expiresAt(lockedUntil)
                     .build();
 
@@ -226,7 +234,7 @@ public class BookingServiceImpl implements BookingService {
             // ================================================================
             // BUOC 4: BROADCAST WEBSOCKET REAL-TIME (HOLD)
             // ================================================================
-            webSocketService.broadcastSeatHold(showtime.getId(), sortedSeatIds);
+            seatChanges.afterCommit(showtime.getId(), availableSeats, Map.of(), null);
 
             log.info("=== TAO DON THANH CONG === bookingCode={}, totalAmount={}, expiresAt={}",
                     bookingCode, totalAmount, lockedUntil);
@@ -237,16 +245,16 @@ public class BookingServiceImpl implements BookingService {
             throw e;
         } catch (Exception e) {
             log.error("Buoc 3 - EXCEPTION BAT NGO khi lock DB. Rollback Redis. Error: {}", e.getMessage());
-            seatLockService.unlockSeats(showtime.getId(), sortedSeatIds);
+
             throw new SeatConflictException(
                     "Ghe ban chon dang duoc xu ly boi nguoi dung khac. Vui long thu lai sau giay lat.");
         }
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public BookingResponse getBookingByCode(String bookingCode, String userEmail) {
-        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+        Booking booking = bookingRepository.findByCodeForUpdate(bookingCode)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don dat ve voi ma: " + bookingCode));
 
         User currentUser = userRepository.findByEmail(userEmail)
@@ -270,65 +278,13 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse cancelBooking(String bookingCode, String userEmail) {
-        log.info("=== BAT DAU HUY DON DAT VE === bookingCode={}, userEmail={}", bookingCode, userEmail);
-
-        // 1. Tim booking
-        Booking booking = bookingRepository.findByBookingCode(bookingCode)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don dat ve voi ma: " + bookingCode));
-
-        // 2. Kiem tra quyen so huu (Owner hoac ADMIN)
-        User currentUser = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
-
-        boolean isOwner = booking.getUser().getId().equals(currentUser.getId());
-        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
-
-        if (!isOwner && !isAdmin) {
-            throw new ForbiddenException("Ban khong co quyen huy don dat ve nay");
-        }
-
-        // 3. Kiem tra trang thai don hang
-        if (booking.getStatus() != BookingStatus.PENDING) {
-            if (booking.getStatus() == BookingStatus.CONFIRMED) {
-                throw new BadRequestException("Don dat ve da duoc thanh toan thanh cong, khong the huy giu cho");
-            } else if (booking.getStatus() == BookingStatus.CANCELLED) {
-                throw new BadRequestException("Don dat ve nay da duoc huy truoc do");
-            } else if (booking.getStatus() == BookingStatus.EXPIRED) {
-                throw new BadRequestException("Don dat ve da het han giu cho");
-            } else {
-                throw new BadRequestException("Khong the huy don dat ve o trang thai " + booking.getStatus());
-            }
-        }
-
-        // 4. Cap nhat Booking sang CANCELLED
+        Booking booking = bookingRepository.findByCodeForUpdate(bookingCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        checkout.authorize(booking, userEmail);
+        if (booking.getStatus() != BookingStatus.PENDING) throw new BadRequestException("Booking is no longer pending");
         booking.setStatus(BookingStatus.CANCELLED);
-        Booking savedBooking = bookingRepository.save(booking);
-
-        // 5. Lay danh sach ShowtimeSeat va nha ghe ve AVAILABLE tren DB
-        List<Long> seatIds = booking.getBookingSeats().stream()
-                .map(bs -> bs.getShowtimeSeat().getId())
-                .collect(Collectors.toList());
-
-        List<ShowtimeSeat> seats = showtimeSeatRepository.findAllByIdIn(seatIds);
-        for (ShowtimeSeat seat : seats) {
-            seat.setStatus(ShowtimeSeatStatus.AVAILABLE);
-            seat.setLockedByUser(null);
-            seat.setLockedUntil(null);
-        }
-        showtimeSeatRepository.saveAll(seats);
-
-        Long showtimeId = booking.getShowtime().getId();
-
-        // 6. Xoa key Redis (Fast-Fail Layer)
-        seatLockService.unlockSeats(showtimeId, seatIds);
-
-        // 7. Broadcast WebSocket real-time su kien nha ghe (RELEASE)
-        webSocketService.broadcastSeatRelease(showtimeId, seatIds);
-
-        log.info("=== HUY DON DAT VE THANH CONG === bookingCode={}, showtimeId={}, releasedSeats={}",
-                bookingCode, showtimeId, seatIds);
-
-        return mapToBookingResponse(savedBooking, seats);
+        seatChanges.release(booking);
+        return mapToBookingResponse(booking, booking.getBookingSeats().stream().map(BookingSeat::getShowtimeSeat).toList());
     }
 
     // ========== Private Helper Methods ==========
@@ -339,7 +295,7 @@ public class BookingServiceImpl implements BookingService {
      */
     private String generateBookingCode() {
         String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
-                .format(LocalDateTime.now());
+                .format(checkout.now());
         String random = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
         return "BK" + timestamp + random;
     }
@@ -396,6 +352,9 @@ public class BookingServiceImpl implements BookingService {
                 .totalAmount(booking.getTotalAmount())
                 .createdAt(booking.getCreatedAt())
                 .expiresAt(booking.getExpiresAt())
+                .serverTime(checkout.instant())
+                .checkoutRevision(checkout.revision(booking))
+                .checkout(checkout.view(booking))
                 .showtime(showtimeInfo)
                 .seats(seatInfos)
                 .products(productInfos)

@@ -24,6 +24,17 @@ public class WebSocketService {
     private static final String SEATS_TOPIC_PREFIX = "/topic/showtimes/";
     private static final String SEATS_TOPIC_SUFFIX = "/seats";
 
+    public void broadcastSnapshots(Long showtimeId, List<com.cinema.booking.entity.ShowtimeSeat> seats) {
+        var groups = seats.stream().collect(java.util.stream.Collectors.groupingBy(com.cinema.booking.entity.ShowtimeSeat::getStatus));
+        groups.forEach((status, group) -> {
+            var versions = group.stream().collect(java.util.stream.Collectors.toMap(com.cinema.booking.entity.ShowtimeSeat::getId, com.cinema.booking.entity.ShowtimeSeat::getVersion));
+            var message = SeatStatusUpdateMessage.builder().showtimeId(showtimeId).seatIds(group.stream().map(com.cinema.booking.entity.ShowtimeSeat::getId).toList())
+                    .status(status).versions(versions).action(status == ShowtimeSeatStatus.AVAILABLE ? "RELEASE" : status == ShowtimeSeatStatus.BOOKED ? "BOOKED" : "HOLD")
+                    .timestamp(LocalDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))).build();
+            messagingTemplate.convertAndSend(SEATS_TOPIC_PREFIX + showtimeId + SEATS_TOPIC_SUFFIX, message);
+        });
+    }
+
     /**
      * Broadcast cap nhat trang thai ghe toi tat ca client dang xem cung suat chieu.
      *

@@ -47,6 +47,9 @@ public class ShowtimeSeat {
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
 
+    @Column(name = "lock_token", length = 64)
+    private String lockToken;
+
     @Version
     @Column(nullable = false)
     @Builder.Default

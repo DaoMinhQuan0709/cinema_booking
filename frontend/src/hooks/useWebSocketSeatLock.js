@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { subscribeShowtimeSeats } from '../config/websocketClient';
 import { seatMapKeys } from '../features/booking/hooks/useShowtimeSeats';
-import { applySeatStatusUpdate } from '../utils/seatRealtime';
+import { applySeatStatusUpdate, filterSeatMessage } from '../utils/seatRealtime';
 
 /**
  * Lang nghe /topic/showtimes/{showtimeId}/seats va cap nhat thang vao cache
@@ -30,8 +30,11 @@ export function useWebSocketSeatLock(showtimeId, { enabled = true, onSeatUpdate 
     return subscribeShowtimeSeats(showtimeId, {
       onMessage: (message) => {
         if (String(message.showtimeId) !== String(showtimeId)) return;
-        queryClient.setQueryData(queryKey, (previous) => applySeatStatusUpdate(previous, message));
-        notify(message);
+        const previous = queryClient.getQueryData(queryKey);
+        const accepted = filterSeatMessage(previous, message);
+        if (!accepted.seatIds.length) return;
+        queryClient.setQueryData(queryKey, (previous) => applySeatStatusUpdate(previous, accepted));
+        notify(accepted);
       },
       onConnect: () => {
         setIsConnected(true);

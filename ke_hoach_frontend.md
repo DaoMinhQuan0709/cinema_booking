@@ -165,8 +165,9 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
 > và tính là 2 chỗ trong giới hạn 8; một bên không khả dụng sẽ khóa cả cặp.
 > Route dùng `showtimes.id` nội bộ dạng số. Đã tích hợp WebSocket STOMP và nút
 > “Tiếp tục” gọi API giữ ghế, yêu cầu đăng nhập, xử lý 409, xác nhận mã/thời hạn,
-> hủy giữ chỗ và khôi phục bằng API khi tải lại trang. Countdown, checkout và
-> thanh toán ở mục 4 là công việc tiếp theo.
+> hủy giữ chỗ và khôi phục bằng API khi tải lại trang. Đã nối sang Checkout,
+> countdown server, combo và tạo URL thanh toán Sandbox ở mục 4.
+> Trang kết quả VNPay ở mục 5 đã có; callback MoMo và vé QR là công việc tiếp theo.
 
 *   **Màn hình chiếu cong (Curved Screen):** Đồ họa SVG vòm cong với dòng chữ sáng *"MÀN HÌNH"*.
 *   **Ma trận ghế (Seat Matrix):**
@@ -188,8 +189,16 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
         lưu theo tài khoản/suất trong tab và được xác thực lại qua API khi tải lại trang.
 
 ### 4. Trang Chọn Bắp Nước & Thanh Toán (`/checkout/:bookingCode`)
+
+> Đã triển khai route, countdown theo giờ server, chọn combo, xác nhận giá mới,
+> lưu combo khi thanh toán, tạo/tiếp tục URL Sandbox và hủy giữ chỗ.
+> Thiết kế và nhật ký rà soát: [2026-11-09-checkout-design.md](docs/plans/2026-11-09-checkout-design.md).
+> Cần cập nhật schema và khởi động lại backend; hướng dẫn trong
+> [CHECKOUT.md](backend/cinema-booking-backend/CHECKOUT.md). Callback VNPay đã có; callback MoMo/vé QR làm sau.
+
 *   **Đồng hồ đếm ngược 10 phút (Countdown Timer):**
-    *   Đếm ngược thời gian giữ chỗ thực tế từ `expiresAt`. Khi hết giờ, hiển thị Modal *"Hết thời gian giữ vé"* và tự động điều hướng về trang chủ
+    *   Đếm ngược theo `serverTime` và deadline, không phụ thuộc đồng hồ máy khách.
+        Khi về 0, kiểm tra lại đơn; chỉ báo hết hạn sau phản hồi server và có nút về trang chủ.
 *   **Danh mục Bắp Nước (Combo Concession):**
     *   Thẻ combo (ảnh, tên combo, mô tả, đơn giá, nút tăng/giảm số lượng `+` `-`).
 *   **Phương thức thanh toán:**
@@ -198,6 +207,11 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
     *   Gọi API `POST /api/v1/payments/create-url`. Nhận `paymentUrl` và chuyển hướng thẳng trình duyệt sang cổng VNPay/MoMo Sandbox.
 
 ### 5. Trang Kết Quả Thanh Toán (`/payment/vnpay-callback` & `/payment/momo-callback`)
+> Đã triển khai VNPay (10/11/2026): trang kết quả có xác minh chữ ký tại backend,
+> kiểm tra quyền xem đơn, thông tin phim/rạp/ghế/combo/tổng tiền và chờ IPN.
+> Chỉ báo đặt vé thành công khi booking CONFIRMED/payment SUCCESS. MoMo, QR và
+> hiệu ứng pháo hoa bên dưới chưa triển khai.
+
 *   Frontend bắt các query parameters do cổng thanh toán trả về.
 *   Nếu thành công:
     *   Kích hoạt hiệu ứng pháo hoa `canvas-confetti`.

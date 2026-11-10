@@ -38,6 +38,12 @@ public interface ShowtimeSeatRepository extends JpaRepository<ShowtimeSeat, Long
      */
     List<ShowtimeSeat> findAllByIdIn(List<Long> ids);
 
+    @Query(value = "SELECT * FROM showtime_seats WHERE id IN :ids ORDER BY id FOR UPDATE", nativeQuery = true)
+    List<ShowtimeSeat> findForUpdate(@Param("ids") List<Long> ids);
+
+    @Query("SELECT ss.id FROM ShowtimeSeat ss WHERE ss.status = 'LOCKED' AND ss.lockedUntil <= :now ORDER BY ss.id")
+    List<Long> findExpiredLockedIds(@Param("now") LocalDateTime now);
+
     /**
      * Tim tat ca ghe dang bi LOCKED ma thoi gian locked_until da qua (dung cho Cronjob 4.3 quet ghe mo coi).
      */

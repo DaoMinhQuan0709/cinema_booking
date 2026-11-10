@@ -44,7 +44,7 @@ class SeatLockServiceTests {
     @Test
     void emptySeatListDoesNotCallRedis() {
         assertTrue(service.getLockedSeatIds(10L, List.of()).isEmpty());
-        service.unlockSeats(10L, List.of());
+        service.unlockSeats(10L, List.of(), "hold-a");
         verifyNoInteractions(values);
         verify(redis, never()).delete(anyCollection());
     }
@@ -56,9 +56,9 @@ class SeatLockServiceTests {
     }
 
     @Test
-    void unlocksRequestedSeatsInOneDeleteCommand() {
-        service.unlockSeats(10L, List.of(101L, 102L));
-        verify(redis).delete(List.of("seat_lock:10:101", "seat_lock:10:102"));
+    void unlocksRequestedSeatsOnlyWhenTheHoldTokenMatches() {
+        service.unlockSeats(10L, List.of(101L, 102L), "hold-a");
+        verify(redis).execute(any(org.springframework.data.redis.core.script.RedisScript.class), eq(List.of("seat_lock:10:101", "seat_lock:10:102")), eq("hold-a"));
         verify(redis, never()).delete(anyString());
     }
 
@@ -66,15 +66,15 @@ class SeatLockServiceTests {
     void failedMultiSeatHoldReleasesOnlyKeysAcquiredByThisRequest() {
         when(values.setIfAbsent(anyString(), eq("7"), eq(Duration.ofSeconds(600))))
                 .thenReturn(true, false);
-        assertFalse(service.lockSeats(10L, List.of(101L, 102L, 103L), 7L));
-        verify(redis).delete(List.of("seat_lock:10:101"));
+        assertFalse(service.lockSeats(10L, List.of(101L, 102L, 103L), "7"));
+        verify(redis).execute(any(org.springframework.data.redis.core.script.RedisScript.class), eq(List.of("seat_lock:10:101")), eq("7"));
         verify(values, never()).setIfAbsent(eq("seat_lock:10:103"), anyString(), any(Duration.class));
     }
 
     @Test
     void successfulHoldPreservesTenMinuteTtl() {
         when(values.setIfAbsent(anyString(), eq("7"), eq(Duration.ofSeconds(600)))).thenReturn(true);
-        assertTrue(service.lockSeats(10L, List.of(101L, 102L), 7L));
+        assertTrue(service.lockSeats(10L, List.of(101L, 102L), "7"));
         verify(values).setIfAbsent("seat_lock:10:101", "7", Duration.ofSeconds(600));
         verify(values).setIfAbsent("seat_lock:10:102", "7", Duration.ofSeconds(600));
         verify(redis, never()).delete(anyCollection());

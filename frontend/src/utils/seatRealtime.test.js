@@ -37,3 +37,17 @@ test('khong thay doi gi thi tra ve cung tham chieu; chua co du lieu thi bo qua',
   assert.equal(applySeatStatusUpdate(undefined, { seatIds: [1], status: 'LOCKED' }), undefined);
   assert.equal(applySeatStatusUpdate(before, null), before);
 });
+test('ignores an older release after a newer hold and advances versions for unchanged status', () => {
+  const cache = { seats: [{ showtimeSeatId: 1, status: 'LOCKED', version: 4 }] };
+  assert.equal(applySeatStatusUpdate(cache, { seatIds: [1], status: 'AVAILABLE', versions: { 1: 3 } }), cache);
+  const advanced = applySeatStatusUpdate(cache, { seatIds: [1], status: 'LOCKED', versions: { 1: 5 } });
+  assert.equal(advanced.seats[0].version, 5);
+  assert.equal(cache.seats[0].version, 4);
+});
+test('only forwards current notifications, including a release already observed by GET', async () => {
+  const { filterSeatMessage } = await import('./seatRealtime.js');
+  const map = { seats: [{ showtimeSeatId: 1, status: 'AVAILABLE', version: 4 }] };
+  assert.deepEqual(filterSeatMessage(map, { seatIds: [1], status: 'AVAILABLE', versions: { 1: 4 } }).seatIds, [1]);
+  assert.deepEqual(filterSeatMessage(map, { seatIds: [1], status: 'AVAILABLE', versions: { 1: 3 } }).seatIds, []);
+  assert.deepEqual(filterSeatMessage(map, { seatIds: [1], status: 'LOCKED', versions: { 1: 4 } }).seatIds, []);
+});

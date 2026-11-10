@@ -19,4 +19,5 @@ public class PaymentUrlResponse {
     private String paymentMethod;
     private BigDecimal amount;
     private LocalDateTime expiresAt;
+    private com.cinema.booking.enums.CheckoutState state;
 }
