@@ -3,11 +3,12 @@ import { Outlet } from 'react-router-dom';
 import Header from '../components/common/Header';
 import Footer from '../components/common/Footer';
 import AuthModal from '../features/auth/AuthModal';
+import ChatWidget from '../features/chatbot/ChatWidget';
 
 /**
  * MainLayout bọc khung giao diện dùng chung cho toàn bộ phân hệ khách hàng.
  * Bao gồm: Header cố định phía trên, nội dung động thay đổi theo route (Outlet),
- * Footer ở dưới cùng và AuthModal toàn cục.
+ * Footer ở dưới cùng, AuthModal toàn cục và widget trợ lý CineBot nổi.
  */
 export const MainLayout = () => {
   return (
@@ -27,9 +28,11 @@ export const MainLayout = () => {
 
       {/* Modal Dang nhap / Dang ky toan cuc */}
       <AuthModal />
+
+      {/* Tro ly ao CineBot (nut noi goc duoi ben phai) */}
+      <ChatWidget />
     </div>
   );
 };
 
 export default MainLayout;
-
