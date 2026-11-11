@@ -36,7 +36,8 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional(readOnly = true)
     public ChatResponse askChatbot(ChatRequest request) {
-        log.info("ChatService: Nhan cau hoi tu nguoi dung: {}", request.getMessage());
+        log.debug("CineBot request: historyMessages={}",
+                request.getConversationHistory() == null ? 0 : request.getConversationHistory().size());
 
         // 1. Thu thap du lieu thuc te tu Database (Context Injection / RAG co ban)
         String systemPrompt = buildSystemPromptWithContext();
@@ -83,7 +84,8 @@ public class ChatServiceImpl implements ChatService {
         context.append("3. TUYET DOI KHONG TU BIA DAT (anti-hallucination) thong tin ve phim, gio chieu hoac rap neu khong xuat hien trong du lieu.\n");
         context.append("4. Neu nguoi dung hoi ve mot bo phim hoac dich vu khong co trong du lieu, hay lich su tra loi rang rap hien tai chua co hoac chua co lich chieu cho bo phim do.\n");
         context.append("5. Neu he thong hien tai chua co du lieu phim hoac lich chieu, hay thong bao lich su voi nguoi dung la rap dang cap nhat lich chieu moi.\n");
-        context.append("6. Khi goi y phim hoac suat chieu, hay neu ro ten rap, phong chieu, gio chieu va huong dan nguoi dung chon ghe tren website de dat ve.\n\n");
+        context.append("6. Khi goi y phim hoac suat chieu, hay neu ro ten rap, phong chieu, gio chieu va huong dan nguoi dung chon ghe tren website de dat ve.\n");
+        context.append("7. Gia trong lich chieu la gia co ban, khong phai gia chinh xac cua ghe VIP hoac COUPLE. Khong tu tinh phu thu; huong dan chon suat va ghe de xem gia thuc te.\n\n");
 
         context.append("=== DU LIEU THOI GIAN THUC CUA HE THONG ===\n");
         context.append("Thoi gian hien tai: ").append(LocalDateTime.now().format(DATE_TIME_FORMATTER)).append("\n\n");

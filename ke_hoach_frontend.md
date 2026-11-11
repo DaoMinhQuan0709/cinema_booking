@@ -231,8 +231,14 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
 >
 > Kiểm chứng: build, ESLint, unit tests và `npm run test:chatbot-browser` sau
 > `npm run build` trong thư mục `frontend` (Windows/Edge, API giả lập, không gọi Gemini).
-> Chưa kiểm thử câu trả lời Gemini thật. Backend hiện chuyển lỗi Gemini thành
-> `reply` với HTTP 200; chuẩn hóa lỗi này và nút thử lại riêng là phần tiếp theo.
+> Backend đã tích hợp Gemini `generateContent`, mặc định `gemini-3.1-flash-lite`;
+> API key chỉ ở backend và được gửi qua header. Có timeout và mã HTTP lỗi
+> cho frontend xử lý, không trả lời giả bằng HTTP 200 khi Gemini thất bại.
+> Đã đạt 30 kiểm tra backend giả lập và 1 kiểm tra hội thoại hai lượt với Gemini
+> thật. API `/api/v1/chat/ask` đã trả lời đúng thông tin phim, nhớ lượt trước
+> và đưa ra suất chiếu cùng giá cơ bản khớp database (kiểm chứng 11/11/2026).
+> Hướng dẫn cấu hình và kiểm thử: [GEMINI.md](backend/cinema-booking-backend/GEMINI.md).
+> Nút thử lại riêng vẫn là phần tiếp theo; hiện câu hỏi lỗi được khôi phục để gửi lại.
 
 *   Nút bong bóng nổi cố định ở góc dưới cùng bên phải (`fixed bottom-6 right-6`).
 *   Khi bấm mở ra cửa sổ chat hiện đại (giống Messenger / Intercom):
