@@ -1,7 +1,42 @@
-# Nền tảng Admin Portal — phần 3
+# Admin Portal — nền tảng và quản lý phim
 
-Các màn hình `MovieManager`, `ShowtimeManager`, `ReportDashboard`, `DataSync` vẫn là
-khung của phần 2. Service, hooks và component bên dưới sẵn sàng cho phần 4–8.
+`MovieManager` đã có danh sách/thêm/sửa phim ở phần 4. `ShowtimeManager`,
+`ReportDashboard`, `DataSync` vẫn là khung; service, hooks và component dùng chung
+sẵn sàng cho các phần 5–8.
+
+## Quản lý phim — phần 4
+
+Mở `/admin/movies` bằng tài khoản ADMIN. Danh sách đọc đúng một trang từ backend,
+mặc định 10 phim, sắp xếp ID mới nhất trước. Tìm theo tên bằng nút Áp dụng/Enter;
+đổi trạng thái hoặc số phim/trang cũng áp dụng tên đang nhập và trở về trang đầu.
+Có cả Đang chiếu, Sắp chiếu, Ngừng chiếu và Tất cả trạng thái.
+
+Bộ lọc lưu trong URL: `q`, `status`, `page` (bắt đầu từ 1), `size` (10/20/50).
+Request backend dùng `keyword` và page bắt đầu từ 0. F5/Back giữ ngữ cảnh;
+tham số sai được chuẩn hóa, trang vượt giới hạn chỉ tự điều chỉnh sau khi nhận
+kết quả thành công. Khi sửa trạng thái khiến trang cuối không còn dữ liệu,
+danh sách tự trở về trang còn tồn tại. Các tham số URL khác được giữ nguyên.
+
+Nút Thêm phim và Sửa mở `MovieFormModal`, dùng đầy đủ chín trường writable của
+`MovieCreateRequest`. Tên không rỗng/tối đa 255 ký tự; thời lượng nguyên dương
+trong phạm vi Integer; ngày phải đúng lịch (không chuyển qua UTC, cho phép ngày
+quá khứ); poster/trailer tùy chọn, chỉ URL HTTP(S) hợp lệ tối đa 500 ký tự.
+Thể loại tối đa 500, phân loại tuổi tối đa 10 ký tự. Các trường tùy chọn để trống
+được gửi `null` để xóa giá trị cũ. Các thông tin Galaxy ngoài DTO như quốc gia,
+đạo diễn, diễn viên và ảnh ngang không được gửi khi sửa.
+
+Lỗi client/server giữ nguyên form; 400 hiện theo trường, lỗi khác dùng thông báo
+chung và một toast từ hook. Trong khi gửi, form/nút đóng/Escape bị khóa. Nếu mất
+phản hồi, bản nháp còn nguyên và nút Kiểm tra lại danh sách chỉ GET để đối chiếu;
+không tự POST lại. Sau lưu, các cache phim, lịch/báo cáo và catalog khách liên quan
+được invalidate; phim mới trở về trang đầu nhưng vẫn giữ bộ lọc hiện tại. Poster
+lỗi có fallback. Bảng cuộn ngang trong vùng riêng ở màn hình nhỏ.
+
+Sau `npm.cmd run build`, chạy `npm.cmd run test:admin-movies-browser` để kiểm tra
+màn hình production bằng Edge (có thể đặt `ADMIN_EDGE_PATH`). REST và catalog lưu
+bằng bộ nhớ giả lập; kiểm tra F5 chỉ chứng minh frontend đọc lại bản ghi từ API
+giả lập, không chứng minh DB thật đã lưu. JSON kết quả/ảnh desktop/390px nằm trong
+thư mục tạm script in ra. Kiểm chứng API thật vẫn thuộc phần 9.
 
 ## Service và query
 

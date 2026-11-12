@@ -202,7 +202,7 @@ async function pressKey(key, modifiers = 0) {
 }
 
 async function foundationBoot(options = {}, mode = 'movies', bootOptions = {}) {
-  reset({ foundation: true, ...options }); await boot(bootOptions); await cdp.wait('Boolean(document.querySelector("#admin-main"))');
+  reset({ foundation: true, ...options }); await boot({ route: '/admin/reports', ...bootOptions }); await cdp.wait('Boolean(document.querySelector("#admin-main"))');
   await installFoundation(mode);
 }
 
@@ -220,8 +220,9 @@ async function seedCaches() {
     await q.getMutationCache().build(q, { mutationKey: ['admin', 'write'], mutationFn: async () => 'old mutation' }).execute();
   })()`);
 }
-async function assertCacheCleared() {
-  assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryCache().findAll({ queryKey: ['admin'] }).length`), 0);
+async function assertCacheCleared({ allowCurrentQueries = false } = {}) {
+  if (!allowCurrentQueries) assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryCache().findAll({ queryKey: ['admin'] }).length`), 0);
+  assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryData(['admin', 'sensitive']) === undefined`), true);
   assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getMutationCache().getAll().filter(m => m.options.mutationKey?.[0] === 'admin').length`), 0);
   assert.deepEqual(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryData(['movies', 'public-probe'])`), ['public catalog']);
 }
@@ -335,7 +336,7 @@ try {
   reset(); await boot(); await cdp.wait(bodyIncludes('Quản lý phim')); await installProbe(); await seedCaches();
   const oldSession = await cdp.evaluate(state('sessionId'));
   await cdp.evaluate(`window.__admin.testApi.auth.getState().login({ email: 'admin@example.invalid', password: 'password123' })`);
-  await cdp.wait(bodyIncludes('Quản lý phim')); await assertCacheCleared();
+  await cdp.wait(bodyIncludes('Quản lý phim')); await assertCacheCleared({ allowCurrentQueries: true });
   assert.notEqual(await cdp.evaluate(state('sessionId')), oldSession);
   results.push('same-account login starts a new session and clears Admin query/mutation cache while preserving public catalog');
 

@@ -13,7 +13,7 @@ Ngày lập: 11/11/2026. Nguồn yêu cầu: [mục V.7 của kế hoạch front
 
 ## Những điểm đã đối chiếu với mã hiện tại
 
-- Ban đầu frontend chưa có màn hình Admin, `adminService.js` trống; Header đã có liên kết. Backend đã bảo vệ `/api/v1/admin/**` bằng quyền ADMIN. Các phần 1–3 đã triển khai và kiểm chứng mô phỏng; bốn màn hình nghiệp vụ vẫn là khung cho các phần 4, 5, 7, 8.
+- Ban đầu frontend chưa có màn hình Admin, `adminService.js` trống; Header đã có liên kết. Backend đã bảo vệ `/api/v1/admin/**` bằng quyền ADMIN. Các phần 1–4 đã triển khai và kiểm chứng mô phỏng; ba màn hình nghiệp vụ còn lại vẫn là khung cho các phần 5, 7, 8.
 - Đọc phim: `GET /movies` trả `PageResponse.content`; thêm/sửa: `POST /admin/movies`, `PUT /admin/movies/{id}` theo `MovieCreateRequest`, ảnh/trailer dùng URL.
 - `GET /cinemas` chứa phòng `auditoriums`; `GET /showtimes` chỉ trả suất mở bán. `POST /admin/showtimes` bắt buộc `endTime`, đã kiểm tra trùng phòng/giờ và trả `409`.
 - Báo cáo doanh thu đang lọc theo ngày tạo đơn `CONFIRMED`, gồm tiền combo; breakdown thiếu lọc phim/rạp và số vé nhóm đang gán 0. Occupancy nhận một ngày, hiện bỏ suất inactive và chỉ đếm ghế đã sinh inventory; cần sửa ở phần 6.
@@ -28,7 +28,7 @@ Mỗi phần là một mốc bàn giao; khi bắt đầu, tách thành việc 2�
 | [x] | **1. Phân quyền và phiên** | Tạo `AdminRoute`, trạng thái kiểm tra phiên trong `authStore`; xác minh `/users/me` trước khi tải Admin, dùng lại đăng nhập và giữ URL đích; xử lý 401/403, xóa cache Admin khi đổi phiên. | Đạt bằng Edge/API mô phỏng và MockMvc ngày 12/11/2026; API thật còn ở phần 9. |
 | [x] | **2. Khung quản trị** | Tạo `AdminLayout`: sidebar, tài khoản/đăng xuất, menu mobile, liên kết website và `Suspense`; bốn route lazy-load, màu/font hiện có. | Đạt 5 nhóm Edge/API mô phỏng ngày 12/11/2026: URL/menu, desktop/390px, bàn phím, lazy/Suspense và tài khoản. |
 | [x] | **3. Service và UI chung** | Điền `adminService.js`, tạo query hooks, bảng/modal và loading/rỗng/lỗi; dùng lại service catalog, chặn gửi lặp, làm mới cache liên quan sau khi ghi. | Đạt 11 nhóm Edge/API mô phỏng ngày 12/11/2026: DTO/Bearer, lỗi 400 theo trường, toast, cache, 409 và mất phản hồi không retry. |
-| [ ] | **4. Quản lý phim** | `MovieManager`: tìm tên, lọc ba trạng thái, phân trang server, thêm/sửa đúng DTO; kiểm tra tên/thời lượng/ngày/URL. | Thêm/sửa rồi F5 vẫn đúng; lỗi giữ form; catalog khách cập nhật theo trạng thái phim. |
+| [x] | **4. Quản lý phim** | `MovieManager`: tìm tên, lọc ba trạng thái, phân trang server, thêm/sửa đúng DTO; kiểm tra tên/thời lượng/ngày/URL. | Đạt 13 nhóm Edge/API mô phỏng trên production build ngày 12/11/2026: F5/Back, DTO/validation, lỗi giữ form và catalog đổi theo trạng thái; API thật còn ở phần 9. |
 | [ ] | **5. Quản lý suất chiếu** | `ShowtimeManager`: lọc ngày/rạp/phim, chọn phòng thuộc rạp, thêm suất; gợi ý kết thúc = thời lượng + 15 phút, gửi đủ hai mốc giờ Việt Nam; kiểm tra giá dương, giờ tương lai và thứ tự giờ. | Suất mới hiện ở lịch khách; trùng giờ trả 409 và giữ form; đổi rạp cập nhật phòng. |
 | [ ] | **6. Sửa dữ liệu báo cáo** | Sửa `AdminReportServiceImpl`/repository: KPI và breakdown cùng bộ lọc, số vé nhóm đúng; occupancy gồm suất đã kết thúc và sức chứa chưa sinh inventory, thể hiện thiếu cấu hình. Chỉ BOOKED tính là đã bán. | Dữ liệu mẫu có tổng nhóm khớp KPI; tỷ lệ không đổi chỉ vì mở sơ đồ ghế; xử lý mẫu số 0, báo cáo không ghi dữ liệu. |
 | [ ] | **7. Dashboard báo cáo** | `ReportDashboard` + `recharts`: KPI doanh thu/đơn/vé; doanh thu lọc khoảng ngày/phim/rạp, `groupBy=movie|cinema`; occupancy có ngày riêng. Bộ lọc lưu URL, hiển thị VND/% và cơ sở tính. | Đổi lọc cập nhật số/biểu đồ/bảng; Back/F5 giữ lọc; chặn ngày đảo ngược; có empty/error/retry. |
@@ -84,3 +84,27 @@ Git trước khi bắt đầu: working tree sạch; giữ nguyên cấu trúc `A
 - **Mô phỏng Admin:** `npm.cmd run test:admin-browser` đạt 35 nhóm: 19 hồi quy phiên, 5 khung quản trị, 11 service/UI; 113 request giả lập, 0 lỗi runtime. Kiểm tra cả Tab/Shift+Tab qua đầu/cuối dialog, sidebar giữ nguyên khi trì hoãn module, chặn tải module cho CUSTOMER; kiểm tra bảng/phân trang/loading/rỗng/lỗi, form 400, chốt gửi hai lần cùng tick, busy/Escape, DTO/Bearer, PUT phim, 409 suất chiếu, timeout không retry, cache và trạng thái sync online tách biệt nhập offline. Fixture dùng service/hook/component thật; không nằm trong entry production.
 - **Mô phỏng hồi quy khách:** `npm.cmd run test:checkout-browser` đạt 18 nhóm booking/checkout/VNPay; `npm.cmd run test:chatbot-browser` đạt 6 nhóm CineBot; 0 lỗi runtime. Không có API/giao dịch thật.
 - **API thật chưa chạy:** chưa gọi ghi phim/suất/sync lên backend/DB thật hoặc kiểm chứng số liệu báo cáo thật. Không sửa backend trong đợt này và không chạy lại Maven; kiểm chứng tích hợp cuối vẫn thuộc phần 9. Các phần 4–8 chưa được đánh dấu hoàn tất.
+
+## Tiến độ phần 4 — Quản lý phim
+
+Git trước khi sửa: working tree sạch. Dùng lại service, hooks và UI chung của phần 3; không triển khai nghiệp vụ phần 5–8.
+
+- [x] Danh sách phim phân trang server; tìm theo tên, lọc ba trạng thái; URL giữ bộ lọc/trang khi F5 và Back.
+- [x] Modal thêm/sửa đầy đủ `MovieCreateRequest`; chuẩn hóa dữ liệu, kiểm tra tên/thời lượng/ngày/URL và giới hạn cột dữ liệu.
+- [x] Lỗi giữ bản nháp, 400 hiện theo trường, chặn gửi lặp và xử lý mất phản hồi; làm mới danh sách/catalog theo trạng thái sau lưu.
+- [x] Kiểm chứng desktop/390px/bàn phím, F5, phân trang và hồi quy Admin; cập nhật tài liệu, ghi riêng mô phỏng/API thật.
+
+### Đầu ra phần 4
+
+- `/admin/movies` đọc một trang server, thứ tự ID mới trước, có tìm tên/lọc Đang chiếu–Sắp chiếu–Ngừng chiếu và chọn 10/20/50 phim mỗi trang. Bộ lọc/trang lưu URL; đổi lọc trở về trang đầu, đổi kích thước trang giữ tên đang nhập; trang ngoài phạm vi tự điều chỉnh sau phản hồi thành công. Có loading/rỗng/lỗi/thử lại và bảng cuộn ngang ở 390px.
+- `MovieFormModal.jsx` dùng lại modal/field/mutation chung, điền sẵn đủ chín trường DTO khi sửa. `movieForm.js` tách chuẩn hóa/validation: trim chuỗi, thời lượng Integer dương, ngày lịch hợp lệ không đổi múi giờ, URL HTTP(S), giới hạn tên/URL/thể loại/độ tuổi theo entity. Trường tùy chọn trống gửi null; không gửi/ghi đè các trường metadata Galaxy ngoài DTO.
+- Lỗi 400/500/mất phản hồi giữ form. Khi đang gửi, khóa form và đóng modal; không tự gửi lại. Khi mất phản hồi sau khi backend có thể đã ghi, nút Kiểm tra lại danh sách chỉ đọc lại dữ liệu để đối chiếu. Lưu thành công dùng invalidation phần 3 để đồng bộ danh sách, catalog khách và cache liên quan; sửa trạng thái làm rỗng trang cuối sẽ quay về trang hợp lệ.
+- Bảo toàn App/layout và nghiệp vụ phần 5–8. Hướng dẫn sử dụng và ranh giới kiểm chứng cập nhật tại [README Admin](frontend/src/features/admin/README.md) và README frontend.
+
+### Kết quả kiểm tra phần 4 ngày 12/11/2026
+
+- **Kiểm tra frontend:** `npm.cmd run lint`, `npm.cmd test` (70/70), `npm.cmd run build` đều đạt. Sáu unit test mới kiểm tra DTO/null, ngày nhuận/ngày không hợp lệ, giới hạn dữ liệu, URL an toàn, bản sao form sửa và chuẩn hóa URL phân trang.
+- **Mô phỏng Quản lý phim:** `npm.cmd run test:admin-movies-browser` đạt 13 nhóm trên Edge/production build, 67 request giả lập, 0 lỗi runtime. Kiểm tra màn hình thật, không dùng fixture form: tìm/lọc/phân trang/kích thước trang, F5/Back, tham số sai/trang ngoài phạm vi, loading/rỗng/lỗi, validation client/400, DTO/Bearer/POST/PUT, gửi hai lần một POST, khóa Escape, xóa trường tùy chọn, lỗi 500 giữ form, catalog khách đang có cache cập nhật khi đổi ENDED/COMING_SOON, mất phản hồi sau ghi và đối chiếu chỉ GET, desktop/390px/bàn phím và CUSTOMER bị chặn. Catalog phía API giả lập giữ trong bộ nhớ qua F5; kết quả này không chứng minh DB thật đã lưu.
+- **Mô phỏng hồi quy Admin:** `npm.cmd run test:admin-browser` đạt 35 nhóm phần 1–3, 131 request giả lập, 0 lỗi runtime. Fixture nền tảng chạy ở route báo cáo để không lẫn query của MovieManager thật; sau đổi phiên, kiểm tra dữ liệu cũ đã xóa trong khi cho phép query mới của phiên ADMIN đã xác minh.
+- **Mô phỏng hồi quy khách:** `npm.cmd run test:checkout-browser` đạt 18 nhóm booking/checkout/VNPay; `npm.cmd run test:chatbot-browser` đạt 6 nhóm CineBot, 0 lỗi runtime. Không gọi API thanh toán/Gemini thật.
+- **Tích hợp thật chưa chạy:** chưa thêm/sửa phim hoặc thử ADMIN/CUSTOMER với backend/DB thật; chưa chạy lại Maven vì không sửa backend. Phần 9 vẫn bao gồm nghiệm thu API/DB thật; các phần 5–9 vẫn chưa hoàn tất.

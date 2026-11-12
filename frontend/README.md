@@ -143,11 +143,11 @@ trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra
 mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
 thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.
 
-## Admin Portal — phần 1–3
+## Admin Portal — phần 1–4
 
 `/admin` xác minh `GET /users/me` rồi chuyển đến `/admin/reports`. Các URL
-`/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` hiện có trang
-chờ được bảo vệ trong `AdminLayout`, có sidebar desktop, drawer mobile và điều hướng
+`/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` được bảo vệ
+trong `AdminLayout`, có sidebar desktop, drawer mobile và điều hướng
 bằng bàn phím. Các màn hình nghiệp vụ tiếp tục theo [kế hoạch Admin](../admin-portal-plan.md).
 Quyền trong localStorage chỉ là dữ liệu ban đầu; guard chờ backend xác nhận ADMIN
 trước khi mount nội dung, tải module lazy hoặc chạy query phía trong.
@@ -173,5 +173,11 @@ tài khoản thật. Kết quả và phạm vi chưa kiểm chứng được ghi
 mẫu và trạng thái loading/rỗng/lỗi cho phần 4–8. Xem [hướng dẫn nền tảng Admin](src/features/admin/README.md)
 để dùng DTO, keys, invalidation và lỗi theo trường. Mutation chống gửi lặp, không
 tự gửi lại khi mất phản hồi; modal khóa đóng trong lúc gửi. Script Admin kiểm tra
-cả khung giao diện và nền tảng này qua fixture với API giả lập; các màn hình thực
-tế vẫn là khung tạm.
+cả khung giao diện và nền tảng này qua fixture với API giả lập.
+
+`/admin/movies` đã có tìm tên/lọc ba trạng thái/phân trang server và modal thêm/sửa
+phim. Bộ lọc/trang lưu URL để F5/Back khôi phục. Form kiểm tra tên/thời lượng/ngày/
+URL, giữ bản nháp khi lỗi và làm mới catalog theo trạng thái sau lưu. Ba màn hình
+báo cáo, suất chiếu và nhập mẫu vẫn là khung. Sau build, chạy
+`npm.cmd run test:admin-movies-browser` để kiểm tra màn hình phim production bằng
+Edge với catalog/API giả lập; chưa thay cho kiểm chứng backend/DB thật ở phần 9.
