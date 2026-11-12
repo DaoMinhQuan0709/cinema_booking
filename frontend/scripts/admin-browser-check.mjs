@@ -202,7 +202,7 @@ async function pressKey(key, modifiers = 0) {
 }
 
 async function foundationBoot(options = {}, mode = 'movies', bootOptions = {}) {
-  reset({ foundation: true, ...options }); await boot({ route: '/admin/reports', ...bootOptions }); await cdp.wait('Boolean(document.querySelector("#admin-main"))');
+  reset({ foundation: true, ...options }); await boot({ route: '/admin/sync', ...bootOptions }); await cdp.wait('Boolean(document.querySelector("#admin-main"))');
   await installFoundation(mode);
 }
 
@@ -288,7 +288,9 @@ try {
 
   reset(); await boot({ route: '/admin?date=2026-11-12#totals' });
   await cdp.wait(bodyIncludes('Báo cáo quản trị'));
-  assert.equal(await cdp.evaluate('location.pathname + location.search + location.hash'), '/admin/reports?date=2026-11-12#totals');
+  assert.equal(await cdp.evaluate('location.pathname'), '/admin/reports');
+  assert.equal(await cdp.evaluate('new URLSearchParams(location.search).get("date")'), '2026-11-12');
+  assert.equal(await cdp.evaluate('location.hash'), '#totals');
   results.push('/admin redirects to reports after verification and preserves search/hash');
 
   reset({ expiredOnce: true }); await boot(); await cdp.wait(bodyIncludes('Quản lý phim')); await installProbe();

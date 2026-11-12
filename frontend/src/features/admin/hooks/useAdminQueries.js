@@ -9,8 +9,8 @@ export function useVerifiedAdmin() {
 }
 
 function useAdminQuery(queryKey, queryFn, options = {}) {
-  const enabled = useVerifiedAdmin();
-  return useQuery({ queryKey, queryFn, staleTime: 30_000, retry: retryAdminQuery, ...options, enabled });
+  const verified = useVerifiedAdmin();
+  return useQuery({ queryKey, queryFn, staleTime: 30_000, retry: retryAdminQuery, ...options, enabled: verified && options.enabled !== false });
 }
 
 export function useAdminMovies(params = {}) {
@@ -29,8 +29,8 @@ export function useAdminShowtimes(params = {}) {
   return useAdminQuery(adminKeys.showtimeList(params), ({ signal }) => adminService.getShowtimes(params, { signal }));
 }
 
-export function useAdminRevenue(params = {}) {
-  return useAdminQuery(adminKeys.revenue(params), ({ signal }) => adminService.getRevenue(params, { signal }));
+export function useAdminRevenue(params = {}, options = {}) {
+  return useAdminQuery(adminKeys.revenue(params), ({ signal }) => adminService.getRevenue(params, { signal }), options);
 }
 
 export function useAdminOccupancy(params = {}) {

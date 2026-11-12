@@ -2,7 +2,7 @@
 
 Hai API GET vẫn thuộc `/api/v1/admin/reports/**`, yêu cầu ADMIN và trả
 `ApiResponse`. Không đổi schema. Khởi động lại backend để áp dụng phần sửa này;
-dashboard frontend sẽ được triển khai ở phần 7.
+dashboard frontend đã được triển khai ở phần 7 tại `/admin/reports`.
 
 ## Doanh thu
 

@@ -143,7 +143,7 @@ trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra
 mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
 thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.
 
-## Admin Portal — phần 1–6
+## Admin Portal — phần 1–7
 
 `/admin` xác minh `GET /users/me` rồi chuyển đến `/admin/reports`. Các URL
 `/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` được bảo vệ
@@ -177,8 +177,8 @@ cả khung giao diện và nền tảng này qua fixture với API giả lập.
 
 `/admin/movies` đã có tìm tên/lọc ba trạng thái/phân trang server và modal thêm/sửa
 phim. Bộ lọc/trang lưu URL để F5/Back khôi phục. Form kiểm tra tên/thời lượng/ngày/
-URL, giữ bản nháp khi lỗi và làm mới catalog theo trạng thái sau lưu. Hai màn hình
-báo cáo và nhập mẫu vẫn là khung. Sau build, chạy
+URL, giữ bản nháp khi lỗi và làm mới catalog theo trạng thái sau lưu. Màn hình
+nhập mẫu vẫn là khung cho phần 8. Sau build, chạy
 `npm.cmd run test:admin-movies-browser` để kiểm tra màn hình phim production bằng
 Edge với catalog/API giả lập; chưa thay cho kiểm chứng backend/DB thật ở phần 9.
 
@@ -195,6 +195,15 @@ nằm trong [README Admin](src/features/admin/README.md).
 Backend báo cáo đã sửa ở phần 6: KPI/nhóm doanh thu dùng chung bộ lọc ngày tạo
 đơn CONFIRMED/phim/rạp, đếm vé BOOKED và tránh nhân tiền khi đơn có nhiều ghế.
 Occupancy gồm lịch sử/inactive, có sức chứa khi chưa mở sơ đồ và chỉ rõ nguồn/
-suất thiếu cấu hình; báo cáo chỉ đọc. Dashboard vẫn thuộc phần 7. Xem
+suất thiếu cấu hình; báo cáo chỉ đọc. Xem
 [REPORTS.md](../backend/cinema-booking-backend/REPORTS.md) để dùng các trường bổ sung
 và chạy kiểm thử Mockito/MockMvc hoặc repository/service thật trên PostgreSQL tạm.
+
+`/admin/reports` đã có dashboard phần 7: KPI doanh thu/đơn/vé, biểu đồ Recharts
+theo phim/rạp và bảng nhóm; lấp đầy có ngày riêng, nguồn sức chứa và cảnh báo
+thiếu cấu hình. Rạp/phim áp dụng chung. URL giữ khoảng ngày, nhóm, ngày lấp đầy,
+ID và hash khi F5/Back; chặn ngày ngược trước request. Loading/rỗng/lỗi/thử lại
+độc lập theo báo cáo, có phân trang bảng và hỗ trợ bàn phím/mobile.
+Sau build, chạy `npm.cmd run test:admin-reports-browser` để kiểm tra dashboard
+production bằng Edge/API mô phỏng. Cần backend phần 6 đã khởi động lại để dùng
+đúng trường dữ liệu mới; kiểm chứng HTTP/DB ứng dụng vẫn thuộc phần 9.

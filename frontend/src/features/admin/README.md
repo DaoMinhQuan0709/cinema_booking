@@ -1,8 +1,8 @@
-# Admin Portal — nền tảng, phim và suất chiếu
+# Admin Portal — báo cáo, phim và suất chiếu
 
 `MovieManager` đã có danh sách/thêm/sửa phim ở phần 4; `ShowtimeManager` có
-danh sách/thêm suất ở phần 5. `ReportDashboard`, `DataSync` vẫn là khung cho
-phần 7–8; hợp đồng dữ liệu báo cáo của phần 6 được mô tả dưới đây.
+danh sách/thêm suất ở phần 5. `ReportDashboard` đã hoàn thành phần 7 trên dữ
+liệu phần 6. `DataSync` vẫn là khung cho phần 8.
 
 ## Quản lý phim — phần 4
 
@@ -92,7 +92,7 @@ báo cáo dòng tiền theo ngày thanh toán/hoàn tiền.
 Occupancy gồm cả suất đã kết thúc/ngừng mở bán. Mỗi dòng thêm `showtimeId`,
 `movieId`, `cinemaId`, `auditoriumId`, `startTime`, `active`, `capacitySource`.
 Nguồn sức chứa là INVENTORY, ACTIVE_SEATS, ROOM_LAYOUT hoặc UNCONFIGURED;
-`showtimesMissingCapacity` ở cấp báo cáo cho biết số suất thiếu cấu hình cần
+`showtimesMissingCapacity` ở cấp báo cáo cho biết số suất thiếu cấu hình được
 cảnh báo trong dashboard phần 7. `totalSeatsAvailable` vẫn là tổng sức chứa
 (gồm ghế đã bán), không phải số ghế còn trống. Tỷ lệ chung là tổng BOOKED chia
 tổng sức chứa, mẫu số 0 trả 0.0. Báo cáo không sinh ghế hoặc ghi dữ liệu.
@@ -101,6 +101,53 @@ Hai báo cáo có bộ ngày riêng: doanh thu dùng khoảng ngày tạo đơn,
 dùng một ngày bắt đầu suất. `groupBy` nhận movie/cinema/none; ngày đảo ngược,
 groupBy khác hoặc ID không dương trả 400. Xem [REPORTS.md](../../../../backend/cinema-booking-backend/REPORTS.md)
 về cơ sở tính, nguồn sức chứa và cách chạy kiểm thử mock/PostgreSQL tạm.
+
+## Dashboard báo cáo — phần 7
+
+Mở `/admin/reports` bằng tài khoản ADMIN đã xác minh. Giao diện giữ nền tối/đỏ,
+Be Vietnam Pro/Plus Jakarta Sans của Admin: KPI doanh thu/đơn/vé, biểu đồ thanh
+Recharts theo phim hoặc rạp, bảng chi tiết và phần lấp đầy riêng.
+
+Bộ lọc URL gồm `startDate`, `endDate`, `cinemaId`, `movieId`, `groupBy`,
+`occupancyDate`. Mặc định doanh thu từ đầu tháng đến hôm nay theo Việt Nam,
+nhóm theo phim; ngày lấp đầy mặc định hôm nay. Các ngày mặc định được ghi rõ
+vào URL nên F5/Back giữ đúng ngữ cảnh, kể cả khi sang ngày mới; các tham số
+không liên quan và hash được giữ. Ngày/ID/group sai định dạng được chuẩn hóa.
+ID lịch sử ngoài danh mục vẫn được giữ và có lựa chọn mô tả tương ứng.
+
+Rạp/phim áp dụng ngay cho cả hai báo cáo. Ngày doanh thu dùng bản nháp và chỉ
+áp dụng bằng nút Áp dụng ngày; khoảng ngược/thiếu ngày báo lỗi theo trường,
+không đổi dữ liệu/URL đã áp dụng. URL trực tiếp có hai ngày hợp lệ nhưng ngược
+thứ tự chặn query doanh thu đến khi sửa, trong khi lấp đầy vẫn hoạt động.
+Ngày lấp đầy áp dụng riêng; đổi ngày hoặc groupBy chỉ gọi lại báo cáo liên quan.
+Đặt lại bộ lọc khôi phục mặc định và xóa cả bản nháp/lỗi ngày.
+
+Biểu đồ chọn tối đa 10 nhóm có doanh thu cao nhất; bảng giữ đủ nhóm, phân trang
+20 hàng ở phía client. Bảng lấp đầy phân trang độc lập. Tên trùng được phân biệt
+bằng ID trên biểu đồ/bảng/bộ chọn; tooltip và bảng có tên đầy đủ. Biểu đồ hỗ trợ
+Tab/phím mũi tên, không chạy animation; container tự đổi kích thước. Recharts
+chỉ nằm trong module báo cáo lazy-load sau guard; CUSTOMER không tải bundle này.
+Tham khảo [BarChart](https://recharts.github.io/en-US/api/BarChart/) khi mở rộng.
+
+Số tiền/số lượng/% dùng định dạng Việt Nam; dữ liệu không có giá trị hiện “—”,
+kết quả doanh thu rỗng thực sự hiện 0. Lấp đầy dùng tỷ lệ chung backend trả về,
+không lấy trung bình các dòng. Sức chứa 0 hiện “—” cùng giải thích thay vì giả
+lập tỷ lệ; suất thiếu cấu hình có cảnh báo dữ liệu chưa đầy đủ. Bảng hiển thị
+nguồn sức chứa và suất đã ngừng mở bán, kèm phần Cách tính sức chứa.
+
+Loading/rỗng/lỗi/thử lại độc lập giữa hai báo cáo; lỗi query không toast lặp.
+Làm mới lỗi vẫn giữ dữ liệu cũ của đúng bộ lọc và ghi rõ trạng thái. Chuyển bộ
+lọc không gắn dữ liệu cũ sang bộ lọc mới; signal/hủy request ngăn phản hồi chậm
+ghi đè kết quả hiện tại. Lỗi danh mục có thử lại riêng, không ngăn tải báo cáo.
+Dashboard chỉ GET; không mở sơ đồ ghế, sinh ghế hay gửi mutation.
+
+Sau `npm.cmd run build`, chạy `npm.cmd run test:admin-reports-browser` trên
+Windows/Edge, đặt `ADMIN_EDGE_PATH` nếu cần. Script kiểm tra màn hình production,
+KPI/biểu đồ/bảng, F5/Back/hash, nhóm trùng tên, ngày riêng/ngày đảo ngược, danh
+mục nhiều trang/lỗi, loading/rỗng/lỗi/thử lại, dữ liệu cũ, nguồn sức chứa, phân
+trang, bàn phím, desktop/390px và phân quyền. API/số liệu đều mô phỏng; ảnh/JSON
+nằm trong temp được script in ra. Chưa thay thế thử HTTP trên backend/DB ứng
+dụng; dùng backend phần 6 đã khởi động lại để có đủ nguồn sức chứa/ID nhóm.
 
 ## Service và query
 
