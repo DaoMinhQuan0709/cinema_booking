@@ -143,11 +143,12 @@ trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra
 mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
 thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.
 
-## Phiên quản trị — phần 1
+## Admin Portal — phần 1–3
 
 `/admin` xác minh `GET /users/me` rồi chuyển đến `/admin/reports`. Các URL
 `/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` hiện có trang
-chờ được bảo vệ; layout và nghiệp vụ tiếp tục theo [kế hoạch Admin](../admin-portal-plan.md).
+chờ được bảo vệ trong `AdminLayout`, có sidebar desktop, drawer mobile và điều hướng
+bằng bàn phím. Các màn hình nghiệp vụ tiếp tục theo [kế hoạch Admin](../admin-portal-plan.md).
 Quyền trong localStorage chỉ là dữ liệu ban đầu; guard chờ backend xác nhận ADMIN
 trước khi mount nội dung, tải module lazy hoặc chạy query phía trong.
 
@@ -167,3 +168,10 @@ cần). Script tự mở Vite development và Edge headless, dùng API giả l�
 lazy trong `scripts/fixtures/` để kiểm tra guard/query; fixture không được đưa vào
 production build. Đây là kiểm thử mô phỏng, không gọi backend thật hay đăng nhập
 tài khoản thật. Kết quả và phạm vi chưa kiểm chứng được ghi riêng trong kế hoạch.
+
+Đã có service đọc/ghi, query/mutation hooks, bảng/phân trang, modal, trường biểu
+mẫu và trạng thái loading/rỗng/lỗi cho phần 4–8. Xem [hướng dẫn nền tảng Admin](src/features/admin/README.md)
+để dùng DTO, keys, invalidation và lỗi theo trường. Mutation chống gửi lặp, không
+tự gửi lại khi mất phản hồi; modal khóa đóng trong lúc gửi. Script Admin kiểm tra
+cả khung giao diện và nền tảng này qua fixture với API giả lập; các màn hình thực
+tế vẫn là khung tạm.

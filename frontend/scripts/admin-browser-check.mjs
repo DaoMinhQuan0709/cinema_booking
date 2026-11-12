@@ -15,7 +15,7 @@ const origin = `http://127.0.0.1:${port}`;
 const admin = { id: 1, email: 'admin@example.invalid', fullName: 'Admin mô phỏng', role: 'ADMIN' };
 const customer = { id: 2, email: 'customer@example.invalid', fullName: 'Khách mô phỏng', role: 'CUSTOMER' };
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const results = [], exceptions = [], requests = [];
+const results = [], exceptions = [], requests = [], moduleRequests = [];
 let server, edge, socket, cdp, bootScript, scenario, bootSequence = 0;
 
 class CDP {
@@ -52,7 +52,7 @@ class CDP {
   }
   async click(text) {
     assert.equal(await this.evaluate(`(() => {
-      const button = [...document.querySelectorAll('main button')].find(b => b.textContent.includes(${JSON.stringify(text)}) && b.offsetWidth && !b.disabled);
+      const button = [...document.querySelectorAll('main button, [aria-labelledby="admin-access-title"] button')].find(b => b.textContent.includes(${JSON.stringify(text)}) && b.offsetWidth && !b.disabled);
       if (!button) return false; button.click(); return true;
     })()`), true, `Visible enabled button: ${text}`);
   }
@@ -63,7 +63,7 @@ function reset(options = {}) {
     me: 0, refresh: 0, login: 0, probe: 0, held: [], ...options };
 }
 
-async function respond(requestId, status, data) {
+async function respond(requestId, status, data, message) {
   await cdp.send('Fetch.fulfillRequest', { requestId, responseCode: status,
     responseHeaders: [
       { name: 'Content-Type', value: 'application/json; charset=utf-8' },
@@ -72,14 +72,23 @@ async function respond(requestId, status, data) {
       { name: 'Access-Control-Allow-Headers', value: 'Authorization, Content-Type, Accept' },
       { name: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
     ],
-    body: Buffer.from(JSON.stringify({ code: status, message: status >= 400 ? 'Mock error' : 'OK', data })).toString('base64'),
+    body: Buffer.from(JSON.stringify({ code: status, message: message || (status >= 400 ? 'Mock error' : 'OK'), data })).toString('base64'),
   });
 }
 
 async function intercept({ request, requestId }) {
+  const url = new URL(request.url);
+  if (url.pathname.startsWith('/src/features/admin/')) {
+    if (scenario.holdMovieModule && url.pathname.endsWith('/MovieManager.jsx')) {
+      scenario.held.push({ requestId, kind: 'module' });
+      return;
+    }
+    return cdp.send('Fetch.continueRequest', { requestId });
+  }
   if (request.method === 'OPTIONS') return respond(requestId, 200);
-  const pathname = new URL(request.url).pathname.replace('/api/v1', '');
-  requests.push({ pathname, method: request.method, bearer: request.headers.Authorization });
+  const pathname = url.pathname.replace('/api/v1', '');
+  requests.push({ pathname, search: url.search, method: request.method, bearer: request.headers.Authorization,
+    body: request.postData ? JSON.parse(request.postData) : null });
   const hold = (kind, status, data) => scenario.held.push({ requestId, kind, status, data });
   if (pathname === '/users/me') {
     scenario.me++;
@@ -109,8 +118,28 @@ async function intercept({ request, requestId }) {
     return respond(requestId, request.headers.Authorization === 'Bearer fresh-token' ? 200 : 401, { label: 'Refreshed' });
   }
   if (pathname === '/admin/late') return hold('late', 403);
-  if (pathname === '/movies') return respond(requestId, 200, { content: [], totalElements: 0, totalPages: 0, last: true });
-  if (pathname === '/cinemas' || pathname === '/showtimes') return respond(requestId, 200, []);
+  if (pathname === '/movies') {
+    if (!scenario.foundation) return respond(requestId, 200, { content: [], totalElements: 0, totalPages: 0, last: true });
+    const pageNo = Number(url.searchParams.get('page') || 0);
+    const empty = url.searchParams.get('keyword') === 'empty';
+    const data = { content: empty ? [] : [{ id: pageNo + 7,
+      title: scenario.savedTitle || `Phim trang ${pageNo + 1}`, description: 'Mô tả phim' }], pageNo, pageSize: 1, totalElements: empty ? 0 : 2, totalPages: empty ? 0 : 2, last: empty || pageNo === 1 };
+    if (scenario.holdMovies) return hold('movies', 200, data);
+    return respond(requestId, scenario.moviesStatus || 200, data);
+  }
+  if (pathname === '/cinemas') return respond(requestId, 200, scenario.foundation ? [{ id: 2, auditoriums: [{ id: 3 }] }] : []);
+  if (pathname === '/showtimes') return respond(requestId, 200, scenario.foundation ? [{ id: 11, movieId: 7, auditoriumId: 3 }] : []);
+  if (pathname === '/admin/reports/revenue') return respond(requestId, 200, { totalRevenue: 90000 });
+  if (pathname === '/admin/reports/occupancy') return respond(requestId, 200, { totalSeats: 50 });
+  if (pathname === '/admin/sync/galaxy/status') return respond(requestId, 200, { lastSuccessAt: '2026-11-01T00:00:00Z' });
+  if ((pathname === '/admin/movies' && request.method === 'POST') || pathname === '/admin/movies/7' || pathname === '/admin/showtimes' || pathname === '/admin/sync/galaxy/local-file') {
+    scenario.writes = (scenario.writes || 0) + 1;
+    const status = scenario.writeStatus || 200;
+    const data = status === 400 ? { title: 'Tên phim bị trùng', durationMinutes: 'Thời lượng không hợp lệ' } : { id: 7, ...JSON.parse(request.postData || '{}') };
+    if (scenario.holdWrite) return hold('write', status, data);
+    if (status < 300 && pathname.startsWith('/admin/movies')) scenario.savedTitle = data.title;
+    return respond(requestId, status, data, status === 400 ? 'Dữ liệu yêu cầu không hợp lệ' : status === 409 ? 'Phòng chiếu đã có suất trùng giờ' : undefined);
+  }
   throw new Error(`Unexpected API request: ${pathname}`);
 }
 
@@ -118,6 +147,8 @@ async function release(kind, { allowAborted = false } = {}) {
   const index = scenario.held.findIndex(item => item.kind === kind);
   assert.ok(index >= 0, `Held ${kind} request exists`);
   const [held] = scenario.held.splice(index, 1);
+  if (kind === 'module') return cdp.send('Fetch.continueRequest', { requestId: held.requestId });
+  if (kind === 'write' && held.status < 300 && held.data?.title) scenario.savedTitle = held.data.title;
   try {
     await respond(held.requestId, held.status, held.data);
   } catch (error) {
@@ -149,13 +180,37 @@ async function boot({ user = admin, route = '/admin/movies?q=arrival#edit', widt
   ` })).identifier;
   await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
   await cdp.send('Page.navigate', { url: origin + route });
-  await cdp.wait(`window.__adminBoot === ${bootSequence} && Boolean(document.querySelector('main'))`);
+  await cdp.wait(`window.__adminBoot === ${bootSequence} && Boolean(document.querySelector('main, #admin-access-title, #root [role="status"]'))`);
 }
 
 const bodyIncludes = text => `document.body.textContent.includes(${JSON.stringify(text)})`;
 const state = property => `window.__admin.testApi.auth.getState().${property}`;
 async function installProbe(mount = false) {
   await cdp.evaluate(`(async () => { window.__admin = await import('/scripts/fixtures/admin-route-probe.jsx'); ${mount ? 'window.__admin.mountAdminProbe();' : ''} })()`);
+}
+
+async function installFoundation(mode = 'movies', guarded = true) {
+  await installProbe();
+  await cdp.evaluate(`window.__admin.mountFoundationProbe(${JSON.stringify(mode)}, ${guarded})`);
+  await cdp.wait('Boolean(document.querySelector("#admin-foundation-probe button"))');
+}
+
+async function pressKey(key, modifiers = 0) {
+  const windowsVirtualKeyCode = { Tab: 9, Enter: 13, Escape: 27 }[key];
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key, windowsVirtualKeyCode, modifiers });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, windowsVirtualKeyCode, modifiers });
+}
+
+async function foundationBoot(options = {}, mode = 'movies', bootOptions = {}) {
+  reset({ foundation: true, ...options }); await boot(bootOptions); await cdp.wait('Boolean(document.querySelector("#admin-main"))');
+  await installFoundation(mode);
+}
+
+async function seedRelatedCaches() {
+  await cdp.evaluate(`(() => {
+    const q = window.__admin.testApi.queryClient;
+    for (const key of [['movies', 'public'], ['showtimes', 'public'], ['cinemas', 'public'], ['admin', 'reports', 'cached'], ['admin', 'movie-options', 'cached'], ['admin', 'showtimes', 'cached']]) q.setQueryData(key, ['old']);
+  })()`);
 }
 async function seedCaches() {
   await cdp.evaluate(`(async () => {
@@ -188,8 +243,11 @@ try {
   socket = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { socket.addEventListener('open', resolve); socket.addEventListener('error', reject); });
   cdp = new CDP(socket);
-  await cdp.send('Runtime.enable'); await cdp.send('Page.enable');
-  await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/v1/*' }] });
+  await cdp.send('Runtime.enable'); await cdp.send('Page.enable'); await cdp.send('Network.enable');
+  cdp.on('Network.requestWillBeSent', event => {
+    if (/\/src\/(features\/admin\/[^/]+\.jsx|layouts\/AdminLayout\.jsx)/.test(event.request.url)) moduleRequests.push(event.request.url);
+  });
+  await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/v1/*' }, { urlPattern: '*/src/features/admin/*.jsx*' }] });
   cdp.on('Runtime.exceptionThrown', event => exceptions.push(event.exceptionDetails.exception?.description || event.exceptionDetails.text));
   cdp.on('Fetch.requestPaused', event => { void intercept(event).catch(error => exceptions.push(error.stack)); });
 
@@ -326,13 +384,195 @@ try {
   }
   results.push('all four Admin URLs and unknown Admin paths use the same guard');
 
+  const layoutResults = [], foundationResults = [];
+  for (const [route, heading] of [['reports', 'Báo cáo quản trị'], ['movies', 'Quản lý phim'], ['showtimes', 'Quản lý suất chiếu'], ['sync', 'Nhập dữ liệu mẫu']]) {
+    reset(); await boot({ route: '/admin/' + route });
+    await cdp.wait(`document.querySelector('#admin-page-title')?.textContent === ${JSON.stringify(heading)}`);
+    assert.equal(await cdp.evaluate(`document.querySelector('aside a[aria-current="page"]')?.getAttribute('href')`), '/admin/' + route);
+    assert.equal(await cdp.evaluate(`document.querySelector('aside').textContent.includes('admin@example.invalid')`), true);
+    assert.equal(await cdp.evaluate(`Boolean(document.querySelector('footer, button[aria-label*="CineBot"]'))`), false);
+    assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  }
+  await cdp.evaluate(`document.querySelector('a[href="#admin-main"]').focus()`); await pressKey('Enter');
+  await cdp.wait(`document.activeElement.id === 'admin-main'`);
+  layoutResults.push('desktop: all four direct URLs, active menu, account, skip link, isolated customer layout');
+
+  reset(); await boot({ route: '/admin/reports', width: 390 }); await cdp.wait(`Boolean(document.querySelector('#admin-main'))`);
+  const openDrawer = async () => { await cdp.evaluate(`document.querySelector('button[aria-label="Mở menu quản trị"]').click()`); await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`); };
+  await openDrawer();
+  for (let index = 0; index < 12; index++) {
+    await pressKey('Tab', index < 6 ? 0 : 8);
+    assert.equal(await cdp.evaluate(`document.querySelector('dialog').contains(document.activeElement)`), true);
+  }
+  await pressKey('Escape'); await cdp.wait(`!document.querySelector('dialog[open]')`);
+  assert.equal(await cdp.evaluate(`document.activeElement.getAttribute('aria-label')`), 'Mở menu quản trị');
+  await openDrawer(); await cdp.evaluate(`document.querySelector('dialog a[href="/admin/showtimes"]').click()`);
+  await cdp.wait(`!document.querySelector('dialog[open]') && document.querySelector('#admin-page-title')?.textContent === 'Quản lý suất chiếu'`);
+  await openDrawer(); await cdp.evaluate(`document.querySelector('button[aria-label="Đóng menu quản trị"]').click()`);
+  await cdp.wait(`!document.querySelector('dialog[open]')`); await openDrawer();
+  await writeFile(path.join(artifacts, 'admin-drawer-390.png'), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 380, y: 350, button: 'left', clickCount: 1 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 380, y: 350, button: 'left', clickCount: 1 });
+  await cdp.wait(`!document.querySelector('dialog[open]')`);
+  assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  layoutResults.push('390px drawer: Tab/Shift+Tab focus trap, Escape/X/backdrop, navigation closes and restores focus');
+
+  reset({ holdMovieModule: true }); await boot({ route: '/admin/reports' }); await cdp.wait(`Boolean(document.querySelector('#admin-page-title'))`);
+  await cdp.evaluate(`document.querySelector('aside').dataset.suspenseProbe = 'preserved'`);
+  await cdp.evaluate(`document.querySelector('aside a[href="/admin/movies"]').click()`); await waitHeld('module');
+  // Router transitions may retain the previous outlet instead of replacing it with fallback.
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('#admin-main'))`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('aside').getBoundingClientRect().width > 0`), true);
+  await release('module'); await cdp.wait(`document.querySelector('#admin-page-title')?.textContent === 'Quản lý phim'`);
+  assert.equal(await cdp.evaluate(`document.querySelector('aside').dataset.suspenseProbe`), 'preserved');
+  layoutResults.push('lazy child Suspense keeps the sidebar mounted and usable while its module is delayed');
+
+  reset({ user: customer, holdMe: true }); const moduleStart = moduleRequests.length;
+  await boot(); await waitHeld('me'); assert.equal(moduleRequests.length, moduleStart);
+  scenario.holdMe = false; await release('me'); await cdp.wait(bodyIncludes('403 — Không có quyền quản trị'));
+  assert.equal(moduleRequests.length, moduleStart);
+  layoutResults.push('CUSTOMER and unverified sessions fetch neither AdminLayout nor Admin page modules');
+
+  reset(); await boot(); await cdp.wait(`Boolean(document.querySelector('aside'))`);
+  await cdp.evaluate(`document.querySelector('aside a[href="/"]').click()`); await cdp.wait(`Boolean(document.querySelector('main h1'))`);
+  assert.notEqual(await cdp.evaluate(`localStorage.getItem('premier_cinema_access_token')`), null);
+  reset(); await boot(); await cdp.wait(`Boolean(document.querySelector('aside'))`);
+  await cdp.evaluate(`document.querySelector('aside button').click()`); await cdp.wait(`location.pathname === '/' && Boolean(document.querySelector('main h1'))`);
+  assert.equal(await cdp.evaluate(`localStorage.getItem('premier_cinema_access_token')`), null);
+  layoutResults.push('website link preserves the session; account logout returns home and clears credentials');
+
+  await foundationBoot({ holdMovies: true }); await waitHeld('movies');
+  assert.equal(await cdp.evaluate(`document.querySelector('#admin-foundation-probe [role="status"]').textContent.includes('Đang tải')`), true);
+  scenario.holdMovies = false; await release('movies'); await cdp.wait(bodyIncludes('Phim trang 1'));
+  await cdp.evaluate(`[...document.querySelectorAll('#admin-foundation-probe button')].find(b => b.textContent === 'Trang sau').click()`);
+  await cdp.wait(bodyIncludes('Phim trang 2'));
+  assert.match(requests.filter(r => r.pathname === '/movies').at(-1).search, /page=1/);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('#admin-foundation-probe table caption'))`), true);
+  foundationResults.push('table: loading, semantic caption/headers and server pagination preserve filters');
+
+  await foundationBoot({}, 'empty'); await cdp.wait(bodyIncludes('Không có phim phù hợp'));
+  assert.equal(await cdp.evaluate(`document.querySelector('#admin-foundation-probe').textContent.includes('Trang 0/0')`), true);
+  await foundationBoot({ moviesStatus: 404 }); await cdp.wait(`Boolean(document.querySelector('#admin-foundation-probe [role="alert"]'))`);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('[data-sonner-toast]').length`), 0);
+  const readCount = requests.filter(r => r.pathname === '/movies').length; await delay(1100);
+  assert.equal(requests.filter(r => r.pathname === '/movies').length, readCount);
+  scenario.moviesStatus = 200; await cdp.evaluate(`document.querySelector('#admin-foundation-probe [role="alert"] button').click()`);
+  await cdp.wait(bodyIncludes('Phim trang 1'));
+  foundationResults.push('empty/error/retry UI: no query toast, no client-error retry, successful explicit recovery');
+
+  await foundationBoot({ writeStatus: 400 }); await cdp.wait(bodyIncludes('Phim trang 1'));
+  await cdp.evaluate(`const opener = document.querySelector('[data-open-form]'); opener.focus(); opener.click()`);
+  await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`);
+  for (let index = 0; index < 12; index++) { await pressKey('Tab', index < 6 ? 0 : 8); assert.equal(await cdp.evaluate(`document.querySelector('dialog').contains(document.activeElement)`), true); }
+  await cdp.evaluate(`document.querySelector('#admin-probe-form').requestSubmit()`);
+  await cdp.wait(bodyIncludes('Tên phim bị trùng'));
+  assert.equal(scenario.writes, 1);
+  assert.equal(await cdp.evaluate(`document.querySelector('input[name="title"]').value`), 'Phim thử nghiệm');
+  assert.equal(await cdp.evaluate(`document.querySelector('input[name="durationMinutes"]').getAttribute('aria-invalid')`), 'true');
+  assert.equal(await cdp.evaluate(`document.getElementById(document.querySelector('input[name="title"]').getAttribute('aria-describedby')).textContent`), 'Tên phim bị trùng');
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('[data-sonner-toast]').length`), 0);
+  await pressKey('Escape'); await cdp.wait(`!document.querySelector('dialog[open]')`);
+  assert.equal(await cdp.evaluate(`document.activeElement.hasAttribute('data-open-form')`), true);
+  await cdp.evaluate(`document.querySelector('[data-open-form]').click()`); await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: 1, y: 1, button: 'left', clickCount: 1 });
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 1, y: 1, button: 'left', clickCount: 1 });
+  await cdp.wait(`!document.querySelector('dialog[open]')`);
+  foundationResults.push('400 validation: maps to accessible fields, preserves draft, no duplicate toast; modal traps/restores focus');
+
+  await foundationBoot({ holdWrite: true }, 'movies', { width: 390 }); await cdp.wait(bodyIncludes('Phim trang 1')); await seedRelatedCaches();
+  await cdp.evaluate(`document.querySelector('[data-open-form]').click()`); await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`);
+  await writeFile(path.join(artifacts, 'admin-modal-390.png'), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  await cdp.evaluate(`document.querySelector('#admin-probe-form').requestSubmit(); document.querySelector('#admin-probe-form').requestSubmit()`);
+  await waitHeld('write'); await cdp.wait(`document.querySelector('dialog').getAttribute('aria-busy') === 'true'`);
+  await pressKey('Escape'); assert.equal(await cdp.evaluate(`Boolean(document.querySelector('dialog[open]'))`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('button[aria-label="Đóng hộp thoại"]').disabled`), true);
+  assert.equal(scenario.writes, 1); await release('write');
+  await cdp.wait(`!document.querySelector('dialog[open]') && document.querySelectorAll('[data-sonner-toast][data-type="success"]').length === 1`);
+  await cdp.wait(bodyIncludes('Phim thử nghiệm'));
+  const created = requests.filter(r => r.pathname === '/admin/movies' && r.method === 'POST').at(-1);
+  assert.equal(created.bearer, 'Bearer boot-token');
+  assert.deepEqual(Object.keys(created.body).sort(), ['ageRating', 'description', 'durationMinutes', 'genre', 'posterUrl', 'releaseDate', 'status', 'title', 'trailerUrl'].sort());
+  assert.equal(created.body.durationMinutes, 90); assert.equal(created.body.releaseDate, '2027-01-02');
+  for (const key of [['movies', 'public'], ['showtimes', 'public'], ['admin', 'reports', 'cached'], ['admin', 'movie-options', 'cached']]) {
+    assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryState(${JSON.stringify(key)}).isInvalidated`), true);
+  }
+  assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryState(['cinemas','public']).isInvalidated`), false);
+  foundationResults.push('create movie: double submit sends one POST, locks modal, exact DTO/Bearer, one toast, refreshes Admin/public cache at 390px');
+
+  await foundationBoot(); await cdp.wait(bodyIncludes('Phim trang 1'));
+  await cdp.evaluate(`document.querySelector('[data-update]').click()`); await cdp.wait(bodyIncludes('Phim đã sửa'));
+  const updated = requests.filter(r => r.pathname === '/admin/movies/7').at(-1);
+  assert.equal(updated.method, 'PUT'); assert.equal(updated.body.title, 'Phim đã sửa'); assert.equal(updated.body.id, undefined);
+  foundationResults.push('update movie uses PUT /admin/movies/{id}, strips form-only fields and refreshes active lists');
+
+  await foundationBoot({ writeStatus: 409 }); await cdp.wait(bodyIncludes('Phim trang 1')); await seedRelatedCaches();
+  await cdp.evaluate(`document.querySelector('[data-showtime]').click()`); await cdp.wait(bodyIncludes('Phòng chiếu đã có suất trùng giờ'));
+  assert.equal(scenario.writes, 1); assert.equal(await cdp.evaluate(`document.querySelectorAll('[data-sonner-toast][data-type="error"]').length`), 1);
+  const scheduled = requests.filter(r => r.pathname === '/admin/showtimes').at(-1);
+  assert.deepEqual(scheduled.body, { movieId: 7, auditoriumId: 3, startTime: '2027-01-02T19:00:00', endTime: '2027-01-02T20:45:00', basePrice: 90000 });
+  scenario.writeStatus = 200; await cdp.evaluate(`document.querySelector('[data-showtime]').click()`);
+  await cdp.wait(`Boolean(document.querySelector('[data-sonner-toast][data-type="success"]'))`);
+  assert.equal(scenario.writes, 2);
+  assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryState(['showtimes','public']).isInvalidated`), true);
+  assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryState(['admin','reports','cached']).isInvalidated`), true);
+  foundationResults.push('showtime DTO includes both times; 409 produces one toast/no retry, successful explicit resubmit refreshes schedule/reports');
+
+  await foundationBoot({ holdWrite: true }); await cdp.wait(bodyIncludes('Phim trang 1'));
+  await cdp.evaluate(`window.__admin.testApi.axiosInstance.defaults.timeout = 100; document.querySelector('[data-open-form]').click()`);
+  await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`); await cdp.evaluate(`document.querySelector('#admin-probe-form').requestSubmit()`);
+  await waitHeld('write'); await cdp.wait(bodyIncludes('Chưa xác định được kết quả lưu'));
+  await delay(1400); assert.equal(scenario.writes, 1);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('dialog[open]'))`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('input[name="title"]').value`), 'Phim thử nghiệm');
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('[data-sonner-toast][data-type="error"]').length`), 1);
+  await release('write', { allowAborted: true });
+  foundationResults.push('lost write response: one POST, no automatic retry, uncertain-result message, draft retained and one toast');
+
+  await foundationBoot({}, 'all');
+  await cdp.wait(`document.querySelector('[data-read-status]').textContent.includes('"lastSuccessAt"') && document.querySelector('[data-read-status]').textContent.includes('"movies":2')`);
+  const reads = JSON.parse(await cdp.evaluate(`document.querySelector('[data-read-status]').textContent`));
+  assert.deepEqual(reads, { movies: 2, cinemas: 1, showtimes: 1, revenue: 90000, occupancy: 50, lastSuccessAt: '2026-11-01T00:00:00Z' });
+  const revenue = requests.filter(r => r.pathname === '/admin/reports/revenue').at(-1);
+  for (const [key, value] of Object.entries({ startDate: '2027-01-01', endDate: '2027-01-31', movieId: '7', cinemaId: '2', groupBy: 'movie' })) {
+    assert.equal(new URLSearchParams(revenue.search).get(key), value);
+  }
+  assert.equal(revenue.bearer, 'Bearer boot-token');
+  foundationResults.push('query hooks reuse paged catalog/cinema/room/showtime services and send correct report/occupancy/sync parameters');
+
+  await seedRelatedCaches(); await cdp.evaluate(`document.querySelector('[data-sync]').click()`);
+  await cdp.wait(`Boolean(document.querySelector('[data-sonner-toast][data-type="success"]'))`);
+  const imported = requests.filter(r => r.pathname === '/admin/sync/galaxy/local-file').at(-1);
+  assert.equal(imported.method, 'POST'); assert.equal(imported.body, null); assert.equal(new URLSearchParams(imported.search).get('limitShowtimes'), '25');
+  assert.equal(scenario.writes, 1);
+  for (const key of [['movies', 'public'], ['showtimes', 'public'], ['cinemas', 'public']]) {
+    assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryState(${JSON.stringify(key)}).isInvalidated`), true);
+  }
+  assert.equal(JSON.parse(await cdp.evaluate(`document.querySelector('[data-read-status]').textContent`)).lastSuccessAt, '2026-11-01T00:00:00Z');
+  foundationResults.push('local-file sync sends limit as query param, refreshes catalog/reports and keeps online status separate');
+
+  await foundationBoot({ holdMovies: true }); await waitHeld('movies'); await installProbe();
+  await cdp.evaluate(`window.__admin.testApi.auth.getState().logout({ silent: true })`);
+  await cdp.wait(bodyIncludes('Đăng nhập để vào quản trị'));
+  assert.equal(await cdp.evaluate(`window.__admin.testApi.queryClient.getQueryCache().findAll({ queryKey: ['admin'] }).length`), 0);
+  await release('movies', { allowAborted: true });
+  foundationResults.push('catalog query signal passes through shared service and is aborted/removed on session expiry');
+
+  reset({ foundation: true, user: customer }); await boot(); await cdp.wait(bodyIncludes('403 — Không có quyền quản trị'));
+  const beforeCustomerProbe = requests.length; await installFoundation('all', false);
+  await cdp.evaluate(`document.querySelector('[data-sync]').click()`); await delay(150);
+  assert.equal(requests.length, beforeCustomerProbe);
+  foundationResults.push('hooks mounted outside the route still block CUSTOMER reads and writes');
+
   assert.deepEqual(exceptions, []);
-  const report = { mode: 'Edge + Vite development + mocked REST APIs; no live integration', passed: results, runtimeExceptions: exceptions.length, mockRequests: requests.length };
+  const report = { mode: 'Edge + Vite development + mocked REST APIs; no live integration', passed: results, layoutPassed: layoutResults, foundationPassed: foundationResults,
+    runtimeExceptions: exceptions.length, mockRequests: requests.length };
   await writeFile(path.join(artifacts, 'results.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ ...report, artifacts }, null, 2));
 } catch (error) {
   await writeFile(path.join(artifacts, 'failure.json'), JSON.stringify({ results, scenario, requests, exceptions,
-    location: await cdp?.evaluate('location.href'), body: await cdp?.evaluate('document.body.innerText') }, null, 2));
+    location: await cdp?.evaluate('location.href'), body: await cdp?.evaluate('document.body.innerText'),
+    modal: await cdp?.evaluate(`document.querySelector('dialog')?.outerHTML`), activeElement: await cdp?.evaluate('document.activeElement?.outerHTML') }, null, 2));
   console.error(`Browser check failed; diagnostics: ${path.join(artifacts, 'failure.json')}`);
   throw error;
 } finally {

@@ -2,6 +2,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CalendarDays, Clapperboard, Film, LayoutDashboard, LogOut, Menu, RefreshCw, X } from 'lucide-react';
 import { useAuthStore } from '../features/auth/authStore';
+import { trapDialogFocus } from '../features/admin/dialogFocus';
 
 const NAV_ITEMS = [
   { to: '/admin/reports', label: 'Báo cáo', icon: LayoutDashboard },
@@ -100,20 +101,23 @@ const MobileDrawer = ({ onClose, returnFocusRef }) => {
 
   useEffect(() => {
     const dialog = dialogRef.current;
+    const returnFocusTarget = returnFocusRef.current;
     const previousOverflow = document.body.style.overflow;
     dialog.showModal();
     document.body.style.overflow = 'hidden';
     return () => {
       if (dialog.open) dialog.close();
       document.body.style.overflow = previousOverflow;
-      returnFocusRef.current?.focus();
+      returnFocusTarget?.focus();
     };
   }, [returnFocusRef]);
 
   return (
     <dialog
       ref={dialogRef}
+      tabIndex={-1}
       aria-label="Menu quản trị"
+      onKeyDown={trapDialogFocus}
       onCancel={(event) => { event.preventDefault(); onClose(); }}
       onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}
       className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none bg-transparent p-0 text-white backdrop:bg-black/70 open:flex"

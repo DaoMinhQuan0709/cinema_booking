@@ -8,8 +8,22 @@ import { queryClient } from '../../src/config/queryClient';
 import { tokenStorage } from '../../src/config/tokenStorage';
 import axiosInstance from '../../src/config/axiosInstance';
 import { useAuthStore } from '../../src/features/auth/authStore';
+import { adminService } from '../../src/services/adminService';
 
-export const testApi = { queryClient, tokenStorage, axiosInstance, auth: useAuthStore };
+export const testApi = { queryClient, tokenStorage, axiosInstance, adminService, auth: useAuthStore };
+
+export async function mountFoundationProbe(mode = 'movies', guarded = true) {
+  const { default: FoundationProbe } = await import('./AdminFoundationProbe');
+  const container = document.createElement('div');
+  container.id = 'admin-foundation-probe';
+  document.body.append(container);
+  const content = <FoundationProbe mode={mode} />;
+  createRoot(container).render(<QueryClientProvider client={queryClient}>
+    {guarded ? <MemoryRouter initialEntries={['/admin/foundation']}><Routes>
+      <Route path="/admin" element={<AdminRoute />}><Route path="foundation" element={content} /></Route>
+    </Routes></MemoryRouter> : content}
+  </QueryClientProvider>);
+}
 
 export function mountAdminProbe() {
   window.__adminProbe = { lazyLoads: 0, aborted: 0 };

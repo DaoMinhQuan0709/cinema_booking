@@ -18,17 +18,17 @@ export const movieService = {
      * @param {string} [params.sort] vd: 'releaseDate,desc'
      * @returns {Promise<{content: object[], pageNo: number, pageSize: number, totalElements: number, totalPages: number, last: boolean}>}
      */
-    getMovies: async (params = {}) => {
-        const { data } = await axiosInstance.get('/movies', { params });
+    getMovies: async (params = {}, options = {}) => {
+        const { data } = await axiosInstance.get('/movies', { ...options, params });
         return data;
     },
 
     // Collect every API page for the full catalog; previews use getMovies directly.
-    getAllMovies: async (params = {}) => {
-        const first = await movieService.getMovies({ ...params, page: 0 });
+    getAllMovies: async (params = {}, options = {}) => {
+        const first = await movieService.getMovies({ ...params, page: 0 }, options);
         const content = [...first.content];
         for (let page = 1; page < first.totalPages; page += 1) {
-            const next = await movieService.getMovies({ ...params, page });
+            const next = await movieService.getMovies({ ...params, page }, options);
             content.push(...next.content);
         }
         return { ...first, content };
@@ -38,8 +38,8 @@ export const movieService = {
      * Lay chi tiet 1 phim theo ID (kem trailer, mo ta day du).
      * @param {number|string} id
      */
-    getMovieById: async (id) => {
-        const { data } = await axiosInstance.get(`/movies/${id}`);
+    getMovieById: async (id, options = {}) => {
+        const { data } = await axiosInstance.get(`/movies/${id}`, options);
         return data;
     },
 };

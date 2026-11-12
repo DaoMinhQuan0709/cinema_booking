@@ -13,7 +13,7 @@ Ngày lập: 11/11/2026. Nguồn yêu cầu: [mục V.7 của kế hoạch front
 
 ## Những điểm đã đối chiếu với mã hiện tại
 
-- Frontend chưa có màn hình Admin, `adminService.js` trống; Header đã có liên kết. Backend đã bảo vệ `/api/v1/admin/**` bằng quyền ADMIN.
+- Ban đầu frontend chưa có màn hình Admin, `adminService.js` trống; Header đã có liên kết. Backend đã bảo vệ `/api/v1/admin/**` bằng quyền ADMIN. Các phần 1–3 đã triển khai và kiểm chứng mô phỏng; bốn màn hình nghiệp vụ vẫn là khung cho các phần 4, 5, 7, 8.
 - Đọc phim: `GET /movies` trả `PageResponse.content`; thêm/sửa: `POST /admin/movies`, `PUT /admin/movies/{id}` theo `MovieCreateRequest`, ảnh/trailer dùng URL.
 - `GET /cinemas` chứa phòng `auditoriums`; `GET /showtimes` chỉ trả suất mở bán. `POST /admin/showtimes` bắt buộc `endTime`, đã kiểm tra trùng phòng/giờ và trả `409`.
 - Báo cáo doanh thu đang lọc theo ngày tạo đơn `CONFIRMED`, gồm tiền combo; breakdown thiếu lọc phim/rạp và số vé nhóm đang gán 0. Occupancy nhận một ngày, hiện bỏ suất inactive và chỉ đếm ghế đã sinh inventory; cần sửa ở phần 6.
@@ -26,8 +26,8 @@ Mỗi phần là một mốc bàn giao; khi bắt đầu, tách thành việc 2�
 | Xong | Phần | Công việc và đầu ra | Kiểm chứng |
 | :---: | --- | --- | --- |
 | [x] | **1. Phân quyền và phiên** | Tạo `AdminRoute`, trạng thái kiểm tra phiên trong `authStore`; xác minh `/users/me` trước khi tải Admin, dùng lại đăng nhập và giữ URL đích; xử lý 401/403, xóa cache Admin khi đổi phiên. | Đạt bằng Edge/API mô phỏng và MockMvc ngày 12/11/2026; API thật còn ở phần 9. |
-| [ ] | **2. Khung quản trị** | Tạo `AdminLayout`: sidebar, tài khoản/đăng xuất, menu mobile, liên kết website và `Suspense`; bốn route lazy-load, màu/font hiện có. | Mở trực tiếp URL, menu active đúng, dùng được ở 390px/desktop và bằng bàn phím. |
-| [ ] | **3. Service và UI chung** | Điền `adminService.js`, tạo query hooks, bảng/modal và loading/rỗng/lỗi; dùng lại service catalog, chặn gửi lặp, làm mới cache liên quan sau khi ghi. | Bearer/payload đúng; validation 400 gắn vào trường; toast một lần; mutation không tự retry khi mất phản hồi. |
+| [x] | **2. Khung quản trị** | Tạo `AdminLayout`: sidebar, tài khoản/đăng xuất, menu mobile, liên kết website và `Suspense`; bốn route lazy-load, màu/font hiện có. | Đạt 5 nhóm Edge/API mô phỏng ngày 12/11/2026: URL/menu, desktop/390px, bàn phím, lazy/Suspense và tài khoản. |
+| [x] | **3. Service và UI chung** | Điền `adminService.js`, tạo query hooks, bảng/modal và loading/rỗng/lỗi; dùng lại service catalog, chặn gửi lặp, làm mới cache liên quan sau khi ghi. | Đạt 11 nhóm Edge/API mô phỏng ngày 12/11/2026: DTO/Bearer, lỗi 400 theo trường, toast, cache, 409 và mất phản hồi không retry. |
 | [ ] | **4. Quản lý phim** | `MovieManager`: tìm tên, lọc ba trạng thái, phân trang server, thêm/sửa đúng DTO; kiểm tra tên/thời lượng/ngày/URL. | Thêm/sửa rồi F5 vẫn đúng; lỗi giữ form; catalog khách cập nhật theo trạng thái phim. |
 | [ ] | **5. Quản lý suất chiếu** | `ShowtimeManager`: lọc ngày/rạp/phim, chọn phòng thuộc rạp, thêm suất; gợi ý kết thúc = thời lượng + 15 phút, gửi đủ hai mốc giờ Việt Nam; kiểm tra giá dương, giờ tương lai và thứ tự giờ. | Suất mới hiện ở lịch khách; trùng giờ trả 409 và giữ form; đổi rạp cập nhật phòng. |
 | [ ] | **6. Sửa dữ liệu báo cáo** | Sửa `AdminReportServiceImpl`/repository: KPI và breakdown cùng bộ lọc, số vé nhóm đúng; occupancy gồm suất đã kết thúc và sức chứa chưa sinh inventory, thể hiện thiếu cấu hình. Chỉ BOOKED tính là đã bán. | Dữ liệu mẫu có tổng nhóm khớp KPI; tỷ lệ không đổi chỉ vì mở sơ đồ ghế; xử lý mẫu số 0, báo cáo không ghi dữ liệu. |
@@ -59,3 +59,28 @@ Backend đã bổ sung JSON `401` cho yêu cầu chưa xác thực/token hết h
 - **Mô phỏng hồi quy:** `npm.cmd run test:checkout-browser` đạt 18 nhóm checkout/booking/VNPay; `npm.cmd run test:chatbot-browser` đạt 6 nhóm CineBot. Không có lỗi runtime; REST/STOMP/cổng thanh toán/Gemini đều dùng mô phỏng, không có giao dịch thật.
 - **Backend MockMvc/Mockito:** `.\mvnw.cmd "-Dtest=SecurityAuthorizationTests,BookingControllerTests,ShowtimeControllerTests" test` đạt 15/15 (5 kiểm thử bảo mật mới, 10 hồi quy controller). Chạy chuỗi lọc bảo mật thật với JWT/user lookup giả lập, không dùng DB/Redis/API ngoài.
 - **Tích hợp thật chưa chạy:** chưa đăng nhập ADMIN/CUSTOMER bằng backend/DB thật; chưa chạy toàn bộ `.\mvnw.cmd test` hoặc `AuthIntegrationTests` cần hạ tầng. Các kiểm chứng này vẫn thuộc phần 9; không coi kết quả mô phỏng là nghiệm thu tích hợp thật.
+
+## Tiến độ phần 2 và 3
+
+Git trước khi bắt đầu: working tree sạch; giữ nguyên cấu trúc `AdminShell`, `AdminLayout` và các màn hình khung đã có trong repo.
+
+- [x] Kiểm chứng phần 2: URL trực tiếp/menu active, desktop/390px, drawer và bàn phím, Suspense giữ sidebar, đăng nhập/đăng xuất.
+- [x] Service đọc dùng lại catalog, ghi đúng DTO phim/suất và endpoint báo cáo/sync; truyền signal và tự xử lý lỗi ở UI.
+- [x] Query keys/hooks theo phiên ADMIN; mutation chống gửi lặp, không tự retry khi mất phản hồi và làm mới cache khách/Admin.
+- [x] Bảng/phân trang, modal, trường biểu mẫu và trạng thái loading/rỗng/lỗi dùng chung, có hỗ trợ bàn phím.
+- [x] Kiểm chứng validation 400, toast một lần, lỗi 409/timeout, cache và hồi quy phiên; ghi riêng mô phỏng và API thật.
+
+### Đầu ra phần 2–3
+
+- Bảo toàn `App.jsx`, AdminShell và bốn màn hình khung đã có. `AdminLayout` chỉ sửa chỗ giữ tham chiếu trả focus để qua lint, và bổ sung vòng Tab/Shift+Tab để focus không rời drawer. Chưa thêm nghiệp vụ vào các màn hình phần 4/5/7/8.
+- `adminService.js` đọc qua service catalog, ghi phim/suất theo DTO và cung cấp endpoint báo cáo/sync mẫu. Mở rộng movieService nhận Axios options để truyền signal qua mọi trang, giữ cách gọi cũ của website khách.
+- Query hooks chỉ chạy sau khi xác minh ADMIN, keys bắt đầu bằng `admin`. Mutation kiểm tra phiên, dùng chung promise khi gửi lặp, không tự retry/xếp hàng ghi lúc offline, làm mới cache Admin/khách đúng nhóm. Validation 400 trả `fieldErrors`; mất phản hồi giữ bản nháp và yêu cầu kiểm tra lại dữ liệu.
+- Có `AdminTable`/phân trang, `AdminModal`, `AdminField`, `AdminLoading`, `AdminEmpty`, `AdminError`. Modal/drawer có vòng focus; modal khóa cả Escape/X/backdrop trong lúc gửi và khôi phục focus/scroll khi đóng.
+- API sử dụng và quy ước ghép form/bảng được ghi tại [README tính năng Admin](frontend/src/features/admin/README.md).
+
+### Kết quả kiểm tra phần 2–3 ngày 12/11/2026
+
+- **Kiểm tra frontend:** `npm.cmd run lint`, `npm.cmd test` (64/64), `npm.cmd run build` đều đạt. Ba unit test mới kiểm tra ánh xạ validation, phân biệt lỗi đọc/mất phản hồi ghi và chính sách retry.
+- **Mô phỏng Admin:** `npm.cmd run test:admin-browser` đạt 35 nhóm: 19 hồi quy phiên, 5 khung quản trị, 11 service/UI; 113 request giả lập, 0 lỗi runtime. Kiểm tra cả Tab/Shift+Tab qua đầu/cuối dialog, sidebar giữ nguyên khi trì hoãn module, chặn tải module cho CUSTOMER; kiểm tra bảng/phân trang/loading/rỗng/lỗi, form 400, chốt gửi hai lần cùng tick, busy/Escape, DTO/Bearer, PUT phim, 409 suất chiếu, timeout không retry, cache và trạng thái sync online tách biệt nhập offline. Fixture dùng service/hook/component thật; không nằm trong entry production.
+- **Mô phỏng hồi quy khách:** `npm.cmd run test:checkout-browser` đạt 18 nhóm booking/checkout/VNPay; `npm.cmd run test:chatbot-browser` đạt 6 nhóm CineBot; 0 lỗi runtime. Không có API/giao dịch thật.
+- **API thật chưa chạy:** chưa gọi ghi phim/suất/sync lên backend/DB thật hoặc kiểm chứng số liệu báo cáo thật. Không sửa backend trong đợt này và không chạy lại Maven; kiểm chứng tích hợp cuối vẫn thuộc phần 9. Các phần 4–8 chưa được đánh dấu hoàn tất.
