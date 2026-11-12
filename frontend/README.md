@@ -143,7 +143,7 @@ trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra
 mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
 thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.
 
-## Admin Portal — phần 1–7
+## Admin Portal — phần 1–8
 
 `/admin` xác minh `GET /users/me` rồi chuyển đến `/admin/reports`. Các URL
 `/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` được bảo vệ
@@ -177,8 +177,7 @@ cả khung giao diện và nền tảng này qua fixture với API giả lập.
 
 `/admin/movies` đã có tìm tên/lọc ba trạng thái/phân trang server và modal thêm/sửa
 phim. Bộ lọc/trang lưu URL để F5/Back khôi phục. Form kiểm tra tên/thời lượng/ngày/
-URL, giữ bản nháp khi lỗi và làm mới catalog theo trạng thái sau lưu. Màn hình
-nhập mẫu vẫn là khung cho phần 8. Sau build, chạy
+URL, giữ bản nháp khi lỗi và làm mới catalog theo trạng thái sau lưu. Sau build, chạy
 `npm.cmd run test:admin-movies-browser` để kiểm tra màn hình phim production bằng
 Edge với catalog/API giả lập; chưa thay cho kiểm chứng backend/DB thật ở phần 9.
 
@@ -207,3 +206,14 @@ ID và hash khi F5/Back; chặn ngày ngược trước request. Loading/rỗng/
 Sau build, chạy `npm.cmd run test:admin-reports-browser` để kiểm tra dashboard
 production bằng Edge/API mô phỏng. Cần backend phần 6 đã khởi động lại để dùng
 đúng trường dữ liệu mới; kiểm chứng HTTP/DB ứng dụng vẫn thuộc phần 9.
+
+`/admin/sync` đã có nhập Galaxy mẫu offline từ file đóng gói trong backend,
+giới hạn mặc định 100 (0 = mọi suất tương lai), nguồn/thời gian và chín bộ đếm
+xử lý. Khóa khi chạy, chống gửi lặp cả khi chuyển trang rồi quay lại cùng tab;
+409/400/500 giữ dữ liệu, timeout không tự gửi lại và có đối chiếu catalog chỉ GET.
+Thành công làm mới catalog/rạp/lịch/báo cáo. Bảng trạng thái online riêng giữ
+đúng lastSuccessAt online đầy đủ, không thay bằng thời gian nhập mẫu.
+Sau build, chạy `npm.cmd run test:admin-sync-browser` bằng Edge với API mô phỏng;
+đọc [README Admin](src/features/admin/README.md) về số liệu, polling, lỗi và giới
+hạn lịch sử offline. Các phần 1–8 đã triển khai; phần 9 còn nghiệm thu dữ liệu/
+tài khoản ứng dụng thật và bàn giao.

@@ -84,6 +84,46 @@ class GalaxySyncServiceTests {
     }
 
     @Test
+    void localFileUsesOfflineImporterAndDoesNotOverwriteOnlineAttemptSuccessOrError() {
+        var empty = mapper.createArrayNode();
+        when(client.fetchSessions(null)).thenReturn(empty);
+        when(client.fetchComingSoon(null)).thenReturn(empty);
+        when(client.fetchNowShowing(null)).thenReturn(empty);
+        when(importer.importData(empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
+        service.syncGalaxyData(null, 0);
+        when(client.fetchSessions(null)).thenThrow(new AppException(502, "Lỗi online riêng"));
+        assertThrows(AppException.class, () -> service.syncGalaxyData(null, 0));
+        var online = service.getStatus();
+        clearInvocations(client, importer);
+        when(importer.importData(any(), isNull(), eq(100), eq(false)))
+                .thenReturn(GalaxySyncResponse.builder().totalMoviesSynced(3).syncedAt(java.time.Instant.parse("2026-11-12T10:00:00Z")).build());
+        var result = service.syncFromLocalFile(100);
+        assertEquals("LOCAL_FILE", result.getSource());
+        assertEquals(3, result.getTotalMoviesSynced());
+        assertEquals(online.lastAttemptAt(), service.getStatus().lastAttemptAt());
+        assertEquals(online.lastSuccessAt(), service.getStatus().lastSuccessAt());
+        assertEquals("Lỗi online riêng", service.getStatus().lastError());
+        assertFalse(service.getStatus().running());
+        verifyNoInteractions(client);
+        verify(importer).importData(argThat(node -> node != null && node.isArray() && !node.isEmpty()), isNull(), eq(100), eq(false));
+    }
+
+    @Test
+    void unlimitedLocalFileWorksWithOnlineScheduleDisabledAndNeverClaimsOnlineFreshness() {
+        var properties = new GalaxySyncProperties();
+        properties.setEnabled(false);
+        service = new GalaxySyncServiceImpl(client, importer, mapper, properties);
+        when(importer.importData(any(), isNull(), eq(0), eq(false))).thenReturn(GalaxySyncResponse.builder().build());
+        var result = service.syncFromLocalFile(0);
+        assertEquals("LOCAL_FILE", result.getSource());
+        assertFalse(service.getStatus().enabled());
+        assertNull(service.getStatus().lastAttemptAt());
+        assertNull(service.getStatus().lastSuccessAt());
+        verifyNoInteractions(client);
+        verify(importer).importData(any(), isNull(), eq(0), eq(false));
+    }
+
+    @Test
     void manualRequestCannotOverlapScheduledFetch() throws Exception {
         CountDownLatch started = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);

@@ -197,6 +197,15 @@ Các endpoint sau yêu cầu JWT của tài khoản `ADMIN`:
 - `/galaxy/local-file` và `/galaxy/raw-json` vẫn dùng được để nhập thử thủ công.
   Đây là dữ liệu offline, không chứng minh catalog đang cập nhật.
 
+Admin Portal có `/admin/sync` cho phần nhập mẫu offline. Màn hình chỉ POST
+`/galaxy/local-file` với `limitShowtimes` (mặc định 100, 0 = mọi suất tương lai),
+không upload file hay gọi luồng online/raw-json. Kết quả hiển thị nguồn LOCAL_FILE,
+syncedAt và các bộ đếm xử lý, tách khỏi bảng trạng thái online. File giữ nguyên
+ngày; có thể cập nhật phim nhưng không thêm suất tương lai. Timeout không tự
+gửi lại; thao tác đối chiếu chỉ GET catalog/trạng thái. Xem
+[README Admin](../../frontend/src/features/admin/README.md) và chạy
+`npm.cmd run test:admin-sync-browser` trong frontend để kiểm tra Edge/API mô phỏng.
+
 Chỉ lần online đầy đủ mới đối chiếu các bản ghi bị gỡ khỏi nguồn. Lần chạy có
 `limitShowtimes > 0` và lần offline không ẩn các bản ghi vắng mặt, không cập nhật
 mốc thành công của đồng bộ online đầy đủ.

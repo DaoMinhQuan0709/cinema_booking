@@ -202,7 +202,7 @@ async function pressKey(key, modifiers = 0) {
 }
 
 async function foundationBoot(options = {}, mode = 'movies', bootOptions = {}) {
-  reset({ foundation: true, ...options }); await boot({ route: '/admin/sync', ...bootOptions }); await cdp.wait('Boolean(document.querySelector("#admin-main"))');
+  reset({ foundation: true, ...options }); await boot({ route: '/admin/foundation-check', ...bootOptions }); await cdp.wait('Boolean(document.querySelector("#admin-main"))');
   await installFoundation(mode);
 }
 

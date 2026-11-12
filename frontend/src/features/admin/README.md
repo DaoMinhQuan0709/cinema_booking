@@ -1,8 +1,9 @@
-# Admin Portal — báo cáo, phim và suất chiếu
+# Admin Portal — báo cáo, phim, suất chiếu và Galaxy mẫu
 
 `MovieManager` đã có danh sách/thêm/sửa phim ở phần 4; `ShowtimeManager` có
 danh sách/thêm suất ở phần 5. `ReportDashboard` đã hoàn thành phần 7 trên dữ
-liệu phần 6. `DataSync` vẫn là khung cho phần 8.
+liệu phần 6. `DataSync` đã hoàn thành phần 8; nghiệm thu API/DB ứng dụng và bàn
+giao toàn hệ thống tiếp tục ở phần 9.
 
 ## Quản lý phim — phần 4
 
@@ -148,6 +149,62 @@ mục nhiều trang/lỗi, loading/rỗng/lỗi/thử lại, dữ liệu cũ, ng
 trang, bàn phím, desktop/390px và phân quyền. API/số liệu đều mô phỏng; ảnh/JSON
 nằm trong temp được script in ra. Chưa thay thế thử HTTP trên backend/DB ứng
 dụng; dùng backend phần 6 đã khởi động lại để có đủ nguồn sức chứa/ID nhóm.
+
+## Galaxy mẫu — phần 8
+
+Mở `/admin/sync` bằng tài khoản ADMIN đã xác minh. Nút Nhập Galaxy mẫu gọi
+`POST /admin/sync/galaxy/local-file?limitShowtimes=100`, body null, qua service
+chung gắn Bearer. Dữ liệu lấy từ `data/galaxy_sessions.json` đóng gói sẵn trong
+backend; không upload file hoặc nhập clientId. Mặc định xét 100 suất tương lai;
+0 là tất cả, giới hạn phải là số nguyên 0–2.147.483.647. Giới hạn không chặn số
+phim trong file được xử lý. Ngày mẫu giữ nguyên; file cũ có thể xử lý phim nhưng
+không có suất tương lai, không tự dời lịch sang hôm nay.
+
+Khi đang gửi, khóa giới hạn/nút nhập, chốt bằng ref và hook để hai submit cùng
+lúc chỉ gửi một POST. Trạng thái pending được đọc từ mutation cache chung nên
+chuyển trang Admin rồi quay lại trong cùng tab vẫn khóa gửi lặp. F5 không tự
+POST lại; việc tải lại trang không chứng minh tác vụ backend đã hủy.
+
+Kết quả nhận trong lần mở trang hiện nguồn LOCAL_FILE, thời gian backend hoàn
+tất theo Việt Nam, giới hạn đã gửi và chín bộ đếm của GalaxySyncResponse: phim,
+rạp, phòng, suất cập nhật/bỏ qua/ngừng mở bán, phim ngừng chiếu, ghế vật lý và
+ghế theo suất. Đây là số bản ghi xử lý, gồm cả thêm/cập nhật; không gọi là toàn
+bộ bản ghi mới. Bỏ qua suất có cảnh báo đối chiếu lịch/vé; số 0 ghế là bình thường
+vì đồng bộ catalog không tạo ghế. Giá trị thiếu hiện “—”, nguồn khác LOCAL_FILE
+có cảnh báo. Kết quả trước vẫn hiển thị nếu lần sau đang chạy hoặc lỗi; rời
+trang/F5 không lưu lịch sử offline vì backend chưa có API lịch sử này.
+
+400 hiện theo trường nếu có, 409 giữ giới hạn và chỉ GET trạng thái để chờ tác
+vụ khác; 500 giữ bản nháp/kết quả trước. Hook xử lý một toast, component không
+toast thêm. Timeout/mất phản hồi giữ thông tin lần gửi, không tự POST hoặc xếp
+hàng gửi lại khi mạng trở lại. Timeout trình duyệt mặc định 60 giây không xác
+nhận backend đã dừng. Nút Đọc catalog để đối chiếu chỉ GET số phim hiện tại,
+rạp, suất mở bán và trạng thái, đồng thời làm mới các cache liên quan; đây
+không phải xác nhận chắc chắn lần nhập đã hoàn tất. Người dùng đối chiếu dữ
+liệu rồi chủ động quyết định gửi lại.
+
+Bảng online riêng đọc `GET /admin/sync/galaxy/status`: lịch enabled/chu kỳ,
+running dùng chung tác vụ, lastAttemptAt, lastSuccessAt và lastError. Mốc thành
+công chỉ dành cho online đầy đủ, không lấy syncedAt offline gán vào đó. Lỗi
+online cũ vẫn có thể hiện sau một lần nhập mẫu thành công. Trạng thái thuộc
+instance backend và mất khi khởi động lại; mốc trống không phải bằng chứng chưa
+từng đồng bộ. Có đọc lại thủ công và polling 2 giây khi tab đang theo dõi tác
+vụ chạy; lỗi trạng thái giữ dữ liệu đọc trước, có retry riêng. Tắt lịch online
+không chặn nhập offline; backend vẫn kiểm tra xung đột khi POST.
+
+Sau thành công, invalidation phần 3 làm mới movies/cinemas/showtimes và mọi
+cache Admin, gồm báo cáo và trạng thái. Liên kết phim/suất/báo cáo phục vụ đối
+chiếu. Trạng thái ghế/booking không bị frontend chỉnh sửa. Lịch online có thể
+cập nhật lại thông tin Galaxy sau lần nhập mẫu; xem
+[GALAXY_SYNC.md](../../../../backend/cinema-booking-backend/GALAXY_SYNC.md).
+
+Sau build, chạy `npm.cmd run test:admin-sync-browser` trên Windows/Edge, đặt
+`ADMIN_EDGE_PATH` nếu cần. Script dùng màn hình production với REST/catalog/
+trạng thái mô phỏng, kiểm tra giới hạn/DTO/null/Bearer, chống lặp, running/409,
+400/500/timeout, đối chiếu chỉ GET, F5/chuyển trang khi pending, nguồn/bộ đếm,
+giờ Việt Nam, cache đang có của khách/Admin, desktop/390px/bàn phím và 403/
+CUSTOMER. Không gọi Galaxy online hoặc ghi DB ứng dụng. JSON/ảnh nằm ở thư mục
+temp script in ra; nghiệm thu thật còn ở phần 9.
 
 ## Service và query
 

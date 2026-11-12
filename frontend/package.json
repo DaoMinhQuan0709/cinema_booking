@@ -11,6 +11,7 @@
     "test:admin-movies-browser": "node scripts/admin-movies-browser-check.mjs",
     "test:admin-showtimes-browser": "node scripts/admin-showtimes-browser-check.mjs",
     "test:admin-reports-browser": "node scripts/admin-reports-browser-check.mjs",
+    "test:admin-sync-browser": "node scripts/admin-sync-browser-check.mjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",

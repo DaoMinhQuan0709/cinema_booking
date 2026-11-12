@@ -37,6 +37,6 @@ export function useAdminOccupancy(params = {}) {
   return useAdminQuery(adminKeys.occupancy(params), ({ signal }) => adminService.getOccupancy(params, { signal }));
 }
 
-export function useAdminSyncStatus() {
-  return useAdminQuery(adminKeys.syncStatus, ({ signal }) => adminService.getSyncStatus({ signal }));
+export function useAdminSyncStatus(options = {}) {
+  return useAdminQuery(adminKeys.syncStatus, ({ signal }) => adminService.getSyncStatus({ signal }), options);
 }
