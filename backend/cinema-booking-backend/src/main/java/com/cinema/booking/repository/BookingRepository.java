@@ -58,59 +58,31 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("userId") Long userId,
             @Param("showtimeId") Long showtimeId);
 
-    @Query("SELECT COALESCE(SUM(b.totalAmount), 0) FROM Booking b " +
-           "WHERE b.status = 'CONFIRMED' " +
-           "AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start) " +
-           "AND (cast(:end as timestamp) IS NULL OR b.createdAt <= :end) " +
-           "AND (:cinemaId IS NULL OR b.showtime.auditorium.cinema.id = :cinemaId) " +
-           "AND (:movieId IS NULL OR b.showtime.movie.id = :movieId)")
-    java.math.BigDecimal calculateTotalRevenue(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end,
-            @Param("cinemaId") Long cinemaId,
-            @Param("movieId") Long movieId);
+    // Đếm ghế bằng truy vấn con theo đơn, không JOIN collection làm nhân totalAmount.
+    String REPORT_METRICS = """
+            COALESCE(SUM(b.totalAmount), 0) AS revenue, COUNT(b) AS bookingCount,
+            COALESCE(SUM((SELECT COUNT(bs) FROM BookingSeat bs
+                WHERE bs.booking = b AND bs.showtimeSeat.status = 'BOOKED')), 0) AS ticketCount
+            """;
+    String REPORT_FILTER = """
+            FROM Booking b WHERE b.status = 'CONFIRMED'
+            AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start)
+            AND (cast(:end as timestamp) IS NULL OR b.createdAt < :end)
+            AND (:cinemaId IS NULL OR b.showtime.auditorium.cinema.id = :cinemaId)
+            AND (:movieId IS NULL OR b.showtime.movie.id = :movieId)
+            """;
 
-    @Query("SELECT COUNT(b) FROM Booking b " +
-           "WHERE b.status = 'CONFIRMED' " +
-           "AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start) " +
-           "AND (cast(:end as timestamp) IS NULL OR b.createdAt <= :end) " +
-           "AND (:cinemaId IS NULL OR b.showtime.auditorium.cinema.id = :cinemaId) " +
-           "AND (:movieId IS NULL OR b.showtime.movie.id = :movieId)")
-    long countSuccessfulBookings(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end,
-            @Param("cinemaId") Long cinemaId,
-            @Param("movieId") Long movieId);
+    @Query("SELECT " + REPORT_METRICS + REPORT_FILTER)
+    RevenueTotals summarizeRevenue(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end,
+                                   @Param("cinemaId") Long cinemaId, @Param("movieId") Long movieId);
 
-    @Query("SELECT COALESCE(COUNT(bs), 0) FROM BookingSeat bs " +
-           "WHERE bs.booking.status = 'CONFIRMED' " +
-           "AND (cast(:start as timestamp) IS NULL OR bs.booking.createdAt >= :start) " +
-           "AND (cast(:end as timestamp) IS NULL OR bs.booking.createdAt <= :end) " +
-           "AND (:cinemaId IS NULL OR bs.booking.showtime.auditorium.cinema.id = :cinemaId) " +
-           "AND (:movieId IS NULL OR bs.booking.showtime.movie.id = :movieId)")
-    long countTotalTicketsSold(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end,
-            @Param("cinemaId") Long cinemaId,
-            @Param("movieId") Long movieId);
+    @Query("SELECT b.showtime.movie.id AS id, b.showtime.movie.title AS label, " + REPORT_METRICS + REPORT_FILTER +
+            "GROUP BY b.showtime.movie.id, b.showtime.movie.title ORDER BY b.showtime.movie.id")
+    List<RevenueGroup> calculateRevenueByMovie(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end,
+                                             @Param("cinemaId") Long cinemaId, @Param("movieId") Long movieId);
 
-    @Query("SELECT b.showtime.movie.title, COALESCE(SUM(b.totalAmount), 0), COUNT(b) " +
-           "FROM Booking b " +
-           "WHERE b.status = 'CONFIRMED' " +
-           "AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start) " +
-           "AND (cast(:end as timestamp) IS NULL OR b.createdAt <= :end) " +
-           "GROUP BY b.showtime.movie.title")
-    List<Object[]> calculateRevenueByMovie(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end);
-
-    @Query("SELECT b.showtime.auditorium.cinema.name, COALESCE(SUM(b.totalAmount), 0), COUNT(b) " +
-           "FROM Booking b " +
-           "WHERE b.status = 'CONFIRMED' " +
-           "AND (cast(:start as timestamp) IS NULL OR b.createdAt >= :start) " +
-           "AND (cast(:end as timestamp) IS NULL OR b.createdAt <= :end) " +
-           "GROUP BY b.showtime.auditorium.cinema.name")
-    List<Object[]> calculateRevenueByCinema(
-            @Param("start") LocalDateTime start,
-            @Param("end") LocalDateTime end);
+    @Query("SELECT b.showtime.auditorium.cinema.id AS id, b.showtime.auditorium.cinema.name AS label, " + REPORT_METRICS + REPORT_FILTER +
+            "GROUP BY b.showtime.auditorium.cinema.id, b.showtime.auditorium.cinema.name ORDER BY b.showtime.auditorium.cinema.id")
+    List<RevenueGroup> calculateRevenueByCinema(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end,
+                                              @Param("cinemaId") Long cinemaId, @Param("movieId") Long movieId);
 }

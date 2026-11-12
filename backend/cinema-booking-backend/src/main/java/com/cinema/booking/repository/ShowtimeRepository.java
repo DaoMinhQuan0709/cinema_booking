@@ -32,6 +32,19 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, Long> {
             @Param("endOfDay") LocalDateTime endOfDay
     );
 
+    // Báo cáo lịch sử độc lập với điều kiện còn mở bán của catalog.
+    @Query("""
+            SELECT s FROM Showtime s
+            JOIN FETCH s.movie m JOIN FETCH s.auditorium a JOIN FETCH a.cinema c
+            WHERE (:movieId IS NULL OR m.id = :movieId)
+            AND (:cinemaId IS NULL OR c.id = :cinemaId)
+            AND (cast(:start as timestamp) IS NULL OR s.startTime >= :start)
+            AND (cast(:end as timestamp) IS NULL OR s.startTime < :end)
+            ORDER BY s.startTime, s.id
+            """)
+    List<Showtime> findForOccupancyReport(@Param("movieId") Long movieId, @Param("cinemaId") Long cinemaId,
+                                        @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
     @Query("SELECT s FROM Showtime s " +
            "JOIN FETCH s.movie m " +
            "JOIN FETCH s.auditorium a " +

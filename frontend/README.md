@@ -143,7 +143,7 @@ trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra
 mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
 thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.
 
-## Admin Portal — phần 1–5
+## Admin Portal — phần 1–6
 
 `/admin` xác minh `GET /users/me` rồi chuyển đến `/admin/reports`. Các URL
 `/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` được bảo vệ
@@ -191,3 +191,10 @@ theo Việt Nam và chặn kết thúc bằng bắt đầu; cần khởi động
 Sau build, chạy `npm.cmd run test:admin-showtimes-browser` để kiểm tra production
 bằng Edge với API/lịch mô phỏng. Chi tiết sử dụng, DTO và phạm vi kiểm chứng
 nằm trong [README Admin](src/features/admin/README.md).
+
+Backend báo cáo đã sửa ở phần 6: KPI/nhóm doanh thu dùng chung bộ lọc ngày tạo
+đơn CONFIRMED/phim/rạp, đếm vé BOOKED và tránh nhân tiền khi đơn có nhiều ghế.
+Occupancy gồm lịch sử/inactive, có sức chứa khi chưa mở sơ đồ và chỉ rõ nguồn/
+suất thiếu cấu hình; báo cáo chỉ đọc. Dashboard vẫn thuộc phần 7. Xem
+[REPORTS.md](../backend/cinema-booking-backend/REPORTS.md) để dùng các trường bổ sung
+và chạy kiểm thử Mockito/MockMvc hoặc repository/service thật trên PostgreSQL tạm.

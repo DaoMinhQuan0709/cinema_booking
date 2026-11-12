@@ -23,6 +23,7 @@ public class RevenueReportResponse {
     @AllArgsConstructor
     @Builder
     public static class RevenueItem {
+        private Long id;
         private String label; // Ngay, Ten Phim, hoac Ten Rap
         private BigDecimal revenue;
         private Long bookingCount;

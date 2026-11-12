@@ -2,7 +2,7 @@
 
 `MovieManager` đã có danh sách/thêm/sửa phim ở phần 4; `ShowtimeManager` có
 danh sách/thêm suất ở phần 5. `ReportDashboard`, `DataSync` vẫn là khung cho
-phần 7–8; dữ liệu báo cáo sẽ được sửa ở phần 6.
+phần 7–8; hợp đồng dữ liệu báo cáo của phần 6 được mô tả dưới đây.
 
 ## Quản lý phim — phần 4
 
@@ -81,6 +81,26 @@ timeout không retry, cập nhật lịch khách có cache, desktop/390px/bàn p
 chặn CUSTOMER. JSON/ảnh nằm ở thư mục tạm script in ra. Backend có
 `AdminShowtimeServiceTests` dùng Clock cố định và repository giả; các kết quả
 này chưa chứng minh DB thật lưu suất hay phát hiện xung đột thật ở phần 9.
+
+## Dữ liệu báo cáo — phần 6
+
+Backend giữ các trường KPI cũ; nhóm doanh thu thêm `id` để phân biệt phim/rạp
+trùng tên. KPI và breakdown dùng cùng bộ lọc, vé nhóm không còn gán 0. Doanh thu
+theo ngày tạo đơn CONFIRMED, gồm combo; vé yêu cầu ghế suất BOOKED. Đây chưa phải
+báo cáo dòng tiền theo ngày thanh toán/hoàn tiền.
+
+Occupancy gồm cả suất đã kết thúc/ngừng mở bán. Mỗi dòng thêm `showtimeId`,
+`movieId`, `cinemaId`, `auditoriumId`, `startTime`, `active`, `capacitySource`.
+Nguồn sức chứa là INVENTORY, ACTIVE_SEATS, ROOM_LAYOUT hoặc UNCONFIGURED;
+`showtimesMissingCapacity` ở cấp báo cáo cho biết số suất thiếu cấu hình cần
+cảnh báo trong dashboard phần 7. `totalSeatsAvailable` vẫn là tổng sức chứa
+(gồm ghế đã bán), không phải số ghế còn trống. Tỷ lệ chung là tổng BOOKED chia
+tổng sức chứa, mẫu số 0 trả 0.0. Báo cáo không sinh ghế hoặc ghi dữ liệu.
+
+Hai báo cáo có bộ ngày riêng: doanh thu dùng khoảng ngày tạo đơn, occupancy
+dùng một ngày bắt đầu suất. `groupBy` nhận movie/cinema/none; ngày đảo ngược,
+groupBy khác hoặc ID không dương trả 400. Xem [REPORTS.md](../../../../backend/cinema-booking-backend/REPORTS.md)
+về cơ sở tính, nguồn sức chứa và cách chạy kiểm thử mock/PostgreSQL tạm.
 
 ## Service và query
 
