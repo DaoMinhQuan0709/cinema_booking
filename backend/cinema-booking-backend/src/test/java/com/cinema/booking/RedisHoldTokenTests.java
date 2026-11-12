@@ -14,7 +14,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named = "CINEMA_TEST_REDIS", matches = "true")
 class RedisHoldTokenTests {
     @Test void aDelayedOldReleaseCannotDeleteANewerHoldAndPartialAcquisitionIsRolledBack() {
-        var connection = new LettuceConnectionFactory("127.0.0.1", 6379); connection.afterPropertiesSet(); connection.start();
+        String host = System.getenv().getOrDefault("CINEMA_TEST_REDIS_HOST", "127.0.0.1");
+        int port = Integer.parseInt(System.getenv().getOrDefault("CINEMA_TEST_REDIS_PORT", "6379"));
+        var connection = new LettuceConnectionFactory(host, port); connection.afterPropertiesSet(); connection.start();
         var redis = new StringRedisTemplate(connection);
         var service = new SeatLockService(redis); ReflectionTestUtils.setField(service, "holdDurationSeconds", 30L);
         long showtime = 8000000000000000000L + Math.abs(UUID.randomUUID().getLeastSignificantBits() % 1000000000L);

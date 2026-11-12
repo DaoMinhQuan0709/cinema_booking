@@ -2,8 +2,10 @@
 
 `MovieManager` đã có danh sách/thêm/sửa phim ở phần 4; `ShowtimeManager` có
 danh sách/thêm suất ở phần 5. `ReportDashboard` đã hoàn thành phần 7 trên dữ
-liệu phần 6. `DataSync` đã hoàn thành phần 8; nghiệm thu API/DB ứng dụng và bàn
-giao toàn hệ thống tiếp tục ở phần 9.
+liệu phần 6. `DataSync` đã hoàn thành phần 8. Phần 9 bổ sung nghiệm thu HTTP/
+PostgreSQL/Redis thật, có Edge production và tài khoản ADMIN/CUSTOMER thử.
+Xem [bàn giao Admin](../../../../ADMIN_PORTAL.md) để khởi động, cấp quyền,
+chạy helper nghiệm thu và xem phạm vi kết quả; các bộ mô phỏng bên dưới vẫn độc lập.
 
 ## Quản lý phim — phần 4
 
@@ -37,7 +39,7 @@ Sau `npm.cmd run build`, chạy `npm.cmd run test:admin-movies-browser` để ki
 màn hình production bằng Edge (có thể đặt `ADMIN_EDGE_PATH`). REST và catalog lưu
 bằng bộ nhớ giả lập; kiểm tra F5 chỉ chứng minh frontend đọc lại bản ghi từ API
 giả lập, không chứng minh DB thật đã lưu. JSON kết quả/ảnh desktop/390px nằm trong
-thư mục tạm script in ra. Kiểm chứng API thật vẫn thuộc phần 9.
+thư mục tạm script in ra. Kiểm chứng API thật được bổ sung trong phần 9.
 
 ## Quản lý suất chiếu — phần 5
 
@@ -81,7 +83,7 @@ gợi ý qua nửa đêm, múi giờ Los Angeles, DTO/Bearer, validation/409/400
 timeout không retry, cập nhật lịch khách có cache, desktop/390px/bàn phím và
 chặn CUSTOMER. JSON/ảnh nằm ở thư mục tạm script in ra. Backend có
 `AdminShowtimeServiceTests` dùng Clock cố định và repository giả; các kết quả
-này chưa chứng minh DB thật lưu suất hay phát hiện xung đột thật ở phần 9.
+này được bổ sung bằng HTTP/DB thật và kiểm tra xung đột thật trong phần 9.
 
 ## Dữ liệu báo cáo — phần 6
 
@@ -204,7 +206,7 @@ trạng thái mô phỏng, kiểm tra giới hạn/DTO/null/Bearer, chống lặ
 400/500/timeout, đối chiếu chỉ GET, F5/chuyển trang khi pending, nguồn/bộ đếm,
 giờ Việt Nam, cache đang có của khách/Admin, desktop/390px/bàn phím và 403/
 CUSTOMER. Không gọi Galaxy online hoặc ghi DB ứng dụng. JSON/ảnh nằm ở thư mục
-temp script in ra; nghiệm thu thật còn ở phần 9.
+temp script in ra; kết quả HTTP/DB thật nằm riêng ở phần 9 và tài liệu bàn giao.
 
 ## Service và query
 

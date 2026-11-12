@@ -98,4 +98,7 @@ CONFIRMED/PENDING/CANCELLED/EXPIRED, BOOKED/LOCKED/AVAILABLE và các mốc biê
 Occupancy kiểm tra lịch sử, thiếu cấu hình, ghế inactive, snapshot inventory,
 sức chứa/tỷ lệ trước và sau mở sơ đồ; thống kê Hibernate kiểm tra số truy vấn
 và không có ghi entity từ thao tác báo cáo. Đây là kiểm chứng DB thật với dữ
-liệu thử độc lập, chưa phải nghiệm thu HTTP với tài khoản/dữ liệu ứng dụng thật.
+liệu thử độc lập. Phần 9 bổ sung nghiệm thu HTTP/Edge với tài khoản ADMIN/CUSTOMER,
+ứng dụng Spring Boot và PostgreSQL/Redis thử thật qua
+[helper nghiệm thu Admin](scripts/test-admin-acceptance.ps1). Hướng dẫn và kết quả
+tách khỏi mô phỏng tại [bàn giao Admin](../../ADMIN_PORTAL.md).

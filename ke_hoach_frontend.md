@@ -248,15 +248,21 @@ Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-des
     *   Hiển thị câu trả lời thông minh dạng Markdown có format đẹp mắt.
 
 ### 7. Phân Hệ Quản Trị Viên (Admin Portal - `/admin/*`)
-*   Bảo vệ bằng `AdminRoute` (Kiểm tra token và `user.role === 'ADMIN'`).
+
+**[x] Đã triển khai và nghiệm thu ngày 13/11/2026** theo [kế hoạch Admin](admin-portal-plan.md).
+Hướng dẫn chạy/cấp quyền, kiểm thử lặp lại và giới hạn: [ADMIN_PORTAL.md](ADMIN_PORTAL.md).
+Có kiểm chứng HTTP/DB/Redis thật trên dữ liệu/tài khoản thử độc lập, tách riêng mô phỏng.
+
+*   Bảo vệ bằng `AdminRoute`: xác minh `/users/me` trước khi tải module/query, yêu cầu ADMIN; backend bảo vệ `/admin/**`, xử lý 401/403 và xóa cache khi đổi phiên.
 *   **Báo cáo Thống kê:**
-    *   Biểu đồ doanh thu theo khoảng ngày, theo phim, theo rạp (Sử dụng `recharts` hoặc `chart.js`).
-    *   Thống kê tỷ lệ lấp đầy phòng chiếu (Occupancy Rate).
+    *   `/admin/reports`: Recharts, KPI/nhóm doanh thu theo ngày tạo đơn CONFIRMED (gồm combo), vé BOOKED, cùng bộ lọc phim/rạp.
+    *   Lấp đầy có ngày suất riêng, gồm lịch sử/inactive, nguồn sức chứa và cảnh báo thiếu cấu hình; URL lưu bộ lọc/ngày/nhóm.
 *   **Quản lý Phim & Suất chiếu:**
-    *   Bảng danh sách phim, modal thêm/sửa phim mới.
-    *   Form xếp lịch chiếu mới kèm validation chống trùng khung giờ.
+    *   `/admin/movies`: tìm tên/lọc ba trạng thái/phân trang server, modal thêm/sửa đủ DTO; URL giữ bộ lọc.
+    *   `/admin/showtimes`: danh sách suất đang mở bán và form thêm theo phòng thuộc rạp, giờ Việt Nam; 409 giữ form. Sửa/xóa và lịch sử suất dành cho đợt sau.
 *   **Đồng bộ Dữ liệu 1-Click:**
-    *   Nút bấm *"Đồng bộ dữ liệu Galaxy Cinema mẫu"* (gọi `POST /api/v1/admin/sync/galaxy/local-file`), hiển thị toast kết quả số lượng phim và rạp đã nạp.
+    *   `/admin/sync`: nhập file offline đóng gói qua `POST /api/v1/admin/sync/galaxy/local-file`, giới hạn mặc định 100/0 = mọi suất tương lai; kết quả nguồn/thời gian/chín bộ đếm, không sinh ghế.
+    *   Trạng thái online riêng, không gán `syncedAt` offline vào `lastSuccessAt`; khóa gửi, 409/timeout không tự POST lại, làm mới cache catalog/báo cáo.
 
 ---
 

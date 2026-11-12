@@ -250,7 +250,10 @@ try {
 
   reset(); await boot(cdp, { route: '/booking/5950' });
   await cdp.wait(`Boolean(document.querySelector('button[aria-label^="A1 -"]'))`);
-  await cdp.evaluate(`document.querySelector('button[aria-label^="A1 -"]').click()`); await cdp.click('Tiếp tục');
+  await cdp.evaluate(`document.querySelector('button[aria-label^="A1 -"]').click()`);
+  // Kết nối STOMP có thể vừa kích hoạt GET đối chiếu; đợi nút sẵn sàng sau render/refetch.
+  await cdp.wait(`[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Tiếp tục' && !button.disabled)`);
+  await cdp.click('Tiếp tục');
   await cdp.wait(`location.pathname === '/checkout/${code}'`); results.push('seat Continue creates hold and navigates using returned bookingCode');
 
   reset(); await boot(cdp);

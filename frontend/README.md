@@ -143,12 +143,16 @@ trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra
 mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
 thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.
 
-## Admin Portal — phần 1–8
+## Admin Portal
+
+Hướng dẫn chạy, cấp quyền, bốn màn hình, nghiệm thu lại và giới hạn bàn giao:
+[ADMIN_PORTAL.md](../ADMIN_PORTAL.md). Phần 9 kiểm chứng HTTP/DB/Redis thật bằng
+tài khoản thử trên hạ tầng độc lập; kết quả mô phỏng được ghi riêng trong kế hoạch.
 
 `/admin` xác minh `GET /users/me` rồi chuyển đến `/admin/reports`. Các URL
 `/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` được bảo vệ
 trong `AdminLayout`, có sidebar desktop, drawer mobile và điều hướng
-bằng bàn phím. Các màn hình nghiệp vụ tiếp tục theo [kế hoạch Admin](../admin-portal-plan.md).
+bằng bàn phím. Tiến độ và bằng chứng tại [kế hoạch Admin](../admin-portal-plan.md).
 Quyền trong localStorage chỉ là dữ liệu ban đầu; guard chờ backend xác nhận ADMIN
 trước khi mount nội dung, tải module lazy hoặc chạy query phía trong.
 
@@ -179,7 +183,7 @@ cả khung giao diện và nền tảng này qua fixture với API giả lập.
 phim. Bộ lọc/trang lưu URL để F5/Back khôi phục. Form kiểm tra tên/thời lượng/ngày/
 URL, giữ bản nháp khi lỗi và làm mới catalog theo trạng thái sau lưu. Sau build, chạy
 `npm.cmd run test:admin-movies-browser` để kiểm tra màn hình phim production bằng
-Edge với catalog/API giả lập; chưa thay cho kiểm chứng backend/DB thật ở phần 9.
+Edge với catalog/API giả lập. Nghiệm thu backend/DB thật chạy bằng helper phần 9.
 
 `/admin/showtimes` có bộ lọc ngày/rạp/phim lưu URL, danh sách suất còn mở bán
 và form thêm suất. Chọn phòng theo rạp, gợi ý kết thúc = thời lượng + 15 phút,
@@ -205,7 +209,7 @@ ID và hash khi F5/Back; chặn ngày ngược trước request. Loading/rỗng/
 độc lập theo báo cáo, có phân trang bảng và hỗ trợ bàn phím/mobile.
 Sau build, chạy `npm.cmd run test:admin-reports-browser` để kiểm tra dashboard
 production bằng Edge/API mô phỏng. Cần backend phần 6 đã khởi động lại để dùng
-đúng trường dữ liệu mới; kiểm chứng HTTP/DB ứng dụng vẫn thuộc phần 9.
+đúng trường dữ liệu mới; kiểm chứng HTTP/DB ứng dụng thử nằm ở phần 9.
 
 `/admin/sync` đã có nhập Galaxy mẫu offline từ file đóng gói trong backend,
 giới hạn mặc định 100 (0 = mọi suất tương lai), nguồn/thời gian và chín bộ đếm
@@ -215,5 +219,5 @@ Thành công làm mới catalog/rạp/lịch/báo cáo. Bảng trạng thái onl
 đúng lastSuccessAt online đầy đủ, không thay bằng thời gian nhập mẫu.
 Sau build, chạy `npm.cmd run test:admin-sync-browser` bằng Edge với API mô phỏng;
 đọc [README Admin](src/features/admin/README.md) về số liệu, polling, lỗi và giới
-hạn lịch sử offline. Các phần 1–8 đã triển khai; phần 9 còn nghiệm thu dữ liệu/
-tài khoản ứng dụng thật và bàn giao.
+hạn lịch sử offline. Nghiệm thu toàn bộ và kịch bản HTTP/Edge với DB/Redis thật
+được hướng dẫn trong tài liệu bàn giao; không dùng DB ứng dụng đang chạy để thử ghi.

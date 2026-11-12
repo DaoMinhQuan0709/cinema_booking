@@ -20,6 +20,10 @@ import org.springframework.web.context.WebApplicationContext;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Duration;
+import com.cinema.booking.config.BookingClockConfig;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -109,7 +113,8 @@ class ShowtimeIntegrationTests {
         seatRepository.save(seatA1);
         seatRepository.save(seatA2);
 
-        LocalDateTime now = LocalDateTime.now().plusHours(2);
+        LocalDate testDay = LocalDate.now(BookingClockConfig.ZONE).plusDays(1);
+        LocalDateTime now = testDay.atTime(14, 0);
         Showtime showtime = Showtime.builder()
                 .movie(movie)
                 .auditorium(auditorium)
@@ -132,14 +137,17 @@ class ShowtimeIntegrationTests {
                 .price(new BigDecimal("140000.00"))
                 .status(ShowtimeSeatStatus.AVAILABLE)
                 .build();
-        showtimeSeatRepository.save(ss1);
-        showtimeSeatRepository.save(ss2);
+        // @Version đã có giá trị khiến save dùng merge; ID nằm trên entity được trả về.
+        ss1 = showtimeSeatRepository.save(ss1);
+        ss2 = showtimeSeatRepository.save(ss2);
+        assertNotNull(ss1.getId());
+        assertNotNull(ss2.getId());
 
         // 2. Test GET /api/v1/showtimes
         mockMvc.perform(get("/api/v1/showtimes")
                         .param("movieId", movie.getId().toString())
                         .param("cinemaId", cinema.getId().toString())
-                        .param("date", LocalDate.now().toString())
+                        .param("date", testDay.toString())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
@@ -161,11 +169,13 @@ class ShowtimeIntegrationTests {
                 .andExpect(jsonPath("$.data.seats[0].status").value("AVAILABLE"))
                 .andExpect(jsonPath("$.data.seats[1].status").value("AVAILABLE"));
 
-        // 5. Kiểm tra tính năng hợp nhất (merge) nếu Redis đang chạy và kết nối được
-        if (redisTemplate != null) {
+        // 5. Helper nghiệm thu yêu cầu Redis thật; lỗi kết nối phải làm test thất bại.
+        if ("true".equals(System.getenv("CINEMA_TEST_REDIS"))) {
+            assertNotNull(redisTemplate);
             String redisKey = "seat_lock:" + showtime.getId() + ":" + ss1.getId();
             try {
-                redisTemplate.opsForValue().set(redisKey, "999");
+                redisTemplate.opsForValue().set(redisKey, "integration-hold", Duration.ofSeconds(30));
+                assertEquals("integration-hold", redisTemplate.opsForValue().get(redisKey));
 
                 mockMvc.perform(get("/api/v1/showtimes/" + showtime.getId() + "/seats")
                                 .contentType(MediaType.APPLICATION_JSON))
@@ -173,11 +183,7 @@ class ShowtimeIntegrationTests {
                         .andExpect(jsonPath("$.data.seats[0].status").value("LOCKED"))
                         .andExpect(jsonPath("$.data.seats[1].status").value("AVAILABLE"));
 
-                redisTemplate.delete(redisKey);
-            } catch (Exception e) {
-                // Redis offline trong môi trường test local -> Graceful fallback vẫn hoạt động bình thường
-                System.out.println("Redis server offline, bỏ qua kiểm tra Redis active key: " + e.getMessage());
-            }
+            } finally { redisTemplate.delete(redisKey); }
         }
     }
 }
