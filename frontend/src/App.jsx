@@ -1,11 +1,13 @@
 import { lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { Film, Sparkles, Ticket } from 'lucide-react';
 import MainLayout from './layouts/MainLayout';
 import { useAuthStore } from './features/auth/authStore';
 import { MovieShowcase } from './features/movies/MovieShowcase';
+import { queryClient } from './config/queryClient';
+import AdminRoute, { AdminIndexRedirect } from './routes/AdminRoute';
 
 const MovieDetail = lazy(() => import('./features/movies/MovieDetail'));
 const MovieCatalog = lazy(() => import('./features/movies/MovieCatalog'));
@@ -13,15 +15,6 @@ const ShowtimesPage = lazy(() => import('./features/showtimes/ShowtimesPage'));
 const SeatSelectionPage = lazy(() => import('./features/booking/SeatSelectionPage'));
 const CheckoutPage = lazy(() => import('./features/booking/CheckoutPage'));
 const VNPayReturnPage = lazy(() => import('./features/booking/VNPayReturnPage'));
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
 
 /**
  * Trang chu: Hero gioi thieu thuong hieu + MovieShowcase (Tabs Dang chieu /
@@ -112,6 +105,14 @@ export const App = () => {
             <Route path="showtimes" element={<ShowtimesPage />} />
             <Route path="cinemas" element={<PlaceholderPage title="Hệ Thống Cụm Rạp & Bảng Giá Vé" />} />
             <Route path="profile/bookings" element={<PlaceholderPage title="Lịch Sử Vé Đã Đặt Của Bạn" />} />
+            <Route path="admin" element={<AdminRoute />}>
+              <Route index element={<AdminIndexRedirect />} />
+              <Route path="reports" element={<PlaceholderPage title="Báo cáo quản trị" />} />
+              <Route path="movies" element={<PlaceholderPage title="Quản lý phim" />} />
+              <Route path="showtimes" element={<PlaceholderPage title="Quản lý suất chiếu" />} />
+              <Route path="sync" element={<PlaceholderPage title="Nhập dữ liệu mẫu" />} />
+              <Route path="*" element={<PlaceholderPage title="Trang quản trị không tồn tại" />} />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

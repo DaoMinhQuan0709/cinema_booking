@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'premier_cinema_access_token',
   REFRESH_TOKEN: 'premier_cinema_refresh_token',
   USER: 'premier_cinema_user',
+  SESSION_ID: 'premier_cinema_session_id',
 };
 
 // Khop enum showtime_seat_status ben backend (ARCHITECTURE.md)

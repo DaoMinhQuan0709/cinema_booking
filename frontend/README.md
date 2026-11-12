@@ -142,3 +142,28 @@ Sau `npm.cmd run build`, có thể chạy `npm.cmd run test:checkout-browser`
 trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra desktop,
 mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
 thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.
+
+## Phiên quản trị — phần 1
+
+`/admin` xác minh `GET /users/me` rồi chuyển đến `/admin/reports`. Các URL
+`/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` hiện có trang
+chờ được bảo vệ; layout và nghiệp vụ tiếp tục theo [kế hoạch Admin](../admin-portal-plan.md).
+Quyền trong localStorage chỉ là dữ liệu ban đầu; guard chờ backend xác nhận ADMIN
+trước khi mount nội dung, tải module lazy hoặc chạy query phía trong.
+
+Khách dùng lại modal đăng nhập, giữ nguyên đường dẫn, query và hash. Xác minh lỗi
+có nút thử lại; 403 chặn nội dung, 401 thử refresh một lần rồi yêu cầu đăng nhập lại
+nếu không phục hồi được. Phản hồi của phiên cũ bị bỏ qua khi đổi tài khoản/đăng xuất;
+đăng xuất từ tab khác cũng đóng quyền truy cập. Khởi động lại backend để áp dụng
+phân biệt 401 chưa xác thực và 403 thiếu quyền trong `SecurityConfig`.
+
+QueryClient dùng chung đặt tại `src/config/queryClient.js`. Mọi query/mutation
+Admin phải có khóa bắt đầu bằng `['admin']`; query truyền `signal` xuống Axios.
+Đổi phiên, đăng xuất hoặc bị từ chối quyền sẽ hủy/xóa cache Admin, giữ cache catalog
+công khai. Trạng thái xác minh nằm trong `authStore.sessionStatus`.
+
+Chạy `npm.cmd run test:admin-browser` trên Windows/Edge (đặt `ADMIN_EDGE_PATH` nếu
+cần). Script tự mở Vite development và Edge headless, dùng API giả lập và fixture
+lazy trong `scripts/fixtures/` để kiểm tra guard/query; fixture không được đưa vào
+production build. Đây là kiểm thử mô phỏng, không gọi backend thật hay đăng nhập
+tài khoản thật. Kết quả và phạm vi chưa kiểm chứng được ghi riêng trong kế hoạch.

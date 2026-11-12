@@ -7,6 +7,7 @@
     "test": "node --test",
     "test:checkout-browser": "node scripts/checkout-browser-check.mjs",
     "test:chatbot-browser": "node scripts/chatbot-browser-check.mjs",
+    "test:admin-browser": "node scripts/admin-browser-check.mjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",

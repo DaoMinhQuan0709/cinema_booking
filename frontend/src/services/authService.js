@@ -31,7 +31,7 @@ export const authService = {
    * @returns {Promise<{ id: number, email: string, fullName: string, phone: string, role: string }>}
    */
   getCurrentUser: async () => {
-    const { data } = await axiosInstance.get('/users/me');
+    const { data } = await axiosInstance.get('/users/me', { skipErrorToast: true });
     return data;
   },
 };

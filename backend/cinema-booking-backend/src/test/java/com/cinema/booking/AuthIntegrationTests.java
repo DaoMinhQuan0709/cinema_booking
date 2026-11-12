@@ -107,8 +107,9 @@ class AuthIntegrationTests {
                 .andExpect(jsonPath("$.data.email").value(testEmail))
                 .andExpect(jsonPath("$.data.fullName").value("Nguyen Van Test"));
 
-        // 5. Access Protected Endpoint /api/v1/users/me (Without Token -> 401 Unauthorized / 403 Forbidden)
+        // 5. Missing/expired authentication is 401; authenticated role denial is 403.
         mockMvc.perform(get("/api/v1/users/me"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(401));
     }
 }

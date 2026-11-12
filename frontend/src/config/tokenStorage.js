@@ -8,6 +8,23 @@ import { STORAGE_KEYS } from './constants';
  * store. authStore se goi lai cac ham o day de dong bo state <-> localStorage.
  */
 export const tokenStorage = {
+  // Stable across token refreshes, different for every login (including the same account).
+  getSessionId() {
+    if (!this.getAccessToken()) return null;
+    let sessionId = localStorage.getItem(STORAGE_KEYS.SESSION_ID);
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      localStorage.setItem(STORAGE_KEYS.SESSION_ID, sessionId);
+    }
+    return sessionId;
+  },
+
+  startSession(session) {
+    this.clearSession();
+    this.setSession(session);
+    localStorage.setItem(STORAGE_KEYS.SESSION_ID, crypto.randomUUID());
+  },
+
   getAccessToken() {
     return localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
   },
@@ -44,6 +61,7 @@ export const tokenStorage = {
     localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(STORAGE_KEYS.SESSION_ID);
   },
 
   isAuthenticated() {

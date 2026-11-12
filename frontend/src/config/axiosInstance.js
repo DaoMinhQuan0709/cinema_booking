@@ -16,6 +16,11 @@ const axiosInstance = axios.create({
 // =====================================================================
 axiosInstance.interceptors.request.use(
   (config) => {
+    const sessionId = tokenStorage.getSessionId();
+    if (Object.hasOwn(config, '_sessionId') && config._sessionId !== sessionId) {
+      throw new axios.CanceledError('Phiên đăng nhập đã thay đổi.');
+    }
+    config._sessionId = sessionId;
     const accessToken = tokenStorage.getAccessToken();
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
@@ -27,40 +32,34 @@ axiosInstance.interceptors.request.use(
 
 // =====================================================================
 // XU LY REFRESH TOKEN KHI GAP 401
-// Gom cac request dang cho vao 1 hang doi de tranh goi /auth/refresh
-// nhieu lan cung luc khi co nhieu request fail 401 dong thoi.
+// Share one refresh per session. A late refresh must never restore an old login.
 // =====================================================================
-let isRefreshing = false;
-let pendingQueue = [];
+let refreshRequest = null;
 
-function resolveQueue(error, newAccessToken) {
-  pendingQueue.forEach(({ resolve, reject }) => {
-    if (error) reject(error);
-    else resolve(newAccessToken);
-  });
-  pendingQueue = [];
-}
-
-async function refreshAccessToken() {
+async function refreshAccessToken(sessionId) {
   const refreshToken = tokenStorage.getRefreshToken();
   if (!refreshToken) {
     throw new Error('Khong co refresh token de lam moi phien dang nhap');
   }
 
   // Dung axios goc (KHONG qua axiosInstance) de tranh vong lap interceptor vo han
-  const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken });
+  const response = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken }, { timeout: 15000 });
+  if (sessionId !== tokenStorage.getSessionId()) throw new axios.CanceledError('Phiên đăng nhập đã thay đổi.');
   const { accessToken, refreshToken: newRefreshToken, user } = response.data.data;
+  if (!accessToken) throw new Error('Phản hồi làm mới phiên không hợp lệ.');
 
   tokenStorage.setSession({ accessToken, refreshToken: newRefreshToken, user });
+  window.dispatchEvent(new CustomEvent('premier_cinema:auth-refreshed'));
   return accessToken;
 }
 
-function forceLogout() {
+function forceLogout(sessionId) {
+  if (sessionId !== tokenStorage.getSessionId()) return;
   tokenStorage.clearSession();
   if (typeof window !== 'undefined') {
-    // authStore (Buoc 2) se lang nghe su kien nay de reset state va dieu huong ve /login
     window.dispatchEvent(new CustomEvent('premier_cinema:auth-expired'));
   }
+  toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
 }
 
 // =====================================================================
@@ -73,6 +72,9 @@ function forceLogout() {
 // =====================================================================
 axiosInstance.interceptors.response.use(
   (response) => {
+    if (response.config._sessionId !== tokenStorage.getSessionId()) {
+      return Promise.reject(new axios.CanceledError('Phản hồi thuộc phiên đăng nhập cũ.'));
+    }
     const apiResponse = response.data;
     return {
       ...response,
@@ -83,37 +85,43 @@ axiosInstance.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config || {};
+    if (axios.isCancel(error)) return Promise.reject(error);
+    const sessionId = originalRequest._sessionId;
+    if (Object.hasOwn(originalRequest, '_sessionId') && sessionId !== tokenStorage.getSessionId()) {
+      return Promise.reject(new axios.CanceledError('Phản hồi thuộc phiên đăng nhập cũ.'));
+    }
     const status = error.response?.status;
     const isAuthEndpoint = originalRequest.url?.includes('/auth/');
     const skipErrorToast = originalRequest.skipErrorToast || isAuthEndpoint;
 
     // --- 401 ngoai cac endpoint /auth/** -> thu refresh token 1 lan ---
     if (status === 401 && !isAuthEndpoint && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          pendingQueue.push({ resolve, reject });
-        }).then((newAccessToken) => {
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
-          return axiosInstance(originalRequest);
+      originalRequest._retry = true;
+      if (!refreshRequest || refreshRequest.sessionId !== sessionId) {
+        const pending = { sessionId, promise: null };
+        pending.promise = refreshAccessToken(sessionId).finally(() => {
+          if (refreshRequest === pending) refreshRequest = null;
         });
+        refreshRequest = pending;
       }
 
-      originalRequest._retry = true;
-      isRefreshing = true;
-
       try {
-        const newAccessToken = await refreshAccessToken();
-        resolveQueue(null, newAccessToken);
+        const newAccessToken = await refreshRequest.promise;
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return axiosInstance(originalRequest);
       } catch (refreshError) {
-        resolveQueue(refreshError, null);
-        forceLogout();
-        toast.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+        if (sessionId === tokenStorage.getSessionId()) forceLogout(sessionId);
         return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
       }
+    }
+
+    if (status === 401 && !isAuthEndpoint) {
+      forceLogout(sessionId);
+      return Promise.reject(error);
+    }
+
+    if (status === 403 && /^\/admin(?:\/|$)/.test(originalRequest.url)) {
+      window.dispatchEvent(new CustomEvent('premier_cinema:admin-forbidden'));
     }
 
     // --- Toast loi chung (co the tat tung request bang { skipErrorToast: true }) ---
