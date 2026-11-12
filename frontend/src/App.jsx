@@ -1,9 +1,10 @@
-import { lazy, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Link, Outlet } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { Film, Sparkles, Ticket } from 'lucide-react';
 import MainLayout from './layouts/MainLayout';
+import AuthModal from './features/auth/AuthModal';
 import { useAuthStore } from './features/auth/authStore';
 import { MovieShowcase } from './features/movies/MovieShowcase';
 import { queryClient } from './config/queryClient';
@@ -15,6 +16,14 @@ const ShowtimesPage = lazy(() => import('./features/showtimes/ShowtimesPage'));
 const SeatSelectionPage = lazy(() => import('./features/booking/SeatSelectionPage'));
 const CheckoutPage = lazy(() => import('./features/booking/CheckoutPage'));
 const VNPayReturnPage = lazy(() => import('./features/booking/VNPayReturnPage'));
+
+// Admin Portal: chi tai sau khi AdminRoute xac minh quyen ADMIN
+const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
+const ReportDashboard = lazy(() => import('./features/admin/ReportDashboard'));
+const MovieManager = lazy(() => import('./features/admin/MovieManager'));
+const ShowtimeManager = lazy(() => import('./features/admin/ShowtimeManager'));
+const DataSync = lazy(() => import('./features/admin/DataSync'));
+const AdminNotFound = lazy(() => import('./features/admin/AdminNotFound'));
 
 /**
  * Trang chu: Hero gioi thieu thuong hieu + MovieShowcase (Tabs Dang chieu /
@@ -81,6 +90,17 @@ const PlaceholderPage = ({ title }) => (
   </div>
 );
 
+/**
+ * Vo toi gian cho khu Admin (khong dung Header/Footer/CineBot cua website khach).
+ * Giu AuthModal de man hinh "Dang nhap de vao quan tri" cua AdminRoute mo duoc form dang nhap.
+ */
+const AdminShell = () => (
+  <div className="min-h-screen bg-background text-white">
+    <Outlet />
+    <AuthModal />
+  </div>
+);
+
 export const App = () => {
   const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser);
 
@@ -105,13 +125,19 @@ export const App = () => {
             <Route path="showtimes" element={<ShowtimesPage />} />
             <Route path="cinemas" element={<PlaceholderPage title="Hệ Thống Cụm Rạp & Bảng Giá Vé" />} />
             <Route path="profile/bookings" element={<PlaceholderPage title="Lịch Sử Vé Đã Đặt Của Bạn" />} />
-            <Route path="admin" element={<AdminRoute />}>
-              <Route index element={<AdminIndexRedirect />} />
-              <Route path="reports" element={<PlaceholderPage title="Báo cáo quản trị" />} />
-              <Route path="movies" element={<PlaceholderPage title="Quản lý phim" />} />
-              <Route path="showtimes" element={<PlaceholderPage title="Quản lý suất chiếu" />} />
-              <Route path="sync" element={<PlaceholderPage title="Nhập dữ liệu mẫu" />} />
-              <Route path="*" element={<PlaceholderPage title="Trang quản trị không tồn tại" />} />
+          </Route>
+
+          {/* Admin Portal: AdminRoute xac minh ADMIN truoc, sau do moi tai AdminLayout va man hinh con */}
+          <Route element={<AdminShell />}>
+            <Route path="/admin" element={<AdminRoute />}>
+              <Route element={<Suspense fallback={<p role="status" className="px-6 py-16 text-center text-sm text-muted">Đang tải…</p>}><AdminLayout /></Suspense>}>
+                <Route index element={<AdminIndexRedirect />} />
+                <Route path="reports" element={<ReportDashboard />} />
+                <Route path="movies" element={<MovieManager />} />
+                <Route path="showtimes" element={<ShowtimeManager />} />
+                <Route path="sync" element={<DataSync />} />
+                <Route path="*" element={<AdminNotFound />} />
+              </Route>
             </Route>
           </Route>
         </Routes>
