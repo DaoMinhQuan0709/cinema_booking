@@ -9,6 +9,7 @@
     "test:chatbot-browser": "node scripts/chatbot-browser-check.mjs",
     "test:admin-browser": "node scripts/admin-browser-check.mjs",
     "test:admin-movies-browser": "node scripts/admin-movies-browser-check.mjs",
+    "test:admin-showtimes-browser": "node scripts/admin-showtimes-browser-check.mjs",
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",

@@ -1,8 +1,8 @@
-# Admin Portal — nền tảng và quản lý phim
+# Admin Portal — nền tảng, phim và suất chiếu
 
-`MovieManager` đã có danh sách/thêm/sửa phim ở phần 4. `ShowtimeManager`,
-`ReportDashboard`, `DataSync` vẫn là khung; service, hooks và component dùng chung
-sẵn sàng cho các phần 5–8.
+`MovieManager` đã có danh sách/thêm/sửa phim ở phần 4; `ShowtimeManager` có
+danh sách/thêm suất ở phần 5. `ReportDashboard`, `DataSync` vẫn là khung cho
+phần 7–8; dữ liệu báo cáo sẽ được sửa ở phần 6.
 
 ## Quản lý phim — phần 4
 
@@ -37,6 +37,50 @@ màn hình production bằng Edge (có thể đặt `ADMIN_EDGE_PATH`). REST và
 bằng bộ nhớ giả lập; kiểm tra F5 chỉ chứng minh frontend đọc lại bản ghi từ API
 giả lập, không chứng minh DB thật đã lưu. JSON kết quả/ảnh desktop/390px nằm trong
 thư mục tạm script in ra. Kiểm chứng API thật vẫn thuộc phần 9.
+
+## Quản lý suất chiếu — phần 5
+
+Mở `/admin/showtimes` bằng tài khoản ADMIN. Bộ lọc ngày/rạp/phim áp dụng ngay,
+lưu `date=YYYY-MM-DD`, `cinemaId`, `movieId` trong URL để F5/Back khôi phục;
+mặc định là hôm nay theo Việt Nam. Xóa bộ lọc giữ ngày đang chọn. Tham số sai
+được chuẩn hóa trước request, các tham số không liên quan được giữ nguyên.
+Ngày quá khứ được phép xem nhưng API chỉ trả các suất chưa bắt đầu, còn mở bán;
+đây chưa phải danh sách lịch sử. Bảng hiện phim, rạp/phòng, hai mốc ngày giờ và
+giá vé cơ bản bằng VND, không có sửa/xóa suất.
+
+Phim dùng bộ chọn gom mọi trang catalog; phòng lấy từ `cinema.auditoriums`.
+Lỗi tải phim/rạp có nút thử lại riêng và không chặn đọc lịch; chưa có danh mục
+thì chưa thể thêm suất. Form kế thừa phim/rạp đang lọc; ngày tương lai gợi ý
+bắt đầu lúc 10:00, hôm nay/quá khứ dùng mốc nửa giờ tiếp theo trong tương lai.
+Đổi rạp luôn xóa phòng cũ; rạp chưa có phòng được giải thích tại trường phòng.
+
+Kết thúc gợi ý = bắt đầu + thời lượng phim + 15 phút, tính đúng cả qua nửa đêm,
+tháng và năm. Gợi ý tự cập nhật khi đổi phim/giờ bắt đầu; sau khi chỉnh tay, mốc
+kết thúc được giữ đến khi bấm Dùng giờ gợi ý. Form chặn thiếu phim/phòng, phòng
+không thuộc rạp, giờ bắt đầu không ở tương lai và kết thúc không sau bắt đầu.
+Giá phải dương, tối đa 99.999.999,99 và 2 chữ số thập phân theo DECIMAL(10,2).
+
+POST chỉ gửi `movieId`, `auditoriumId`, `startTime`, `endTime`, `basePrice`.
+Hai mốc là `YYYY-MM-DDTHH:mm:ss` theo giờ Việt Nam (UTC+7), không chuyển sang
+UTC bằng `toISOString()`; kiểm tra tương lai vẫn đúng khi trình duyệt ở múi giờ
+khác. Backend Admin cũng dùng Clock theo `Asia/Ho_Chi_Minh` và chặn kết thúc
+bằng bắt đầu; cần khởi động lại backend để áp dụng thay đổi này.
+
+409 trùng lịch giữ toàn bộ form để sửa phòng/giờ, 400 hiện lỗi theo trường,
+500/mất phản hồi giữ bản nháp. Trong khi gửi, khóa form/đóng/Escape và chống
+gửi lặp. Không tự POST lại khi timeout; Kiểm tra lại danh sách chỉ GET bộ lọc
+đang xem, cần đối chiếu đúng ngày/rạp/phim trước khi gửi lại. Sau thành công,
+danh sách chuyển đến ngày/rạp/phim của suất mới; cache lịch/báo cáo và catalog
+khách liên quan được invalidate, kể cả lịch khách đã có cache.
+
+Sau build, chạy `npm.cmd run test:admin-showtimes-browser` trên Windows/Edge
+(có thể đặt `ADMIN_EDGE_PATH`). Script kiểm tra màn hình production và lịch
+khách thật với REST/danh mục lưu trong bộ nhớ mô phỏng: bộ lọc/F5/Back, phòng,
+gợi ý qua nửa đêm, múi giờ Los Angeles, DTO/Bearer, validation/409/400/500,
+timeout không retry, cập nhật lịch khách có cache, desktop/390px/bàn phím và
+chặn CUSTOMER. JSON/ảnh nằm ở thư mục tạm script in ra. Backend có
+`AdminShowtimeServiceTests` dùng Clock cố định và repository giả; các kết quả
+này chưa chứng minh DB thật lưu suất hay phát hiện xung đột thật ở phần 9.
 
 ## Service và query
 

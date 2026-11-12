@@ -1,5 +1,6 @@
 package com.cinema.booking.service.impl;
 
+import com.cinema.booking.config.BookingClockConfig;
 import com.cinema.booking.dto.request.*;
 import com.cinema.booking.dto.response.*;
 import com.cinema.booking.entity.*;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,7 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
     private final ShowtimeRepository showtimeRepository;
     private final ShowtimeSeatRepository showtimeSeatRepository;
     private final ProductRepository productRepository;
+    private final Clock clock;
 
     // =========================================================================
     // PHIM (MOVIES)
@@ -192,7 +195,8 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
         Auditorium auditorium = auditoriumRepository.findById(request.getAuditoriumId())
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay phong chieu voi id: " + request.getAuditoriumId()));
 
-        if (request.getStartTime().isBefore(LocalDateTime.now())) {
+        LocalDateTime vietnamNow = LocalDateTime.ofInstant(clock.instant(), BookingClockConfig.ZONE);
+        if (!request.getStartTime().isAfter(vietnamNow)) {
             throw new BadRequestException("Thoi gian bat dau phai o tuong lai");
         }
 
@@ -200,7 +204,7 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
         LocalDateTime endTime = request.getEndTime();
         if (endTime == null) {
             endTime = request.getStartTime().plusMinutes(movie.getDurationMinutes() + 15);
-        } else if (endTime.isBefore(request.getStartTime())) {
+        } else if (!endTime.isAfter(request.getStartTime())) {
             throw new BadRequestException("Thoi gian ket thuc phai sau thoi gian bat dau");
         }
 

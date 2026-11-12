@@ -143,7 +143,7 @@ trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra
 mobile, clock skew/timezone, giá mới, lỗi/xung đột, resume và callback VNPay, không ghi dữ liệu
 thật. Có thể đặt `CHECKOUT_EDGE_PATH` nếu Edge ở đường dẫn khác.
 
-## Admin Portal — phần 1–4
+## Admin Portal — phần 1–5
 
 `/admin` xác minh `GET /users/me` rồi chuyển đến `/admin/reports`. Các URL
 `/admin/reports`, `/admin/movies`, `/admin/showtimes`, `/admin/sync` được bảo vệ
@@ -177,7 +177,17 @@ cả khung giao diện và nền tảng này qua fixture với API giả lập.
 
 `/admin/movies` đã có tìm tên/lọc ba trạng thái/phân trang server và modal thêm/sửa
 phim. Bộ lọc/trang lưu URL để F5/Back khôi phục. Form kiểm tra tên/thời lượng/ngày/
-URL, giữ bản nháp khi lỗi và làm mới catalog theo trạng thái sau lưu. Ba màn hình
-báo cáo, suất chiếu và nhập mẫu vẫn là khung. Sau build, chạy
+URL, giữ bản nháp khi lỗi và làm mới catalog theo trạng thái sau lưu. Hai màn hình
+báo cáo và nhập mẫu vẫn là khung. Sau build, chạy
 `npm.cmd run test:admin-movies-browser` để kiểm tra màn hình phim production bằng
 Edge với catalog/API giả lập; chưa thay cho kiểm chứng backend/DB thật ở phần 9.
+
+`/admin/showtimes` có bộ lọc ngày/rạp/phim lưu URL, danh sách suất còn mở bán
+và form thêm suất. Chọn phòng theo rạp, gợi ý kết thúc = thời lượng + 15 phút,
+cho chỉnh tay, kiểm tra giá/giờ tương lai và gửi đủ hai mốc theo giờ Việt Nam.
+Trùng lịch 409 giữ form; mất phản hồi không tự gửi lại. Lưu xong chuyển bộ lọc
+đến suất mới và làm mới lịch khách có cache. Backend Admin đã sửa kiểm tra giờ
+theo Việt Nam và chặn kết thúc bằng bắt đầu; cần khởi động lại để áp dụng.
+Sau build, chạy `npm.cmd run test:admin-showtimes-browser` để kiểm tra production
+bằng Edge với API/lịch mô phỏng. Chi tiết sử dụng, DTO và phạm vi kiểm chứng
+nằm trong [README Admin](src/features/admin/README.md).

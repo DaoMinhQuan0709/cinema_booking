@@ -11,7 +11,7 @@ export function toMovieForm(movie) {
     ? name === 'status' && !movie ? 'COMING_SOON' : '' : String(movie[name])]));
 }
 
-function isCalendarDate(value) {
+export function isCalendarDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const [year, month, day] = value.split('-').map(Number);
   const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
