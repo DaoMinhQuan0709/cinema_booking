@@ -20,7 +20,7 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, Long> {
            "JOIN FETCH s.movie m " +
            "JOIN FETCH s.auditorium a " +
            "JOIN FETCH a.cinema c " +
-           "WHERE s.active = true AND (:movieId IS NULL OR s.movie.id = :movieId) " +
+           "WHERE s.active = true AND s.deletedAt IS NULL AND m.deletedAt IS NULL AND (:movieId IS NULL OR s.movie.id = :movieId) " +
            "AND (:cinemaId IS NULL OR a.cinema.id = :cinemaId) " +
            "AND (cast(:startOfDay as timestamp) IS NULL OR s.startTime >= :startOfDay) " +
            "AND (cast(:endOfDay as timestamp) IS NULL OR s.startTime <= :endOfDay) " +
@@ -57,11 +57,15 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, Long> {
     List<Showtime> findByGalaxySessionIdIn(@Param("sessionIds") Collection<String> sessionIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select s from Showtime s where s.auditorium.id=:auditoriumId and s.movie.id=:movieId and s.startTime=:startTime and s.galaxySessionId is null and s.deletedAt is null order by s.id limit 1")
     Optional<Showtime> findFirstByAuditoriumIdAndMovieIdAndStartTimeAndGalaxySessionIdIsNull(
-            Long auditoriumId, Long movieId, LocalDateTime startTime);
+            @Param("auditoriumId") Long auditoriumId, @Param("movieId") Long movieId, @Param("startTime") LocalDateTime startTime);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Showtime> findByGalaxySessionIdIsNotNullAndActiveTrue();
+
+    @Query("select s.galaxySessionId from Showtime s where s.deletedAt is not null and s.galaxySessionId in :ids")
+    List<String> findDeletedGalaxyIds(@Param("ids") Collection<String> ids);
 
     @Lock(LockModeType.PESSIMISTIC_READ)
     @Query("SELECT s FROM Showtime s WHERE s.id = :id")

@@ -14,7 +14,8 @@ import java.util.List;
 @Table(name = "bookings", indexes = {
     @Index(name = "idx_bookings_booking_code", columnList = "booking_code", unique = true),
     @Index(name = "idx_bookings_user_created", columnList = "user_id, created_at"),
-    @Index(name = "idx_bookings_status_expires", columnList = "status, expires_at")
+    @Index(name = "idx_bookings_status_expires", columnList = "status, expires_at"),
+    @Index(name = "idx_bookings_showtime_status", columnList = "showtime_id,status")
 })
 @Getter
 @Setter

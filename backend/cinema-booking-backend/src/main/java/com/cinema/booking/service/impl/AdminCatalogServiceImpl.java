@@ -11,6 +11,7 @@ import com.cinema.booking.exception.ConflictException;
 import com.cinema.booking.exception.ResourceNotFoundException;
 import com.cinema.booking.repository.*;
 import com.cinema.booking.service.AdminCatalogService;
+import com.cinema.booking.service.CatalogGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
     private final ShowtimeSeatRepository showtimeSeatRepository;
     private final ProductRepository productRepository;
     private final Clock clock;
+    private final CatalogGuard guard;
 
     // =========================================================================
     // PHIM (MOVIES)
@@ -44,6 +46,7 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
     @Override
     @Transactional
     public MovieResponse createMovie(MovieCreateRequest request) {
+        guard.catalogWrite();
         log.info("Admin tao phim moi: title={}", request.getTitle());
         Movie movie = Movie.builder()
                 .title(request.getTitle())
@@ -63,6 +66,8 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
     @Override
     @Transactional
     public MovieResponse updateMovie(Long id, MovieCreateRequest request) {
+        guard.catalogWrite();
+        guard.movie(id, true, false);
         log.info("Admin cap nhat phim id={}", id);
         Movie movie = movieRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay phim voi id: " + id));
@@ -78,16 +83,6 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
         movie.setStatus(request.getStatus());
 
         return mapToMovieResponse(movieRepository.save(movie));
-    }
-
-    @Override
-    @Transactional
-    public void deleteMovie(Long id) {
-        log.info("Admin xoa phim id={}", id);
-        if (!movieRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Khong tim thay phim voi id: " + id);
-        }
-        movieRepository.deleteById(id);
     }
 
     // =========================================================================
@@ -187,6 +182,8 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
     @Override
     @Transactional
     public ShowtimeResponse createShowtime(ShowtimeCreateRequest request) {
+        guard.catalogWrite();
+        guard.movie(request.getMovieId(), false, false);
         log.info("Admin tao lich chieu moi: movieId={}, auditoriumId={}, startTime={}",
                 request.getMovieId(), request.getAuditoriumId(), request.getStartTime());
 
@@ -261,16 +258,6 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
         }
 
         return mapToShowtimeResponse(savedShowtime);
-    }
-
-    @Override
-    @Transactional
-    public void deleteShowtime(Long id) {
-        log.info("Admin xoa suat chieu id={}", id);
-        if (!showtimeRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Khong tim thay suat chieu voi id: " + id);
-        }
-        showtimeRepository.deleteById(id);
     }
 
     // =========================================================================

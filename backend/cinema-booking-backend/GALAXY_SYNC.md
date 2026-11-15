@@ -311,3 +311,21 @@ Test này lấy `GALAXY_CLIENT_ID` từ môi trường, xác nhận nhận đủ
 khi chủ động đặt `galaxy.live=true`. `MovieDetailsMappingTests` kiểm tra mapping
 JSONB/HQL bằng dialect PostgreSQL với connection provider không kết nối database.
 Tổng số suất chiếu thay đổi theo thời điểm gọi, không được cố định theo mẫu JSON.
+
+## Dấu xóa của admin — 15/11/2026
+
+`Movie.deletedAt` và `Showtime.deletedAt` độc lập với ENDED/active=false.
+Importer dùng khóa PostgreSQL chung với ghi catalog/xóa; khóa phim trước các
+suất. Mọi nguồn online, JSON và file dùng cùng kiểm tra dấu xóa. Phim đã xóa
+chặn cả session mới mang mã phim đó; xóa riêng session không chặn phim/suất
+khác. Không nhận lại phim/suất local đã xóa qua nhánh khớp tên/phòng/giờ.
+
+Candidate chi tiết, bulk claim và writer đều tôn trọng dấu xóa; writer đọc
+lại dưới khóa sau HTTP. Đồng bộ không bỏ dấu xóa hoặc cập nhật metadata của
+bản ghi đã xóa. `totalMoviesExcluded`/`totalShowtimesExcluded` đếm mã duy nhất
+trong snapshot, riêng với `totalShowtimesSkipped` do đổi lịch/phòng.
+
+Dấu xóa lưu DB nên còn hiệu lực sau restart. Galaxy cấp mã mới hoàn toàn vẫn
+là danh tính mới; không chặn theo tên. Nâng schema và toàn bộ backend/worker
+theo [bàn giao Admin](../../ADMIN_PORTAL.md#xóa-phimsuất-và-ngăn-galaxy-nhập-lại--15112026)
+trước mở chức năng xóa; không chạy song song phiên bản cũ chưa biết dấu xóa.

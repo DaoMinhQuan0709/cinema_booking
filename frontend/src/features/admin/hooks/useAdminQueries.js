@@ -40,3 +40,8 @@ export function useAdminOccupancy(params = {}) {
 export function useAdminSyncStatus(options = {}) {
   return useAdminQuery(adminKeys.syncStatus, ({ signal }) => adminService.getSyncStatus({ signal }), options);
 }
+
+export function useDeletionPreview(kind, id) {
+  return useAdminQuery(['admin', 'deletion-preview', kind, id], ({ signal }) => adminService.getDeletionPreview(kind, id, { signal }),
+    { staleTime: 0, refetchOnWindowFocus: false, retry: false });
+}

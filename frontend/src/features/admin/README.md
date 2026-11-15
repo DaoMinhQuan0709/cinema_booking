@@ -1,7 +1,8 @@
 # Admin Portal — báo cáo, phim, suất chiếu và Galaxy mẫu
 
-`MovieManager` đã có danh sách/thêm/sửa phim ở phần 4; `ShowtimeManager` có
-danh sách/thêm suất ở phần 5. `ReportDashboard` đã hoàn thành phần 7 trên dữ
+`MovieManager` có danh sách/thêm/sửa phim ở phần 4; `ShowtimeManager` có
+danh sách/thêm suất ở phần 5. Cả hai có xóa mềm ở phần mở rộng ngày 15/11.
+`ReportDashboard` đã hoàn thành phần 7 trên dữ
 liệu phần 6. `DataSync` đã hoàn thành phần 8. Phần 9 bổ sung nghiệm thu HTTP/
 PostgreSQL/Redis thật, có Edge production và tài khoản ADMIN/CUSTOMER thử.
 Xem [bàn giao Admin](../../../../ADMIN_PORTAL.md) để khởi động, cấp quyền,
@@ -49,7 +50,7 @@ mặc định là hôm nay theo Việt Nam. Xóa bộ lọc giữ ngày đang ch
 được chuẩn hóa trước request, các tham số không liên quan được giữ nguyên.
 Ngày quá khứ được phép xem nhưng API chỉ trả các suất chưa bắt đầu, còn mở bán;
 đây chưa phải danh sách lịch sử. Bảng hiện phim, rạp/phòng, hai mốc ngày giờ và
-giá vé cơ bản bằng VND, không có sửa/xóa suất.
+giá vé cơ bản bằng VND; có xóa mềm qua phần mở rộng ngày 15/11, chưa có sửa suất.
 
 Phim dùng bộ chọn gom mọi trang catalog; phòng lấy từ `cinema.auditoriums`.
 Lỗi tải phim/rạp có nút thử lại riêng và không chặn đọc lịch; chưa có danh mục
@@ -177,9 +178,10 @@ chuyển trang Admin rồi quay lại trong cùng tab vẫn khóa gửi lặp. F
 POST lại; việc tải lại trang không chứng minh tác vụ backend đã hủy.
 
 Kết quả nhận trong lần mở trang hiện nguồn LOCAL_FILE, thời gian backend hoàn
-tất theo Việt Nam, giới hạn đã gửi và chín bộ đếm của GalaxySyncResponse: phim,
+tất theo Việt Nam, giới hạn đã gửi và mười một bộ đếm của GalaxySyncResponse: phim,
 rạp, phòng, suất cập nhật/bỏ qua/ngừng mở bán, phim ngừng chiếu, ghế vật lý và
-ghế theo suất. Đây là số bản ghi xử lý, gồm cả thêm/cập nhật; không gọi là toàn
+ghế theo suất, cùng phim/suất đã xóa được loại trừ. Đây là số bản ghi xử lý,
+gồm cả thêm/cập nhật; không gọi là toàn
 bộ bản ghi mới. Bỏ qua suất có cảnh báo đối chiếu lịch/vé; số 0 ghế là bình thường
 vì đồng bộ catalog không tạo ghế. Giá trị thiếu hiện “—”, nguồn khác LOCAL_FILE
 có cảnh báo. Kết quả trước vẫn hiển thị nếu lần sau đang chạy hoặc lỗi; rời
@@ -300,3 +302,25 @@ Edge/Vite development với toàn bộ API giả lập. Fixture trong `scripts/f
 không phải entry production. Script ghi JSON và ảnh ở thư mục tạm được in khi xong.
 `npm.cmd test` kiểm tra thêm ánh xạ lỗi, kết quả ghi không chắc chắn và chính sách
 retry. Các kết quả này không thay cho tích hợp backend/DB thật ở phần 9.
+
+## Xóa phim/suất — mở rộng ngày 15/11
+
+`DeleteCatalogModal` dùng chung cho hai bảng; `useDeletionPreview` lấy snapshot
+và scopeToken mới khi mở. `useDeleteCatalog` dùng mutation hiện có (không retry,
+không xếp hàng offline, chống gửi lặp, kiểm tra phiên và làm mới cache).
+Service gửi DELETE với `If-Match`; CORS backend cho phép header này.
+
+Preview đếm toàn bộ suất của phim, không đếm từ bảng đang lọc. CONFIRMED chặn
+xóa theo quy tắc; PENDING cần xử lý trạng thái; tiền chưa rõ cần đối soát;
+khóa bận có thể kiểm tra lại. Không đưa danh tính khách vào modal. Trong khi
+gửi, giữ modal mở và khóa nút/cách đóng. Không xóa hàng trước phản hồi.
+409/412/428 và lỗi mạng yêu cầu GET kiểm tra rồi xác nhận lại rõ ràng; GET thấy
+đã xóa thì chỉ làm mới danh sách. Phản hồi của modal đã đóng hoặc phiên cũ
+không được đóng modal mới. Các ô chọn/danh mục hoạt động loại bản ghi đã xóa;
+lịch sử/báo cáo vẫn giữ dữ liệu, không thêm bộ lọc xóa toàn cục.
+
+`npm.cmd run test:admin-deletion-browser` chạy Edge production với REST mô
+phỏng và ghi artifact riêng. `scripts/admin-deletion-http-browser-check.mjs`
+chỉ được Java helper gọi trên backend/DB thử thật; không mock phản hồi API.
+Hai loại kết quả phải báo riêng. UI sync có thêm `totalMoviesExcluded` và
+`totalShowtimesExcluded`; dữ liệu thiếu hiện “—”, số 0 thật vẫn hiện 0.

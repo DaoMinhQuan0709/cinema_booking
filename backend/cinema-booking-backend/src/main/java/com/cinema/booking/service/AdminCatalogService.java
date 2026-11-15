@@ -10,7 +10,6 @@ public interface AdminCatalogService {
     // --- PHIM (MOVIES) ---
     MovieResponse createMovie(MovieCreateRequest request);
     MovieResponse updateMovie(Long id, MovieCreateRequest request);
-    void deleteMovie(Long id);
 
     // --- RẠP & PHÒNG CHIẾU (CINEMAS & AUDITORIUMS) ---
     CinemaResponse createCinema(CinemaCreateRequest request);
@@ -19,7 +18,6 @@ public interface AdminCatalogService {
 
     // --- LỊCH CHIẾU (SHOWTIMES) ---
     ShowtimeResponse createShowtime(ShowtimeCreateRequest request);
-    void deleteShowtime(Long id);
 
     // --- BẮP NƯỚC (PRODUCTS) ---
     ProductResponse createProduct(ProductCreateRequest request);

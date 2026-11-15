@@ -56,6 +56,7 @@ public class BookingServiceImpl implements BookingService {
     private final WebSocketService webSocketService;
     private final com.cinema.booking.service.CheckoutSupport checkout;
     private final com.cinema.booking.service.SeatChanges seatChanges;
+    private final com.cinema.booking.service.CatalogGuard guard;
 
     @Value("${application.booking.hold-seat-duration-seconds:600}")
     private long holdDurationSeconds;
@@ -63,6 +64,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse createBooking(BookingCreateRequest request, String userEmail) {
+        guard.showtime(request.getShowtimeId(), false, false);
         log.info("=== BAT DAU TAO DON DAT VE === userEmail={}, showtimeId={}, seats={}",
                 userEmail, request.getShowtimeId(), request.getShowtimeSeatIds());
 

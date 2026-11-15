@@ -33,6 +33,7 @@ public class MovieServiceImpl implements MovieService {
     public PageResponse<MovieResponse> getMovies(MovieStatus status, String genre, String keyword, Pageable pageable) {
         Specification<Movie> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isNull(root.get("deletedAt")));
 
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
@@ -55,6 +56,7 @@ public class MovieServiceImpl implements MovieService {
     @Transactional(readOnly = true)
     public MovieResponse getMovieById(Long id) {
         Movie movie = movieRepository.findById(id)
+                .filter(value -> value.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phim với ID: " + id));
         return mapToMovieResponse(movie);
     }

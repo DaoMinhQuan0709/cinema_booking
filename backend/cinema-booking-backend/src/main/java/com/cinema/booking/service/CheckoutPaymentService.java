@@ -22,6 +22,7 @@ public class CheckoutPaymentService {
     private final CheckoutSupport checkout;
     private final PaymentGateway gateway;
     private final TransactionTemplate transactions;
+    private final CatalogGuard guard;
 
     private record Reservation(Long id, PaymentGateway.Order order, PaymentUrlResponse existing) { }
 
@@ -37,9 +38,10 @@ public class CheckoutPaymentService {
         }
         final String result = url;
         return transactions.execute(status -> {
+            boolean deleted = guard.booking(request.getBookingCode());
             Booking b = bookings.findByCodeForUpdate(request.getBookingCode()).orElseThrow();
             PaymentAttempt a = attempts.findById(reserved.id()).orElseThrow();
-            if (!checkout.live(b) || a.getOutcome() != PaymentStatus.PENDING) return reply(b, a, CheckoutState.CLOSED);
+            if (deleted || !checkout.live(b) || a.getOutcome() != PaymentStatus.PENDING) return reply(b, a, CheckoutState.CLOSED);
             if (a.getState() == CheckoutState.CREATING || a.getState() == CheckoutState.UNKNOWN) {
                 a.setState(result == null ? CheckoutState.UNKNOWN : CheckoutState.READY);
                 a.setPaymentUrl(result);
@@ -49,8 +51,10 @@ public class CheckoutPaymentService {
     }
 
     private Reservation reserve(PaymentCreateUrlRequest request, String email, String ip) {
+        boolean deleted = guard.booking(request.getBookingCode());
         Booking b = bookings.findByCodeForUpdate(request.getBookingCode()).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn đặt vé."));
         checkout.authorize(b, email); checkout.requireLive(b);
+        if (deleted) throw new ConflictException("Phim hoặc suất chiếu đã được xóa; không thể bắt đầu thanh toán.");
         String method = request.getPaymentMethod().toUpperCase(Locale.ROOT);
         PaymentAttempt latest = attempts.findFirstByBookingIdOrderByIdDesc(b.getId()).orElse(null);
         CheckoutState state = checkout.state(b, latest);

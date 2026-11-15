@@ -83,3 +83,8 @@ export function useSyncLocalFile() {
   return useAdminMutation({ name: 'sync-local-file', mutationFn: adminService.syncLocalFile,
     invalidates: adminInvalidationKeys.sync, successMessage: 'Đã nhập dữ liệu Galaxy mẫu.' });
 }
+
+export function useDeleteCatalog() {
+  return useAdminMutation({ name: 'delete-catalog', mutationFn: adminService.deleteCatalog,
+    invalidates: adminInvalidationKeys.sync, successMessage: 'Đã xóa khỏi danh sách hoạt động.' });
+}

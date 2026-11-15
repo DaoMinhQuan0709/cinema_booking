@@ -35,7 +35,7 @@ class LocalSeatInventoryTests {
         rooms = mock(AuditoriumRepository.class);
         seats = mock(SeatRepository.class);
         inventory = mock(ShowtimeSeatRepository.class);
-        service = new LocalSeatInventoryService(showtimes, rooms, seats, inventory);
+        service = new LocalSeatInventoryService(showtimes, rooms, seats, inventory, mock(com.cinema.booking.service.CatalogGuard.class));
         room = Auditorium.builder().id(10L).totalRows(10).totalCols(12).build();
         showtime = Showtime.builder().id(1L).auditorium(room).startTime(LocalDateTime.of(2099, 11, 8, 10, 0))
                 .basePrice(BigDecimal.valueOf(80000)).build();

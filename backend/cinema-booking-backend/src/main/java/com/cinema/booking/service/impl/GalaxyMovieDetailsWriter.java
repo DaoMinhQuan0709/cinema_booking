@@ -13,11 +13,15 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class GalaxyMovieDetailsWriter {
     private final MovieRepository movieRepository;
+    private final com.cinema.booking.service.CatalogGuard guard;
 
     // A short transaction after HTTP and validation; never writes catalog status or inventory.
     @Transactional
     public void apply(Long movieId, String expectedSlug, GalaxyMovieDetails details, Instant syncedAt) {
+        if (guard.movie(movieId, true, true)) return;
         movieRepository.findById(movieId).ifPresent(movie -> {
+            guard.refresh(movie);
+            if (movie.getDeletedAt() != null) return;
             if (!Objects.equals(movie.getGalaxyMovieId(), details.galaxyMovieId())
                     || !Objects.equals(movie.getGalaxySlug(), expectedSlug)) return;
             if (details.landscapeUrl() != null) movie.setLandscapeUrl(details.landscapeUrl());

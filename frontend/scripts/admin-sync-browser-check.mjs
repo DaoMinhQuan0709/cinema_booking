@@ -25,7 +25,7 @@ function onlineStatus() {
 }
 function importResult() {
   return { source: 'LOCAL_FILE', syncedAt: '2026-11-12T18:00:00Z', message: 'Đã xử lý dữ liệu mẫu.', totalMoviesSynced: 3,
-    totalCinemasSynced: 2, totalAuditoriumsSynced: 2, totalShowtimesSynced: 4, totalShowtimesSkipped: 1,
+    totalCinemasSynced: 2, totalAuditoriumsSynced: 2, totalShowtimesSynced: 4, totalShowtimesSkipped: 1, totalMoviesExcluded: 1, totalShowtimesExcluded: 2,
     totalShowtimesDeactivated: 0, totalMoviesEnded: 0, totalSeatsSynced: 0, totalShowtimeSeatsSynced: 0, ...scenario.result };
 }
 function commit() { revision++; return importResult(); }
@@ -144,7 +144,7 @@ try {
   assert.equal(posted.body == null ? null : JSON.parse(posted.body), null); assert.equal(posted.bearer, 'Bearer sync-token');
   await cdp.key('Enter'); assert.equal(scenario.writes, 1);
   scenario.holdWrite = false; await release('write'); await result();
-  for (const [key, value] of Object.entries({ totalMoviesSynced: '3', totalCinemasSynced: '2', totalAuditoriumsSynced: '2', totalShowtimesSynced: '4', totalShowtimesSkipped: '1', totalShowtimesDeactivated: '0', totalMoviesEnded: '0', totalSeatsSynced: '0', totalShowtimeSeatsSynced: '0' })) {
+  for (const [key, value] of Object.entries({ totalMoviesSynced: '3', totalCinemasSynced: '2', totalAuditoriumsSynced: '2', totalShowtimesSynced: '4', totalShowtimesSkipped: '1', totalMoviesExcluded: '1', totalShowtimesExcluded: '2', totalShowtimesDeactivated: '0', totalMoviesEnded: '0', totalSeatsSynced: '0', totalShowtimeSeatsSynced: '0' })) {
     assert.equal(await textOf(`#admin-sync-count-${key}`), value);
   }
   assert.equal(await textOf('#admin-sync-result-source'), 'File mẫu offline (LOCAL_FILE)');
@@ -152,7 +152,7 @@ try {
   assert.equal(await textOf('#admin-sync-last-success'), '17:00:00 10/11/2026');
   assert.equal(await textOf('#admin-sync-online-error'), 'Lỗi online riêng từ lượt trước');
   assert.equal(await cdp.evaluate(`document.querySelectorAll('[data-sonner-toast][data-type=success]').length`), 1);
-  passed.push('hai submit/Enter chỉ một POST null body/query/Bearer; khóa form, đủ 9 bộ đếm và giờ Việt Nam trên browser Los Angeles; offline không đổi mốc/lỗi online');
+  passed.push('hai submit/Enter chỉ một POST null body/query/Bearer; khóa form, đủ 11 bộ đếm gồm loại trừ đã xóa và giờ Việt Nam trên browser Los Angeles; offline không đổi mốc/lỗi online');
 
   const beforeReload = scenario.writes;
   await cdp.evaluate('window.__reload = true'); await cdp.send('Page.reload');

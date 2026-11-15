@@ -49,7 +49,7 @@ class AdminReportPostgresTests {
     @Configuration
     @EnableTransactionManagement
     @EnableJpaRepositories(basePackageClasses = BookingRepository.class)
-    @Import({AdminReportServiceImpl.class, LocalSeatInventoryService.class})
+    @Import({AdminReportServiceImpl.class, LocalSeatInventoryService.class, com.cinema.booking.service.CatalogGuard.class})
     static class Config {
         @Bean DataSource dataSource() throws Exception {
             var ds = new DriverManagerDataSource(System.getenv("CINEMA_TEST_DB_URL"), System.getenv("CINEMA_TEST_DB_USER"), System.getenv("CINEMA_TEST_DB_PASSWORD"));

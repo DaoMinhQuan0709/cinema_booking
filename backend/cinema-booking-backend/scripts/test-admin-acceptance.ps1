@@ -38,7 +38,7 @@ try {
         Push-Location $frontend
         try {
             foreach ($task in @('lint', 'test', 'build', 'test:admin-browser', 'test:admin-movies-browser',
-                    'test:admin-showtimes-browser', 'test:admin-reports-browser', 'test:admin-sync-browser',
+                    'test:admin-showtimes-browser', 'test:admin-deletion-browser', 'test:admin-reports-browser', 'test:admin-sync-browser',
                     'test:checkout-browser', 'test:chatbot-browser')) {
                 & npm.cmd run $task
                 if ($LASTEXITCODE -ne 0) { throw "Frontend không đạt: $task" }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, RefreshCw, X } from 'lucide-react';
+import { Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import DeleteCatalogModal from './DeleteCatalogModal';
 import { MovieImage } from '../movies/MovieImage';
 import { formatCurrency } from '../../utils/formatCurrency';
 import AdminTable from './components/AdminTable';
@@ -29,6 +30,7 @@ export default function ShowtimeManager() {
   const currentSearch = params.toString();
   const canonical = writeShowtimeFilters(params, filters).toString();
   const [editor, setEditor] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const moviesQuery = useAdminMovieOptions({ size: 100, sort: 'title,asc' });
   const cinemasQuery = useAdminCinemas();
   const query = useAdminShowtimes({ date: filters.date, ...(filters.cinemaId ? { cinemaId: filters.cinemaId } : {}), ...(filters.movieId ? { movieId: filters.movieId } : {}) });
@@ -53,6 +55,8 @@ export default function ShowtimeManager() {
     { key: 'startTime', label: 'Bắt đầu', className: 'whitespace-nowrap tabular-nums', render: slot => <time dateTime={`${slot.startTime}+07:00`}>{formatShowtimeTime(slot.startTime)}</time> },
     { key: 'endTime', label: 'Kết thúc', className: 'whitespace-nowrap tabular-nums', render: slot => <time dateTime={`${slot.endTime}+07:00`}>{formatShowtimeTime(slot.endTime)}</time> },
     { key: 'basePrice', label: 'Giá vé cơ bản', className: 'whitespace-nowrap text-right tabular-nums', render: slot => formatCurrency(slot.basePrice) },
+    { key: 'actions', label: 'Thao tác', render: slot => <button type="button" aria-label={`Xóa suất chiếu ${slot.id}`} disabled={query.isFetching}
+      onClick={() => setDeleting(slot)} className={`${buttonClass} border border-primary/30 text-red-300 hover:bg-primary/10`}><Trash2 aria-hidden="true" className="h-4 w-4" />Xóa</button> },
   ];
 
   return (
@@ -89,6 +93,7 @@ export default function ShowtimeManager() {
         {query.data && <p role="status" className="tabular-nums">{query.data.length} suất chiếu</p>}
       </div>
       <p className="mb-3 text-xs text-muted sm:hidden">Vuốt ngang để xem đủ các cột trong bảng.</p>
+      {deleting && <DeleteCatalogModal key={deleting.id} kind="showtimes" item={deleting} onClose={() => setDeleting(null)} onDeleted={() => setDeleting(null)} />}
       <AdminTable columns={columns} rows={query.data || []} caption="Danh sách suất chiếu quản trị" loading={query.isPending} fetching={query.isFetching}
         error={query.error} onRetry={() => void query.refetch()} emptyTitle="Không có suất chiếu phù hợp" emptyDescription="Chọn ngày, rạp hoặc phim khác; các suất đã bắt đầu không xuất hiện trong danh sách này." />
       {editor && <ShowtimeFormModal filters={editor} movies={movies} cinemas={cinemas} onClose={() => setEditor(null)} onCheckList={() => query.refetch({ throwOnError: true })}

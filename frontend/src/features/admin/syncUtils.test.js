@@ -17,7 +17,9 @@ test('chặn giới hạn trống, âm, thập phân, số mũ và vượt phạ
 });
 
 test('bộ đếm giữ số 0 thực, không biến dữ liệu thiếu hoặc không hợp lệ thành 0', () => {
-  assert.equal(SYNC_COUNTERS.length, 9); assert.equal(new Set(SYNC_COUNTERS.map(item => item.key)).size, 9);
+  assert.equal(SYNC_COUNTERS.length, 11); assert.equal(new Set(SYNC_COUNTERS.map(item => item.key)).size, 11);
+  assert.ok(SYNC_COUNTERS.some(item => item.key === 'totalMoviesExcluded'));
+  assert.ok(SYNC_COUNTERS.some(item => item.key === 'totalShowtimesExcluded'));
   assert.equal(formatSyncCount(0), '0'); assert.equal(formatSyncCount('1234'), '1.234');
   for (const value of [null, undefined, '', ' ', -1, 1.5, NaN, Infinity, 'bad']) assert.equal(formatSyncCount(value), '—');
 });

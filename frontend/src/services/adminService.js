@@ -12,6 +12,16 @@ const showtimeBody = ({ movieId, auditoriumId, startTime, endTime, basePrice }) 
   ({ movieId, auditoriumId, startTime, endTime, basePrice });
 
 export const adminService = {
+  getDeletionPreview: async (kind, id, options) => {
+    const { data } = await axiosInstance.get(`/admin/${kind}/${encodeURIComponent(id)}/deletion-preview`, requestOptions(options));
+    return data;
+  },
+  deleteCatalog: async ({ kind, id, scopeToken }, options) => {
+    const { data } = await axiosInstance.delete(`/admin/${kind}/${encodeURIComponent(id)}`, {
+      ...requestOptions(options), headers: { 'If-Match': scopeToken },
+    });
+    return data;
+  },
   getMovies: (params = {}, options) => movieService.getMovies(params, requestOptions(options)),
   getMovieOptions: (params = {}, options) => movieService.getAllMovies(params, requestOptions(options)),
   getCinemas: (params = {}, options) => cinemaService.getCinemas(params, requestOptions(options)),

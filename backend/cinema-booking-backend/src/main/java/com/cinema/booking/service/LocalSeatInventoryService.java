@@ -24,9 +24,11 @@ public class LocalSeatInventoryService {
     private final AuditoriumRepository auditoriumRepository;
     private final SeatRepository seatRepository;
     private final ShowtimeSeatRepository showtimeSeatRepository;
+    private final CatalogGuard guard;
 
     @Transactional
     public List<ShowtimeSeat> getOrCreateSeats(Long showtimeId) {
+        guard.showtime(showtimeId, true, false);
         List<ShowtimeSeat> existing = showtimeSeatRepository.findByShowtimeIdWithSeat(showtimeId);
         if (!existing.isEmpty()) return existing;
         // Row locks coordinate concurrent first access across all backend instances.

@@ -8,11 +8,18 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "payment_attempts", indexes = @Index(name = "idx_attempt_booking", columnList = "booking_id,id"))
+@Table(name = "payment_attempts", indexes = @Index(name = "idx_attempt_booking", columnList = "booking_id,id"),
+        uniqueConstraints = @UniqueConstraint(name = "uk_attempt_provider_transaction", columnNames = {"method", "provider_transaction_id"}))
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class PaymentAttempt {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "provider_transaction_id", length = 100)
+    private String providerTransactionId;
+
+    @Column(name = "received_at")
+    private LocalDateTime receivedAt;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
     @Column(nullable = false, length = 10)

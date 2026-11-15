@@ -39,6 +39,7 @@ public class ShowtimeServiceImpl implements ShowtimeService {
     private final AuditoriumRepository auditoriumRepository;
     private final SeatLockService seatLockService;
     private final LocalSeatInventoryService localSeatInventoryService;
+    private final com.cinema.booking.service.CatalogGuard guard;
 
     @Override
     @Transactional(readOnly = true)
@@ -61,6 +62,7 @@ public class ShowtimeServiceImpl implements ShowtimeService {
     @Transactional(readOnly = true)
     public ShowtimeResponse getShowtimeById(Long id) {
         Showtime showtime = showtimeRepository.findByIdWithDetails(id)
+                .filter(value -> value.getDeletedAt() == null && value.getMovie().getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy suất chiếu với ID: " + id));
         return mapToShowtimeResponse(showtime);
     }
@@ -113,6 +115,8 @@ public class ShowtimeServiceImpl implements ShowtimeService {
     @Override
     @Transactional
     public ShowtimeResponse createShowtime(ShowtimeCreateRequest request) {
+        guard.catalogWrite();
+        guard.movie(request.getMovieId(), false, false);
         Movie movie = movieRepository.findById(request.getMovieId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phim với ID: " + request.getMovieId()));
 

@@ -26,6 +26,8 @@ public class PaymentServiceImpl implements PaymentService {
     private final TicketFulfillmentService fulfillment;
     private final VNPayConfig vnpay;
     private final MoMoConfig momo;
+    private final CatalogGuard guard;
+    private final PaymentReceiptService receipts;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager entityManager;
@@ -45,10 +47,12 @@ public class PaymentServiceImpl implements PaymentService {
         try { amount = new BigDecimal(params.get("vnp_Amount")).movePointLeft(2); }
         catch (Exception e) { return VNPayIpnResponse.invalidAmount(); }
         if (amount.compareTo(a.getAmount()) != 0) return VNPayIpnResponse.invalidAmount();
-        if (a.getOutcome() != PaymentStatus.PENDING) return VNPayIpnResponse.alreadyConfirmed();
         boolean success = "00".equals(params.get("vnp_ResponseCode")) && "00".equals(params.get("vnp_TransactionStatus"));
         if (success && (params.get("vnp_TransactionNo") == null || params.get("vnp_TransactionNo").isBlank() || "0".equals(params.get("vnp_TransactionNo"))))
             return VNPayIpnResponse.otherError("Invalid transaction identity");
+        boolean deleted = guard.showtime(a.getBooking().getShowtime().getId(), false, true);
+        if (success && !receipts.record(a, params.get("vnp_TransactionNo"))) return VNPayIpnResponse.otherError("Transaction identity conflict");
+        if (a.getOutcome() != PaymentStatus.PENDING && !(success && deleted && a.getOutcome() == PaymentStatus.FAILED)) return VNPayIpnResponse.alreadyConfirmed();
         settle(a, success, "02".equals(params.get("vnp_TransactionStatus")), params.get("vnp_TransactionNo"));
         return VNPayIpnResponse.success();
     }
@@ -61,9 +65,11 @@ public class PaymentServiceImpl implements PaymentService {
         if (a == null || !Objects.equals(a.getRequestId(), request.getRequestId())) return MoMoIpnResponse.error(1, "Order not found");
         if (request.getAmount() == null || a.getAmount().compareTo(BigDecimal.valueOf(request.getAmount())) != 0)
             return MoMoIpnResponse.error(4, "Invalid amount");
-        if (a.getOutcome() != PaymentStatus.PENDING) return MoMoIpnResponse.alreadyConfirmed();
         int code = request.getResultCode() == null ? -1 : request.getResultCode();
         if (code == 0 && (request.getTransId() == null || request.getTransId() <= 0)) return MoMoIpnResponse.error(4, "Invalid transaction identity");
+        boolean deleted = guard.showtime(a.getBooking().getShowtime().getId(), false, true);
+        if (code == 0 && !receipts.record(a, request.getTransId().toString())) return MoMoIpnResponse.error(4, "Transaction identity conflict");
+        if (a.getOutcome() != PaymentStatus.PENDING && !(code == 0 && deleted && a.getOutcome() == PaymentStatus.FAILED)) return MoMoIpnResponse.alreadyConfirmed();
         boolean finalFailure = Set.of(1001, 1002, 1003, 1004, 1005, 1006, 1007, 1017, 1026).contains(code);
         settle(a, code == 0, finalFailure, request.getTransId() == null ? null : request.getTransId().toString());
         return MoMoIpnResponse.success();
@@ -74,6 +80,7 @@ public class PaymentServiceImpl implements PaymentService {
         var found = attempts.findByProviderOrderId(reference);
         if (found.isEmpty() || !method.equals(found.get().getMethod())) return null;
         var candidate = found.get();
+        guard.booking(candidate.getBooking().getBookingCode());
         var booking = bookings.findByCodeForUpdate(candidate.getBooking().getBookingCode()).orElse(null);
         if (booking == null) return null;
         // The candidate/proxy may have been read before waiting for the booking lock.
@@ -85,7 +92,20 @@ public class PaymentServiceImpl implements PaymentService {
     private void settle(PaymentAttempt a, boolean success, boolean finalFailure, String transaction) {
         Booking b = a.getBooking();
         Payment payment = payments.findByBookingId(b.getId()).orElse(null);
-        if (payment == null || a.getOutcome() != PaymentStatus.PENDING) return;
+        if (payment == null) return;
+        boolean deleted = guard.showtime(b.getShowtime().getId(), false, true);
+        if (success && deleted) {
+            a.setState(CheckoutState.CLOSED);
+            a.setOutcome(PaymentStatus.REFUND_REQUIRED);
+            if (payment.getTransactionNo() == null) {
+                payment.setTransactionNo(a.getMethod() + ":" + transaction);
+                payment.setPaidAt(checkout.now());
+            }
+            if (payment.getStatus() != PaymentStatus.SUCCESS && payment.getStatus() != PaymentStatus.REFUNDED)
+                payment.setStatus(PaymentStatus.REFUND_REQUIRED);
+            return;
+        }
+        if (a.getOutcome() != PaymentStatus.PENDING) return;
         if (!success) {
             if (!finalFailure) { a.setState(CheckoutState.UNKNOWN); return; }
             a.setOutcome(PaymentStatus.FAILED); a.setState(CheckoutState.REJECTED);

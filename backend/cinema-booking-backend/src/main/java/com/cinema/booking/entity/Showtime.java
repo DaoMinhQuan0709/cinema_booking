@@ -22,6 +22,12 @@ public class Showtime {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "deleted_at")
+    private java.time.Instant deletedAt;
+
+    @Column(name = "deleted_by_user_id")
+    private Long deletedByUserId;
+
     @Column(name = "galaxy_session_id", unique = true, length = 100)
     private String galaxySessionId;
 

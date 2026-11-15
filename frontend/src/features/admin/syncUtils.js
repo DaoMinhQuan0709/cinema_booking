@@ -5,6 +5,8 @@ export const SYNC_COUNTERS = [
   { key: 'totalAuditoriumsSynced', label: 'Phòng đã xử lý' },
   { key: 'totalShowtimesSynced', label: 'Suất đã cập nhật' },
   { key: 'totalShowtimesSkipped', label: 'Suất bị bỏ qua' },
+  { key: 'totalMoviesExcluded', label: 'Phim đã xóa được loại trừ' },
+  { key: 'totalShowtimesExcluded', label: 'Suất đã xóa được loại trừ' },
   { key: 'totalShowtimesDeactivated', label: 'Suất ngừng mở bán' },
   { key: 'totalMoviesEnded', label: 'Phim chuyển ngừng chiếu' },
   { key: 'totalSeatsSynced', label: 'Ghế vật lý đã tạo' },

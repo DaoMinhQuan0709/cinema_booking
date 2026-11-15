@@ -30,6 +30,12 @@ public class Movie {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deleted_by_user_id")
+    private Long deletedByUserId;
+
     @Column(name = "galaxy_movie_id", unique = true, length = 100)
     private String galaxyMovieId;
 

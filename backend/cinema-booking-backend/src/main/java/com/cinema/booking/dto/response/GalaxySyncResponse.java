@@ -18,6 +18,8 @@ public class GalaxySyncResponse {
     private int totalShowtimesDeactivated;
     private int totalMoviesEnded;
     private int totalShowtimesSkipped;
+    private int totalMoviesExcluded;
+    private int totalShowtimesExcluded;
     private String source;
     private java.time.Instant syncedAt;
     private String message;

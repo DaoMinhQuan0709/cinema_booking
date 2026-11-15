@@ -45,7 +45,7 @@ class GalaxyDataImporterTests {
         auditoriums = mock(AuditoriumRepository.class);
         showtimes = mock(ShowtimeRepository.class);
         bookings = mock(BookingRepository.class);
-        importer = new GalaxyDataImporter(movies, cinemas, auditoriums, showtimes, bookings);
+        importer = new GalaxyDataImporter(movies, cinemas, auditoriums, showtimes, bookings, mock(com.cinema.booking.service.CatalogGuard.class));
         movieStore = new HashMap<>();
         cinemaStore = new HashMap<>();
         showtimeStore = new HashMap<>();

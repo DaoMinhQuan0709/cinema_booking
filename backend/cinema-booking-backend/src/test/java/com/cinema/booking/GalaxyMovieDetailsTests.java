@@ -64,7 +64,7 @@ class GalaxyMovieDetailsTests {
         var details = GalaxyMovieDetails.fromJson(mapper.readTree("""
                 {"id":"movie-1","actors":[{"name":"Actor"}],"categories":[{"name":"Hài"}]}
                 """));
-        new GalaxyMovieDetailsWriter(repository).apply(16L, "test-movie", details, Instant.EPOCH);
+        new GalaxyMovieDetailsWriter(repository, mock(com.cinema.booking.service.CatalogGuard.class)).apply(16L, "test-movie", details, Instant.EPOCH);
         assertEquals(List.of("Actor"), movie.getActors());
         assertEquals(Instant.EPOCH, movie.getGalaxyDetailsSyncedAt());
         assertEquals(MovieStatus.COMING_SOON, movie.getStatus());
@@ -78,7 +78,7 @@ class GalaxyMovieDetailsTests {
         Movie movie = Movie.builder().id(16L).galaxyMovieId("movie-1").galaxySlug("test-movie")
                 .directors(List.of("Saved director")).description("Saved description").genre("Hài").build();
         when(repository.findById(16L)).thenReturn(Optional.of(movie));
-        new GalaxyMovieDetailsWriter(repository).apply(16L, "test-movie",
+        new GalaxyMovieDetailsWriter(repository, mock(com.cinema.booking.service.CatalogGuard.class)).apply(16L, "test-movie",
                 GalaxyMovieDetails.fromJson(mapper.readTree("{\"id\":\"movie-1\"}")), Instant.EPOCH);
         assertEquals(List.of("Saved director"), movie.getDirectors());
         assertEquals("Saved description", movie.getDescription());
@@ -90,7 +90,7 @@ class GalaxyMovieDetailsTests {
         MovieRepository repository = mock(MovieRepository.class);
         Movie movie = Movie.builder().id(16L).galaxyMovieId("new-id").galaxySlug("new-slug").build();
         when(repository.findById(16L)).thenReturn(Optional.of(movie));
-        new GalaxyMovieDetailsWriter(repository).apply(16L, "old-slug",
+        new GalaxyMovieDetailsWriter(repository, mock(com.cinema.booking.service.CatalogGuard.class)).apply(16L, "old-slug",
                 GalaxyMovieDetails.fromJson(mapper.readTree("{\"id\":\"old-id\",\"country\":\"Đức\"}")), Instant.EPOCH);
         assertNull(movie.getCountry());
         assertNull(movie.getGalaxyDetailsSyncedAt());

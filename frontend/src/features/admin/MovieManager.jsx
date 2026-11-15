@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Pencil, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import DeleteCatalogModal from './DeleteCatalogModal';
 import { MovieImage } from '../movies/MovieImage';
 import AdminTable from './components/AdminTable';
 import MovieFormModal from './MovieFormModal';
@@ -45,6 +46,7 @@ export default function MovieManager() {
   const filters = readMovieFilters(params);
   const canonical = writeMovieFilters(params, filters).toString();
   const [editor, setEditor] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const query = useAdminMovies({ page: filters.page, size: filters.size, sort: 'id,desc',
     ...(filters.keyword ? { keyword: filters.keyword } : {}), ...(filters.status ? { status: filters.status } : {}) });
 
@@ -77,10 +79,11 @@ export default function MovieManager() {
       const status = ADMIN_MOVIE_STATUSES.find(option => option.value === movie.status);
       return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${status?.className || 'border-surfaceBorder text-muted'}`}>{status?.label || 'Chưa xác định'}</span>;
     } },
-    { key: 'actions', label: 'Thao tác', className: 'text-right', render: movie => <button type="button" aria-label={`Sửa phim ${movie.title}`} disabled={query.isFetching}
+    { key: 'actions', label: 'Thao tác', className: 'text-right', render: movie => <div className="flex justify-end gap-2"><button type="button" aria-label={`Sửa phim ${movie.title}`} disabled={query.isFetching}
       onClick={() => setEditor({ movie })} className={`${buttonClass} min-h-10 border border-surfaceBorder px-3 text-neutral-300 hover:bg-white/5 hover:text-white`}>
       <Pencil aria-hidden="true" className="h-3.5 w-3.5" />Sửa
-    </button> },
+    </button><button type="button" aria-label={`Xóa phim ${movie.title}`} disabled={query.isFetching} onClick={() => setDeleting(movie)}
+      className={`${buttonClass} min-h-10 border border-primary/30 px-3 text-red-300 hover:bg-primary/10`}><Trash2 aria-hidden="true" className="h-3.5 w-3.5" />Xóa</button></div> },
   ];
 
   return (
@@ -98,6 +101,7 @@ export default function MovieManager() {
         </div>
       </header>
       <MovieFilters key={JSON.stringify([filters.keyword, filters.status, filters.size])} filters={filters} onChange={changeFilters} />
+      {deleting && <DeleteCatalogModal key={deleting.id} kind="movies" item={deleting} onClose={() => setDeleting(null)} onDeleted={() => setDeleting(null)} />}
       <p className="mb-3 text-xs text-muted sm:hidden">Vuốt ngang để xem đủ các cột trong bảng.</p>
       <AdminTable columns={columns} rows={query.data?.content || []} caption="Danh sách phim quản trị"
         loading={query.isPending || query.isPlaceholderData || resetPage} fetching={query.isFetching} error={query.error} onRetry={() => void query.refetch()}

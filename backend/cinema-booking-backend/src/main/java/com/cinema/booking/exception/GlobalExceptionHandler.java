@@ -22,6 +22,17 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(DeletionBlockedException.class)
+    public ResponseEntity<ApiResponse<com.cinema.booking.dto.response.DeletionPreviewResponse>> handleDeletionBlocked(DeletionBlockedException ex) {
+        return ResponseEntity.status(409).body(ApiResponse.error(409, ex.getMessage(), ex.getPreview()));
+    }
+
+    @ExceptionHandler({org.springframework.dao.PessimisticLockingFailureException.class,
+            jakarta.persistence.LockTimeoutException.class, jakarta.persistence.PessimisticLockException.class})
+    public ResponseEntity<ApiResponse<Object>> handleCatalogLock(RuntimeException ex) {
+        return ResponseEntity.status(409).body(ApiResponse.error(409, "Dữ liệu đang được xử lý. Vui lòng kiểm tra lại."));
+    }
+
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ApiResponse<Object>> handleArgumentTypeMismatch(MethodArgumentTypeMismatchException ex) {
         String message = "Tham số '" + ex.getName() + "' không hợp lệ.";

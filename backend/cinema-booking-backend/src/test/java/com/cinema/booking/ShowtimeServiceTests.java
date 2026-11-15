@@ -25,7 +25,7 @@ class ShowtimeServiceTests {
         LocalSeatInventoryService inventory = mock(LocalSeatInventoryService.class);
         SeatLockService holds = mock(SeatLockService.class);
         ShowtimeServiceImpl service = new ShowtimeServiceImpl(showtimes, mock(MovieRepository.class),
-                mock(AuditoriumRepository.class), holds, inventory);
+                mock(AuditoriumRepository.class), holds, inventory, mock(com.cinema.booking.service.CatalogGuard.class));
         Cinema cinema = Cinema.builder().id(1L).name("Test cinema").build();
         Auditorium room = Auditorium.builder().id(2L).cinema(cinema).name("Room 1").totalRows(1).totalCols(3).build();
         Showtime showtime = Showtime.builder().id(10L).auditorium(room).movie(Movie.builder().id(3L).title("Movie").build())

@@ -17,7 +17,13 @@ import java.time.Instant;
 @Repository
 public interface MovieRepository extends JpaRepository<Movie, Long>, JpaSpecificationExecutor<Movie> {
 
-    List<Movie> findByStatus(MovieStatus status);
+    @Query("select m from Movie m where m.status=:status and m.deletedAt is null")
+    List<Movie> findByStatus(@Param("status") MovieStatus status);
+
+    java.util.Optional<Movie> findFirstByTitleAndGalaxyMovieIdIsNullAndDeletedAtIsNullOrderByIdAsc(String title);
+
+    @Query("select m.galaxyMovieId from Movie m where m.deletedAt is not null and m.galaxyMovieId in :ids")
+    List<String> findDeletedGalaxyIds(@Param("ids") java.util.Collection<String> ids);
 
     java.util.Optional<Movie> findByTitle(String title);
 
@@ -28,7 +34,7 @@ public interface MovieRepository extends JpaRepository<Movie, Long>, JpaSpecific
     @Query("""
             SELECT m.id AS id, m.galaxyMovieId AS galaxyMovieId, m.galaxySlug AS galaxySlug FROM Movie m
             WHERE m.galaxyMovieId IS NOT NULL AND m.galaxySlug IS NOT NULL AND m.galaxySlug <> ''
-              AND m.status IN :statuses
+              AND m.deletedAt IS NULL AND m.status IN :statuses
               AND (m.galaxyDetailsSyncedAt IS NULL OR m.galaxyDetailsSyncedAt <= :refreshBefore)
               AND (m.galaxyDetailsAttemptAt IS NULL OR m.galaxyDetailsAttemptAt <= :retryBefore)
             ORDER BY CASE WHEN m.galaxyDetailsAttemptAt IS NULL THEN 0 ELSE 1 END,
@@ -48,7 +54,7 @@ public interface MovieRepository extends JpaRepository<Movie, Long>, JpaSpecific
     @Transactional
     @Query("""
             UPDATE Movie m SET m.galaxyDetailsAttemptAt = :now
-            WHERE m.id = :id AND m.status IN :statuses
+            WHERE m.id = :id AND m.deletedAt IS NULL AND m.status IN :statuses
               AND (m.galaxyDetailsSyncedAt IS NULL OR m.galaxyDetailsSyncedAt <= :refreshBefore)
               AND (m.galaxyDetailsAttemptAt IS NULL OR m.galaxyDetailsAttemptAt <= :retryBefore)
             """)

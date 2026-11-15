@@ -33,6 +33,7 @@ public class GalaxyDataImporter {
     private final AuditoriumRepository auditoriumRepository;
     private final ShowtimeRepository showtimeRepository;
     private final BookingRepository bookingRepository;
+    private final com.cinema.booking.service.CatalogGuard guard;
 
     private static final ZoneId VIETNAM = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm")
@@ -81,15 +82,24 @@ public class GalaxyDataImporter {
                 }
             }
         }
+        guard.catalogWrite();
         if (!showtimeRepository.tryAcquireGalaxySyncLock()) {
             throw new AppException(409, "Một tiến trình khác đang đồng bộ Galaxy. Vui lòng thử lại sau.");
         }
         LocalDateTime now = LocalDateTime.now(VIETNAM);
+        Set<String> sourceMovieIds = new HashSet<>(), sourceTitles = new HashSet<>();
+        for (JsonNode s : sessions) { sourceMovieIds.add(s.path("movie").path("id").asText()); sourceTitles.add(s.path("movie").path("name").asText().trim()); }
+        if (nowShowing != null) for (JsonNode m : nowShowing) { sourceMovieIds.add(m.path("id").asText()); sourceTitles.add(m.path("name").asText().trim()); }
+        if (comingSoon != null) for (JsonNode m : comingSoon) { sourceMovieIds.add(m.path("id").asText()); sourceTitles.add(m.path("name").asText().trim()); }
+        guard.syncMovies(sourceMovieIds, sourceTitles, authoritative && limitShowtimes == 0);
+        Set<String> excludedMovies = sourceMovieIds.isEmpty() ? Set.of() : new HashSet<>(movieRepository.findDeletedGalaxyIds(sourceMovieIds));
+        Set<String> excludedSessions = new HashSet<>();
         Map<String, Movie> movies = new HashMap<>();
         Map<String, Cinema> cinemas = new HashMap<>();
         Map<String, Auditorium> auditoriums = new HashMap<>();
         Set<String> seenSessionIds = new HashSet<>();
         for (JsonNode session : sessions) seenSessionIds.add(session.path("id").asText());
+        Set<String> deletedSessions = seenSessionIds.isEmpty() ? Set.of() : new HashSet<>(showtimeRepository.findDeletedGalaxyIds(seenSessionIds));
         Map<String, Showtime> existingShowtimes = new HashMap<>();
         if (!seenSessionIds.isEmpty()) {
             for (Showtime showtime : showtimeRepository.findByGalaxySessionIdIn(seenSessionIds)) {
@@ -103,6 +113,7 @@ public class GalaxyDataImporter {
         for (JsonNode session : sessions) {
             JsonNode node = session.path("movie");
             String id = node.path("id").asText();
+            if (excludedMovies.contains(id)) continue;
             if (!movies.containsKey(id)) {
                 MovieStatus fallback = nowShowing == null ? MovieStatus.NOW_SHOWING : MovieStatus.ENDED;
                 movies.put(id, upsertMovie(node, fallback, movies));
@@ -111,6 +122,7 @@ public class GalaxyDataImporter {
         if (nowShowing != null) {
             for (JsonNode node : nowShowing) {
                 String id = node.path("id").asText();
+                if (excludedMovies.contains(id)) continue;
                 movies.put(id, upsertMovie(node, MovieStatus.NOW_SHOWING, movies));
                 catalogIds.add(id);
             }
@@ -118,6 +130,7 @@ public class GalaxyDataImporter {
         if (comingSoon != null) {
             for (JsonNode node : comingSoon) {
                 String id = node.path("id").asText();
+                if (excludedMovies.contains(id)) continue;
                 movies.put(id, upsertMovie(node, MovieStatus.COMING_SOON, movies));
                 catalogIds.add(id);
             }
@@ -125,6 +138,10 @@ public class GalaxyDataImporter {
         int processed = 0;
         for (JsonNode session : sessions) {
             String sessionId = session.path("id").asText();
+            if (deletedSessions.contains(sessionId) || excludedMovies.contains(session.path("movie").path("id").asText())) {
+                excludedSessions.add(sessionId);
+                continue;
+            }
             LocalDateTime start = parseDateTime(session.path("showDate").asText(), session.path("showTime").asText());
             if (!start.isAfter(now)) continue;
             if (limitShowtimes > 0 && processed >= limitShowtimes) continue;
@@ -186,6 +203,7 @@ public class GalaxyDataImporter {
                 }
             }
             for (Movie movie : movieRepository.findByGalaxyMovieIdIsNotNull()) {
+                if (movie.getDeletedAt() != null) continue;
                 if (!(nowShowing == null ? movies.keySet() : catalogIds).contains(movie.getGalaxyMovieId()) && movie.getStatus() != MovieStatus.ENDED) {
                     movie.setStatus(MovieStatus.ENDED);
                     ended++;
@@ -196,6 +214,7 @@ public class GalaxyDataImporter {
                 .totalAuditoriumsSynced(auditoriums.size()).totalSeatsSynced(0)
                 .totalShowtimesSynced(syncedShowtimes).totalShowtimeSeatsSynced(0)
                 .totalShowtimesDeactivated(deactivated).totalMoviesEnded(ended).totalShowtimesSkipped(skipped)
+                .totalMoviesExcluded(excludedMovies.size()).totalShowtimesExcluded(excludedSessions.size())
                 .syncedAt(Instant.now()).message(skipped == 0 ? "Đồng bộ Galaxy thành công."
                         : "Đồng bộ hoàn tất; một số suất chiếu bị đổi lịch/phòng đã ẩn để quản trị viên kiểm tra.")
                 .build();
@@ -208,8 +227,7 @@ public class GalaxyDataImporter {
         boolean alreadyImported = movie != null;
         if (!alreadyImported) {
             movie = movieRepository.findByGalaxyMovieId(externalId)
-                    .orElseGet(() -> movieRepository.findByTitle(title)
-                            .filter(old -> old.getGalaxyMovieId() == null).orElseGet(Movie::new));
+                    .orElseGet(() -> movieRepository.findFirstByTitleAndGalaxyMovieIdIsNullAndDeletedAtIsNullOrderByIdAsc(title).orElseGet(Movie::new));
         }
         Movie values = buildMovieFromNode(node, status);
         movie.setGalaxyMovieId(externalId);

@@ -40,9 +40,9 @@ và vòng focus, Escape đóng menu.
 | Đường dẫn | Thao tác | API chính |
 | --- | --- | --- |
 | `/admin/reports` | KPI, biểu đồ theo phim/rạp, bảng nhóm, lấp đầy theo ngày riêng | `GET /admin/reports/revenue`, `/occupancy` |
-| `/admin/movies` | Tìm/lọc/phân trang server, thêm/sửa chín trường DTO bằng modal | `GET /movies`, `POST /admin/movies`, `PUT /admin/movies/{id}` |
-| `/admin/showtimes` | Xem suất đang mở bán, lọc ngày/rạp/phim và thêm lịch | `GET /showtimes`, `/movies`, `/cinemas`; `POST /admin/showtimes` |
-| `/admin/sync` | Nhập file Galaxy mẫu, giới hạn 100/0, kết quả chín bộ đếm, trạng thái online riêng | `POST /admin/sync/galaxy/local-file?limitShowtimes=100`, `GET /admin/sync/galaxy/status` |
+| `/admin/movies` | Tìm/lọc/phân trang server, thêm/sửa chín trường DTO, xóa mềm có xác nhận | `GET /movies`, `POST /admin/movies`, `PUT /admin/movies/{id}`, preview và DELETE |
+| `/admin/showtimes` | Xem suất đang mở bán, lọc ngày/rạp/phim, thêm lịch và xóa mềm | `GET /showtimes`, `/movies`, `/cinemas`; `POST /admin/showtimes`, preview và DELETE |
+| `/admin/sync` | Nhập file Galaxy mẫu, giới hạn 100/0, mười một bộ đếm, trạng thái online riêng | `POST /admin/sync/galaxy/local-file?limitShowtimes=100`, `GET /admin/sync/galaxy/status` |
 
 Các API trong bảng có tiền tố `/api/v1`. Bộ lọc được lưu trong URL để F5/Back
 khôi phục ngữ cảnh. Danh mục/báo cáo liên quan được làm mới sau ghi. Form khóa
@@ -82,7 +82,7 @@ khác. Từ `backend/cinema-booking-backend`:
 .\scripts\test-admin-acceptance.ps1
 ```
 
-Helper chạy lint/unit/build, bảy bộ Edge **mô phỏng**, rồi `./mvnw.cmd test`
+Helper chạy lint/unit/build, tám bộ Edge **mô phỏng**, rồi `./mvnw.cmd test`
 không lọc lớp. Helper tự tạo PostgreSQL mới trong temp, Redis container không
 volume trên cổng loopback ngẫu nhiên và tắt Galaxy online/details, VNPay query
 và email ra ngoài. Ứng dụng Spring Boot thử dùng Tomcat cổng ngẫu nhiên; fixture
@@ -136,8 +136,60 @@ DB thử. Kiểm tra giữ/hủy ghế và cập nhật combo dùng HTTP/Redis t
 hiện giao dịch cổng thanh toán. Các test cần Galaxy/Gemini live được tắt chủ
 động, không suy diễn kết quả mô phỏng thành kết nối dịch vụ ngoài thành công.
 
-Bản bàn giao chưa gồm xóa phim, sửa/xóa suất, danh sách lịch sử suất trong màn
-hình quản lý, CRUD tài khoản/rạp/phòng/ghế/combo hoặc lịch sử job nhập offline.
+Bản đầu ngày 13/11 chưa gồm xóa; phần mở rộng ngày 15/11 bên dưới bổ sung xóa
+phim/suất. Sửa suất, danh sách lịch sử suất trong màn hình quản lý, CRUD tài
+khoản/rạp/phòng/ghế/combo hoặc lịch sử job nhập offline vẫn ngoài phạm vi.
 Backend có một số API rộng hơn nhưng UI chỉ bàn giao phạm vi bốn màn hình trên.
 Nghiệm thu dùng tài khoản/dữ liệu thử của ứng dụng thật trên hạ tầng độc lập;
 không ghi hoặc kiểm toán dữ liệu vận hành hiện có ở cổng 8080/2005/6379.
+
+## Xóa phim/suất và ngăn Galaxy nhập lại — 15/11/2026
+
+Admin có nút **Xóa** tại mỗi dòng phim/suất. Hộp thoại đọc phạm vi từ backend;
+xóa phim bao gồm mọi suất chưa xóa thuộc phim, kể cả ngoài bộ lọc hiện tại.
+Đây là xóa mềm: giữ ID, mã Galaxy, inventory, đơn và thông tin lịch sử/báo cáo.
+Chưa có giao diện khôi phục. Xóa riêng suất không xóa phim hoặc các suất khác.
+
+Không được xóa nếu có đơn CONFIRMED/PENDING, kể cả PENDING đã quá hạn nhưng
+chưa được xử lý, hoặc có thanh toán còn chờ/kết quả chưa rõ/tiền cần đối soát.
+Lỗi 409 giữ hộp thoại và nêu lý do. Phạm vi đổi trả 412; thiếu xác nhận trả 428.
+Cần bấm **Kiểm tra lại** và xác nhận lại, không tự gửi lại DELETE. Nếu mất phản
+hồi, chỉ GET đối chiếu trạng thái đã xóa; danh sách chỉ đổi sau thành công.
+
+Các đường sync online, JSON, file mẫu và worker chi tiết đều bỏ qua dấu xóa.
+Phim Galaxy đã xóa chặn cả session mới mang cùng mã phim. Hai bộ đếm loại trừ
+được hiển thị riêng với suất đổi lịch/phòng. Galaxy cấp mã mới hoàn toàn vẫn
+được xem là danh tính mới. Không dùng ENDED hoặc active=false thay dấu xóa.
+
+Trước khi đưa mã mới vào sử dụng với DB cũ:
+
+1. Chọn đúng database/schema ứng dụng, sao lưu theo quy trình vận hành; dừng
+   toàn bộ backend/worker cũ và thao tác ghi trong lúc nâng phiên bản.
+2. Áp dụng [admin-deletion-schema.sql](backend/cinema-booking-backend/scripts/admin-deletion-schema.sql)
+   trên schema đó với chế độ dừng khi có lỗi. Script chỉ thêm cột nullable,
+   chỉ mục và tính duy nhất giao dịch provider; có thể chạy lại. Không xóa
+   dữ liệu hoặc đoán giao dịch lịch sử. Prod dùng `ddl-auto=validate` cần bước
+   này; không dựa vào việc dev tự update schema để bỏ qua chuẩn bị prod.
+3. Khởi động mọi instance bằng phiên bản hiểu dấu xóa rồi mới cho admin thao
+   tác và bật lại worker. Sau khi có dấu xóa, chỉ rollback sang phiên bản vẫn
+   hiểu dấu xóa; không chạy lại backend cũ hoặc xóa dấu để hạ phiên bản.
+
+Backend lấy người xóa từ phiên đăng nhập, giữ dấu xóa trong PostgreSQL và phối
+hợp khóa giữa xóa/đặt vé/thanh toán/sync. Callback thành công đến muộn cho
+phim/suất đã xóa ghi nhận tiền để đối soát theo đúng attempt, không phát vé
+hoặc tự hoàn tiền. `(method, provider_transaction_id)` duy nhất trong DB;
+callback mâu thuẫn không ghi đè bằng chứng cũ.
+
+Hợp đồng: `GET /admin/movies/{id}/deletion-preview`,
+`GET /admin/showtimes/{id}/deletion-preview`, rồi DELETE cùng đường dẫn tài
+nguyên với `If-Match: scopeToken`. Preview chỉ dành cho ADMIN, trả lý do/số
+lượng theo nhóm, không có thông tin cá nhân khách. Xóa lặp trả 200 và giữ
+người/thời điểm xóa ban đầu; tài nguyên công khai đã xóa trả 404.
+
+Thiết kế/nhật ký quyết định tại [tài liệu thiết kế](docs/plans/2026-11-15-admin-deletion-design.md),
+tiến độ và kết quả mới tại [kế hoạch triển khai](admin-deletion-implementation.md).
+Kiểm thử giao diện mô phỏng: `npm.cmd run test:admin-deletion-browser`.
+Helper nghiệm thu đã gồm bộ mới; với frontend build sẵn có thể chạy
+`scripts/test-admin-acceptance.ps1 -SkipFrontendChecks -Tests AdminDeletionHttpTests`
+từ thư mục backend để tạo DB/Redis thử riêng, chạy HTTP/Edge và dọn tiến trình
+thử. Không chạy thử DELETE trên dữ liệu vận hành.

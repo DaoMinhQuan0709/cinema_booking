@@ -33,7 +33,7 @@ class AdminShowtimeServiceTests {
     // Deliberately UTC: Vietnam now is 10:00, regardless of the JVM/Clock zone.
     private final Clock clock = Clock.fixed(Instant.parse("2026-11-12T03:00:00Z"), ZoneOffset.UTC);
     private final AdminCatalogServiceImpl service = new AdminCatalogServiceImpl(movies, mock(CinemaRepository.class),
-            rooms, seats, showtimes, inventory, mock(ProductRepository.class), clock);
+            rooms, seats, showtimes, inventory, mock(ProductRepository.class), clock, mock(com.cinema.booking.service.CatalogGuard.class));
 
     private ShowtimeCreateRequest request(String start, String end) {
         Cinema cinema = Cinema.builder().id(2L).name("Cinema").build();

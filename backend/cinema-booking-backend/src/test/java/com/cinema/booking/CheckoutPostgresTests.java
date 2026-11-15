@@ -59,7 +59,7 @@ class CheckoutPostgresTests {
 
     @Configuration @EnableTransactionManagement @EnableJpaRepositories(basePackageClasses = BookingRepository.class)
     @Import({ CheckoutSupport.class, BookingProductsService.class, BookingServiceImpl.class, CheckoutPaymentService.class,
-            PaymentServiceImpl.class, PaymentReturnService.class, BookingCleanupService.class, SeatChanges.class })
+            PaymentServiceImpl.class, PaymentReturnService.class, BookingCleanupService.class, SeatChanges.class, CatalogGuard.class, PaymentReceiptService.class })
     static class Config {
         @Bean DataSource dataSource() throws Exception {
             var ds = new DriverManagerDataSource(System.getenv("CINEMA_TEST_DB_URL"), System.getenv("CINEMA_TEST_DB_USER"), System.getenv("CINEMA_TEST_DB_PASSWORD"));
@@ -144,7 +144,7 @@ class CheckoutPostgresTests {
         return request;
     }
     private PaymentCreateUrlRequest payment(String revision) { return PaymentCreateUrlRequest.builder().bookingCode(fixture.code()).paymentMethod("VNPAY").expectedRevision(revision).build(); }
-    private Map<String, String> ipn(String reference) { return Map.of("vnp_TxnRef", reference, "vnp_TmnCode", "test-merchant", "vnp_Amount", "8000000", "vnp_ResponseCode", "00", "vnp_TransactionStatus", "00", "vnp_TransactionNo", UUID.randomUUID().toString()); }
+    private Map<String, String> ipn(String reference) { return Map.of("vnp_TxnRef", reference, "vnp_TmnCode", "test-merchant", "vnp_Amount", "8000000", "vnp_ResponseCode", "00", "vnp_TransactionStatus", "00", "vnp_TransactionNo", UUID.nameUUIDFromBytes(reference.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString()); }
     private String reference() { return tx.execute(s -> context.getBean(PaymentAttemptRepository.class).findFirstByBookingIdOrderByIdDesc(context.getBean(BookingRepository.class).findByBookingCode(fixture.code()).orElseThrow().getId()).orElseThrow().getProviderOrderId()); }
 
     @Test void browserReturnReadsTheOrderButOnlyIpnConfirmsIt() {

@@ -143,9 +143,9 @@ try {
   reset(); await boot(); await waitTable();
   assert.equal(await cdp.evaluate(`document.querySelector('main tbody').textContent.includes('90.000đ')`), true);
   assert.equal(await cdp.evaluate(`document.querySelector('main tbody time').textContent.startsWith('12:00')`), true);
-  assert.equal(await cdp.evaluate(`document.querySelector('main tbody button') === null`), true);
+  assert.equal(await cdp.evaluate(`[...document.querySelectorAll('main tbody button')].every(b => b.getAttribute('aria-label')?.startsWith('Xóa suất chiếu'))`), true);
   await writeFile(path.join(artifacts, 'showtimes-desktop.png'), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
-  passed.push('real production table shows movie, cinema/room, local start/end and VND; only open-sale list and create actions');
+  passed.push('real production table shows movie, cinema/room, local start/end and VND; open-sale list with create/delete actions');
 
   await field('cinemaId', '1', '#admin-showtime-filters'); await waitTable(1);
   await field('movieId', '1', '#admin-showtime-filters'); await waitTable(1);
