@@ -48,6 +48,7 @@ class GalaxySessionTransportTests {
         AtomicInteger sessionRequests = new AtomicInteger();
         AtomicReference<String> cookieOnRetry = new AtomicReference<>();
         AtomicReference<String> cookieOnComingSoon = new AtomicReference<>();
+        AtomicReference<String> cookieOnCinemas = new AtomicReference<>();
         AtomicReference<String> clientIdOnRetry = new AtomicReference<>();
         server.createContext("/api/v2/mobile/sessions2", exchange -> {
             if (sessionRequests.incrementAndGet() == 1) {
@@ -64,12 +65,18 @@ class GalaxySessionTransportTests {
             cookieOnComingSoon.set(exchange.getRequestHeaders().getFirst("Cookie"));
             respond(exchange, 200, "application/json; charset=utf-8", EMPTY);
         });
+        server.createContext("/api/v2/mobile/cinemas", exchange -> {
+            cookieOnCinemas.set(exchange.getRequestHeaders().getFirst("Cookie"));
+            respond(exchange, 200, "application/json; charset=utf-8", EMPTY);
+        });
         assertTrue(client.fetchSessions(null).isArray());
         assertTrue(client.fetchComingSoon(null).isArray());
+        assertTrue(client.fetchCinemas(null).isArray());
         assertEquals(2, sessionRequests.get());
         assertNotNull(cookieOnRetry.get());
         assertTrue(cookieOnRetry.get().contains("muid_mly=public-session"));
         assertTrue(cookieOnComingSoon.get().contains("muid_mly=public-session"));
+        assertTrue(cookieOnCinemas.get().contains("muid_mly=public-session"));
         assertEquals("configured-client", clientIdOnRetry.get());
     }
 

@@ -6,6 +6,7 @@ import com.cinema.booking.service.impl.CinemaServiceImpl;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -42,5 +43,30 @@ class CinemaServiceTests {
         assertTrue(new CinemaServiceImpl(repository).getCinemas("  HÀ NỘI  ").isEmpty());
         verify(repository).findByCityIgnoreCaseWithAuditoriums("HÀ NỘI");
         verify(repository, never()).findAllWithAuditoriums();
+    }
+
+    @Test
+    void cinemaDetailExposesSyncedMetadataAndStillSupportsLocalCinemas() {
+        CinemaRepository repository = mock(CinemaRepository.class);
+        Cinema cinema = Cinema.builder().id(1L).galaxyCinemaId("galaxy-1").siteId("000001")
+                .slug("galaxy-test").name("Galaxy").address("Hà Nội").city("Hà Nội").galaxyCityId("city-1")
+                .latitude(new BigDecimal("21.031587302213463")).longitude(new BigDecimal("105.8309551052807"))
+                .phone("19002224").imageLandscape("landscape.jpg").imagePortrait("portrait.jpg")
+                .imageUrls(List.of("one.jpg", "two.jpg")).cinemaType("premium").displayOrder(0).build();
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(cinema));
+        var response = new CinemaServiceImpl(repository).getCinemaById(1L);
+        assertEquals("galaxy-1", response.getGalaxyCinemaId());
+        assertEquals("000001", response.getSiteId());
+        assertEquals("galaxy-test", response.getSlug());
+        assertEquals("city-1", response.getGalaxyCityId());
+        assertEquals(cinema.getLatitude(), response.getLatitude());
+        assertEquals(cinema.getLongitude(), response.getLongitude());
+        assertEquals("19002224", response.getPhone());
+        assertEquals("landscape.jpg", response.getImageLandscape());
+        assertEquals("portrait.jpg", response.getImagePortrait());
+        assertEquals(List.of("one.jpg", "two.jpg"), response.getImageUrls());
+        assertEquals("premium", response.getCinemaType());
+        assertEquals(0, response.getDisplayOrder());
+        assertTrue(response.getAuditoriums().isEmpty());
     }
 }

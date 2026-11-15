@@ -62,6 +62,22 @@ public class GalaxyDataImporter {
     @Transactional
     public GalaxySyncResponse importData(JsonNode sessions, JsonNode comingSoon, JsonNode nowShowing,
                                          int limitShowtimes, boolean authoritative) {
+        return importData(sessions, comingSoon, nowShowing, null, limitShowtimes, authoritative);
+    }
+
+    @Transactional
+    public GalaxySyncResponse importData(JsonNode sessions, JsonNode comingSoon, JsonNode nowShowing,
+                                         JsonNode cinemaCatalog, int limitShowtimes, boolean authoritative) {
+        if (cinemaCatalog != null) {
+            if (!cinemaCatalog.isArray()) throw new BadRequestException("Danh sách rạp Galaxy không hợp lệ.");
+            Set<String> cinemaIds = new HashSet<>();
+            for (JsonNode node : cinemaCatalog) {
+                validateCinema(node);
+                if (!cinemaIds.add(node.path("id").asText())) {
+                    throw new BadRequestException("Danh sách rạp Galaxy có ID trùng lặp. Không cập nhật dữ liệu.");
+                }
+            }
+        }
         if (nowShowing != null) {
             if (!nowShowing.isArray()) throw new BadRequestException("Invalid now-showing catalog.");
             Set<String> ids = new HashSet<>();
@@ -96,6 +112,13 @@ public class GalaxyDataImporter {
         Set<String> excludedSessions = new HashSet<>();
         Map<String, Movie> movies = new HashMap<>();
         Map<String, Cinema> cinemas = new HashMap<>();
+        // The dedicated catalog is independent of session dates/limits and takes precedence
+        // over the less complete cinema object attached to a session.
+        if (cinemaCatalog != null) {
+            for (JsonNode node : cinemaCatalog) {
+                cinemas.put(node.path("id").asText(), upsertCinema(node));
+            }
+        }
         Map<String, Auditorium> auditoriums = new HashMap<>();
         Set<String> seenSessionIds = new HashSet<>();
         for (JsonNode session : sessions) seenSessionIds.add(session.path("id").asText());
@@ -258,9 +281,87 @@ public class GalaxyDataImporter {
                         .filter(old -> old.getGalaxyCinemaId() == null).orElseGet(Cinema::new));
         cinema.setGalaxyCinemaId(externalId);
         cinema.setName(name);
-        cinema.setAddress(node.path("address").asText(""));
-        cinema.setCity(resolveCityName(node.path("cityId").asText(""), cinema.getAddress()));
+        // Offline/session payloads can omit metadata; absence must not erase enrichment.
+        if (hasText(node, "address")) cinema.setAddress(node.path("address").asText().trim());
+        if (cinema.getAddress() == null) cinema.setAddress("");
+        if (hasText(node, "siteId")) cinema.setSiteId(node.path("siteId").asText().trim());
+        else if (cinema.getSiteId() == null && hasText(node, "code")) cinema.setSiteId(node.path("code").asText().trim());
+        if (hasText(node, "slug")) cinema.setSlug(node.path("slug").asText().trim());
+        if (hasText(node, "cityId")) cinema.setGalaxyCityId(node.path("cityId").asText().trim());
+        String city = resolveCityName(cinema.getGalaxyCityId(), cinema.getAddress());
+        if (!"Chưa xác định".equals(city) || cinema.getCity() == null) cinema.setCity(city);
+        BigDecimal latitude = coordinate(node, "latitude", 90);
+        BigDecimal longitude = coordinate(node, "longitude", 180);
+        if (latitude != null) cinema.setLatitude(latitude);
+        if (longitude != null) cinema.setLongitude(longitude);
+        if (hasText(node, "phone")) cinema.setPhone(node.path("phone").asText().trim());
+        if (hasText(node, "imageLandscape")) cinema.setImageLandscape(node.path("imageLandscape").asText().trim());
+        if (hasText(node, "imagePortrait")) cinema.setImagePortrait(node.path("imagePortrait").asText().trim());
+        if (node.path("imageUrls").isArray()) {
+            List<String> images = new ArrayList<>();
+            for (JsonNode image : node.path("imageUrls")) images.add(image.asText().trim());
+            cinema.setImageUrls(images);
+        }
+        if (hasText(node, "cinemaType")) cinema.setCinemaType(node.path("cinemaType").asText().trim());
+        if (node.path("order").isIntegralNumber()) cinema.setDisplayOrder(node.path("order").intValue());
         return cinemaRepository.save(cinema);
+    }
+
+    private boolean hasText(JsonNode node, String field) {
+        return node.path(field).isTextual() && !node.path(field).asText().isBlank();
+    }
+
+    private void validateCinema(JsonNode node) {
+        if (!node.isObject() || !hasText(node, "id") || !hasText(node, "name")) {
+            throw new BadRequestException("Galaxy có rạp thiếu ID hoặc tên. Không cập nhật dữ liệu.");
+        }
+        validateCinemaText(node, "id", 100);
+        validateCinemaText(node, "name", 255);
+        validateCinemaText(node, "address", Integer.MAX_VALUE);
+        validateCinemaText(node, "siteId", 100);
+        validateCinemaText(node, "code", 100);
+        validateCinemaText(node, "slug", 255);
+        validateCinemaText(node, "cityId", 100);
+        validateCinemaText(node, "phone", 50);
+        validateCinemaText(node, "imageLandscape", 1000);
+        validateCinemaText(node, "imagePortrait", 1000);
+        validateCinemaText(node, "cinemaType", 50);
+        coordinate(node, "latitude", 90);
+        coordinate(node, "longitude", 180);
+        JsonNode images = node.path("imageUrls");
+        if (!images.isMissingNode() && !images.isNull()) {
+            if (!images.isArray()) throw new BadRequestException("Danh sách ảnh rạp Galaxy không hợp lệ.");
+            for (JsonNode image : images) {
+                if (!image.isTextual() || image.asText().isBlank() || image.asText().trim().length() > 1000) {
+                    throw new BadRequestException("Danh sách ảnh rạp Galaxy không hợp lệ.");
+                }
+            }
+        }
+        JsonNode order = node.path("order");
+        if (!order.isMissingNode() && !order.isNull()
+                && (!order.isIntegralNumber() || !order.canConvertToInt() || order.intValue() < 0)) {
+            throw new BadRequestException("Thứ tự hiển thị rạp Galaxy không hợp lệ.");
+        }
+    }
+
+    private void validateCinemaText(JsonNode node, String field, int maxLength) {
+        JsonNode value = node.path(field);
+        if (!value.isMissingNode() && !value.isNull()
+                && (!value.isTextual() || value.asText().trim().length() > maxLength)) {
+            throw new BadRequestException("Trường " + field + " của rạp Galaxy không hợp lệ.");
+        }
+    }
+
+    private BigDecimal coordinate(JsonNode node, String field, int maxAbsoluteValue) {
+        JsonNode value = node.path(field);
+        if (value.isMissingNode() || value.isNull() || (value.isTextual() && value.asText().isBlank())) return null;
+        try {
+            if (value.isNumber() || value.isTextual()) {
+                BigDecimal coordinate = new BigDecimal(value.asText().trim());
+                if (coordinate.abs().compareTo(BigDecimal.valueOf(maxAbsoluteValue)) <= 0) return coordinate;
+            }
+        } catch (NumberFormatException ignored) { }
+        throw new BadRequestException("Tọa độ " + field + " của rạp Galaxy không hợp lệ.");
     }
 
     private void validateSessions(JsonNode sessions) {
@@ -274,6 +375,7 @@ public class GalaxyDataImporter {
                     || parseDateTime(node.path("showDate").asText(""), node.path("showTime").asText("")) == null) {
                 throw new BadRequestException("Galaxy có suất chiếu thiếu dữ liệu, trùng ID hoặc sai ngày giờ. Không cập nhật dữ liệu.");
             }
+            validateCinema(node.path("cinema"));
             validateMovie(node.path("movie"));
         }
     }
@@ -329,7 +431,7 @@ public class GalaxyDataImporter {
     }
 
     private String resolveCityName(String cityId, String address) {
-        if (CITY_MAP.containsKey(cityId)) {
+        if (cityId != null && CITY_MAP.containsKey(cityId)) {
             return CITY_MAP.get(cityId);
         }
         if (address.contains("TP.HCM") || address.contains("Hồ Chí Minh") || address.contains("Sài Gòn")) {

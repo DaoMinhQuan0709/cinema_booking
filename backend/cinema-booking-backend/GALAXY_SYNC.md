@@ -2,8 +2,8 @@
 
 ## Ranh giới hệ thống và quyền sở hữu dữ liệu
 
-Hệ thống dùng Galaxy làm nguồn tham chiếu cho phim, thông tin rạp xuất hiện
-trong lịch chiếu và suất chiếu. Đây là đồng bộ định kỳ (periodic sync / near
+Hệ thống dùng Galaxy làm nguồn tham chiếu cho phim, danh mục rạp và suất
+chiếu. Đây là đồng bộ định kỳ (periodic sync / near
 real-time), không phải bản sao đồng nhất tức thì của toàn bộ hệ thống Galaxy.
 Các endpoint website đang truy cập được không đồng nghĩa với một Partner API
 có cam kết hỗ trợ, độ đầy đủ dữ liệu hoặc SLA cho hệ thống bên ngoài.
@@ -11,7 +11,8 @@ có cam kết hỗ trợ, độ đầy đủ dữ liệu hoặc SLA cho hệ th�
 | Nhóm dữ liệu | Nguồn và cơ chế cập nhật | Phạm vi thực tế |
 | --- | --- | --- |
 | Phim, poster, trailer, thời lượng | Galaxy → backend qua HTTP định kỳ | Cập nhật các trường API cung cấp; không cam kết đồng nhất 100% mọi trường trên website |
-| Rạp và tên phòng chiếu | Thông tin đính kèm suất chiếu Galaxy | Hiện chỉ nhập rạp/phòng có trong các suất tương lai được xử lý; chưa lấy toàn bộ danh mục rạp bằng API riêng |
+| Danh mục rạp | `/api/v2/mobile/cinemas` | Nhập toàn bộ rạp trong danh sách đầy đủ, kể cả rạp chưa có suất chiếu; metadata danh mục được ưu tiên hơn dữ liệu rạp đính kèm suất chiếu |
+| Tên phòng chiếu | Thông tin đính kèm suất chiếu Galaxy | Chỉ nhập phòng có trong các suất tương lai được xử lý |
 | Ngày giờ và liên kết phim/rạp/phòng của suất chiếu | Galaxy → snapshot → DB nội bộ | Đồng bộ gần thời gian thực; suất đã có đơn bị đổi giờ cần xử lý riêng |
 | `seats`: sơ đồ và loại ghế | Template nội bộ, mặc định 10×12 | Sơ đồ mô phỏng phục vụ đồ án, không khẳng định đúng sơ đồ phòng Galaxy |
 | `showtime_seats`: trạng thái, người giữ, hạn giữ, giá | Booking/payment/cleanup nội bộ cập nhật PostgreSQL và Redis | Không nhập hoặc gửi trạng thái ghế sang Galaxy; không dùng `totalSeat`/`bookedSeat` để suy ra ghế nào trống |
@@ -59,8 +60,9 @@ Ví dụ: đồng bộ 2.000 suất mới tạo khoảng 2.000 bản ghi `showti
 bản ghi `showtime_seats`. Các bộ đếm ghế trong response đồng bộ giữ giá trị 0
 để tương thích API cũ.
 
-Backend lấy trực tiếp ba API `sessions2?includeCinema=true&includeMovie=true`,
-`movies/showing` và `movies/comming`. Hai danh sách phim quyết định phân loại
+Backend lấy trực tiếp bốn API `sessions2?includeCinema=true&includeMovie=true`,
+`movies/showing`, `movies/comming` và `cinemas` dưới `/api/v2/mobile/`.
+Hai danh sách phim quyết định phân loại
 đang chiếu/sắp chiếu; phim có suất bán trước vẫn có thể là sắp chiếu.
 Lần chạy tự động đầu tiên bắt đầu sau 10 giây; mỗi lần hoàn tất,
 backend đợi 5 phút trước lần tiếp theo. Độ trễ cập nhật còn phụ thuộc thời gian
@@ -120,6 +122,39 @@ Dev dùng `ddl-auto=update` khi khởi động lại. Production cần chạy b�
 `src/main/resources/db/manual/galaxy-sync.sql` trước deploy; script có thể chạy lại.
 Tác vụ không đọc/ghi `seats`, `showtime_seats` hoặc booking. Trạng thái freshness
 catalog không đại diện cho thời điểm cập nhật metadata của từng phim.
+
+### Danh mục và metadata rạp
+
+Mỗi lượt online lấy danh mục `cinemas` bằng cùng `clientId` và phiên cookie
+với các API khác. Tất cả phản hồi phải là danh sách đầy đủ (`data.total` khớp
+`data.result.length`) trước khi mở transaction ghi dữ liệu. Lỗi API danh mục
+rạp giữ nguyên snapshot cũ của cả lượt đồng bộ. Chu kỳ hiện tại vẫn là 5 phút.
+
+Bảng `cinemas` bổ sung các cột nullable: `site_id`, `slug`, `galaxy_city_id`,
+`latitude`, `longitude`, `phone`, `image_landscape`, `image_portrait`,
+`image_urls`, `cinema_type`, `display_order`. `site_id` lưu chuỗi để giữ số 0
+đầu; tọa độ lưu `numeric(20,17)`; danh sách ảnh lưu JSONB. `order` nguồn ánh xạ
+sang `display_order`. Chưa nhập `reward` hoặc `isVip`.
+
+`galaxy_cinema_id` là khóa đối chiếu duy nhất; ID nội bộ và các phòng chiếu
+được giữ nguyên. Danh mục được nhập toàn bộ ngay cả khi giới hạn số suất chiếu.
+Nếu một rạp chưa xuất hiện trong danh mục nhưng có suất được xử lý, bộ nhập
+vẫn dùng thông tin đính kèm suất đó; `code` là giá trị dự phòng cho `site_id`.
+Payload thiếu/null trường metadata không xóa giá trị cũ; `imageUrls: []` chủ
+động xóa danh sách ảnh. ID trùng, tọa độ sai, danh sách ảnh sai kiểu hoặc trường
+vượt độ dài được từ chối trước khi ghi. Rạp vắng mặt ở lượt sau không bị xóa.
+
+`GET /api/v1/cinemas` và `GET /api/v1/cinemas/{id}` trả thêm metadata đã lưu;
+không gọi Galaxy khi người dùng đọc danh sách. Profile dev tự thêm cột khi
+khởi động lại với `ddl-auto=update`; production cần chạy bản cập nhật
+`src/main/resources/db/manual/galaxy-sync.sql` trước khi triển khai.
+
+Kiểm thử PostgreSQL tách biệt: chạy
+`./scripts/test-reports-postgres.ps1 -Tests GalaxyCinemaPostgresTests` trong
+thư mục backend. Script tạo và dừng cụm PostgreSQL tạm; kiểm thử nâng cấp
+bảng rạp cũ, chạy lại migration, giữ ID và lưu/đọc ảnh JSONB cùng tọa độ.
+Kiểm thử API rạp thật chỉ đọc: đặt `GALAXY_CLIENT_ID` rồi chạy
+`./mvnw.cmd '-Dtest=GalaxyLiveApiTests#fetchesCompleteCinemaCatalogUsingProductionHttpClient' -Dgalaxy.live=true test`.
 
 ### Redis cho luồng giữ ghế
 

@@ -37,11 +37,13 @@ public class GalaxySyncServiceImpl implements GalaxySyncService {
         acquireLock();
         lastAttemptAt = Instant.now();
         try {
-            // Fetch/validate all three complete responses before opening a database transaction.
+            // Fetch/validate all complete responses before opening a database transaction.
             JsonNode sessions = apiClient.fetchSessions(clientId);
             JsonNode comingSoon = apiClient.fetchComingSoon(clientId);
             JsonNode nowShowing = apiClient.fetchNowShowing(clientId);
-            GalaxySyncResponse result = importer.importData(sessions, comingSoon, nowShowing, limitShowtimes, limitShowtimes == 0);
+            JsonNode cinemas = apiClient.fetchCinemas(clientId);
+            GalaxySyncResponse result = importer.importData(sessions, comingSoon, nowShowing, cinemas,
+                    limitShowtimes, limitShowtimes == 0);
             result.setSource("GALAXY_ONLINE");
             // A limited preview cannot establish freshness of the entire catalog.
             if (limitShowtimes == 0) lastSuccessAt = Instant.now();

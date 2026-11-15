@@ -67,9 +67,21 @@ public class CinemaServiceImpl implements CinemaService {
 
         return CinemaResponse.builder()
                 .id(cinema.getId())
+                .galaxyCinemaId(cinema.getGalaxyCinemaId())
+                .siteId(cinema.getSiteId())
+                .slug(cinema.getSlug())
                 .name(cinema.getName())
                 .address(cinema.getAddress())
                 .city(cinema.getCity())
+                .galaxyCityId(cinema.getGalaxyCityId())
+                .latitude(cinema.getLatitude())
+                .longitude(cinema.getLongitude())
+                .phone(cinema.getPhone())
+                .imageLandscape(cinema.getImageLandscape())
+                .imagePortrait(cinema.getImagePortrait())
+                .imageUrls(cinema.getImageUrls())
+                .cinemaType(cinema.getCinemaType())
+                .displayOrder(cinema.getDisplayOrder())
                 .auditoriums(auditoriums)
                 .build();
     }

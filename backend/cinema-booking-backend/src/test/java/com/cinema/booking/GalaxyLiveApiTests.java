@@ -14,6 +14,23 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfSystemProperty(named = "galaxy.live", matches = "true")
 class GalaxyLiveApiTests {
     @Test
+    void fetchesCompleteCinemaCatalogUsingProductionHttpClient() {
+        GalaxySyncProperties properties = new GalaxySyncProperties();
+        properties.setClientId(System.getProperty("galaxy.client-id", System.getenv("GALAXY_CLIENT_ID")));
+        GalaxyApiClient client = new GalaxyApiClient(new GalaxyClientConfig().galaxyRestClient(properties),
+                new ObjectMapper(), properties);
+        var cinemas = client.fetchCinemas(null);
+        assertFalse(cinemas.isEmpty(), "Expected Galaxy cinema catalog");
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (var cinema : cinemas) {
+            assertFalse(cinema.path("id").asText().isBlank());
+            assertTrue(ids.add(cinema.path("id").asText()), "Duplicate Galaxy cinema ID");
+            assertFalse(cinema.path("name").asText().isBlank());
+        }
+        System.out.printf("Galaxy live: %d cinemas; complete catalog validated%n", cinemas.size());
+    }
+
+    @Test
     void fetchesCompleteSessionsAndComingSoonUsingProductionHttpClient() {
         GalaxySyncProperties properties = new GalaxySyncProperties();
         properties.setClientId(System.getProperty("galaxy.client-id", System.getenv("GALAXY_CLIENT_ID")));

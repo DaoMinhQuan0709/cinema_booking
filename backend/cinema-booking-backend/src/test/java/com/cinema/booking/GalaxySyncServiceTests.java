@@ -63,7 +63,8 @@ class GalaxySyncServiceTests {
         when(client.fetchSessions(null)).thenReturn(empty);
         when(client.fetchComingSoon(null)).thenReturn(empty);
         when(client.fetchNowShowing(null)).thenReturn(empty);
-        when(importer.importData(empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
+        when(client.fetchCinemas(null)).thenReturn(empty);
+        when(importer.importData(empty, empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
         service.syncGalaxyData(null, 0);
         var lastSuccess = service.getStatus().lastSuccessAt();
         assertNotNull(lastSuccess);
@@ -78,7 +79,8 @@ class GalaxySyncServiceTests {
         when(client.fetchSessions(null)).thenReturn(empty);
         when(client.fetchComingSoon(null)).thenReturn(empty);
         when(client.fetchNowShowing(null)).thenReturn(empty);
-        when(importer.importData(empty, empty, empty, 100, false)).thenReturn(GalaxySyncResponse.builder().build());
+        when(client.fetchCinemas(null)).thenReturn(empty);
+        when(importer.importData(empty, empty, empty, empty, 100, false)).thenReturn(GalaxySyncResponse.builder().build());
         service.syncGalaxyData(null, 100);
         assertNull(service.getStatus().lastSuccessAt());
     }
@@ -89,7 +91,8 @@ class GalaxySyncServiceTests {
         when(client.fetchSessions(null)).thenReturn(empty);
         when(client.fetchComingSoon(null)).thenReturn(empty);
         when(client.fetchNowShowing(null)).thenReturn(empty);
-        when(importer.importData(empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
+        when(client.fetchCinemas(null)).thenReturn(empty);
+        when(importer.importData(empty, empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
         service.syncGalaxyData(null, 0);
         when(client.fetchSessions(null)).thenThrow(new AppException(502, "Lỗi online riêng"));
         assertThrows(AppException.class, () -> service.syncGalaxyData(null, 0));
@@ -135,7 +138,8 @@ class GalaxySyncServiceTests {
         });
         when(client.fetchComingSoon(null)).thenReturn(empty);
         when(client.fetchNowShowing(null)).thenReturn(empty);
-        when(importer.importData(empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
+        when(client.fetchCinemas(null)).thenReturn(empty);
+        when(importer.importData(empty, empty, empty, empty, 0, true)).thenReturn(GalaxySyncResponse.builder().build());
         try (var executor = Executors.newSingleThreadExecutor()) {
             var running = executor.submit(() -> service.syncGalaxyData(null, 0));
             try {
@@ -148,5 +152,35 @@ class GalaxySyncServiceTests {
             running.get(5, TimeUnit.SECONDS);
         }
         assertFalse(service.getStatus().running());
+    }
+
+    @Test
+    void failedCinemaCatalogFetchDoesNotApplyOtherSnapshots() {
+        var empty = mapper.createArrayNode();
+        when(client.fetchSessions(null)).thenReturn(empty);
+        when(client.fetchComingSoon(null)).thenReturn(empty);
+        when(client.fetchNowShowing(null)).thenReturn(empty);
+        when(client.fetchCinemas(null)).thenThrow(new AppException(502, "Cinema catalog unavailable"));
+        assertThrows(AppException.class, () -> service.syncGalaxyData(null, 0));
+        verifyNoInteractions(importer);
+        assertNull(service.getStatus().lastSuccessAt());
+        assertFalse(service.getStatus().running());
+    }
+
+    @Test
+    void passesCinemaCatalogAndClientIdToTheSameOnlineSync() {
+        var empty = mapper.createArrayNode();
+        var cinemas = mapper.createArrayNode().addObject().put("id", "cinema-1").put("name", "Galaxy");
+        var catalog = mapper.createArrayNode().add(cinemas);
+        when(client.fetchSessions("browser-client")).thenReturn(empty);
+        when(client.fetchComingSoon("browser-client")).thenReturn(empty);
+        when(client.fetchNowShowing("browser-client")).thenReturn(empty);
+        when(client.fetchCinemas("browser-client")).thenReturn(catalog);
+        when(importer.importData(empty, empty, empty, catalog, 0, true))
+                .thenReturn(GalaxySyncResponse.builder().totalCinemasSynced(1).build());
+        var result = service.syncGalaxyData("browser-client", 0);
+        assertEquals(1, result.getTotalCinemasSynced());
+        assertEquals("GALAXY_ONLINE", result.getSource());
+        verify(importer).importData(empty, empty, empty, catalog, 0, true);
     }
 }

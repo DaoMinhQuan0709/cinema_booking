@@ -41,6 +41,26 @@ class GalaxyApiClientTests {
     }
 
     @Test
+    void fetchesCompleteCinemaCatalogWithConfiguredClientId() {
+        server.expect(requestTo("https://galaxy.test/api/v2/mobile/cinemas"))
+                .andExpect(header("clientId", "configured-client"))
+                .andRespond(withSuccess("{\"data\":{\"total\":1,\"result\":[{\"id\":\"cinema-1\",\"siteId\":\"000001\"}]}}",
+                        MediaType.APPLICATION_JSON));
+        var result = client.fetchCinemas(null);
+        assertEquals("000001", result.get(0).path("siteId").asText());
+        server.verify();
+    }
+
+    @Test
+    void cinemaCatalogUsesOverrideClientIdAndRejectsIncompleteLists() {
+        server.expect(requestTo("https://galaxy.test/api/v2/mobile/cinemas"))
+                .andExpect(header("clientId", "browser-client"))
+                .andRespond(withSuccess("{\"data\":{\"total\":32,\"result\":[]}}", MediaType.APPLICATION_JSON));
+        assertThrows(AppException.class, () -> client.fetchCinemas(" browser-client "));
+        server.verify();
+    }
+
+    @Test
     void acceptsJsonEvenWhenGalaxyLabelsItAsHtml() {
         server.expect(requestTo(SESSIONS)).andExpect(header("clientId", "configured-client"))
                 .andRespond(withSuccess(EMPTY, MediaType.TEXT_HTML));

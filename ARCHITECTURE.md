@@ -26,8 +26,8 @@ flowchart TD
     Booking --> WS
 ```
 
-- Galaxy cung cấp dữ liệu tham chiếu cho phim, rạp/phòng xuất hiện trong lịch
-  chiếu và thời gian suất chiếu. Các ID nguồn được lưu riêng; ID nội bộ tiếp
+- Galaxy cung cấp dữ liệu tham chiếu cho phim, danh mục rạp, phòng xuất hiện
+  trong lịch chiếu và thời gian suất chiếu. Các ID nguồn được lưu riêng; ID nội bộ tiếp
   tục được dùng cho booking, Redis key và WebSocket topic.
 - `seats` mô tả sơ đồ mô phỏng do đồ án tạo, không phải sơ đồ Galaxy được kiểm
   chứng. `showtime_seats` lưu trạng thái, giá, người giữ và hạn giữ của đồ án;
@@ -136,9 +136,20 @@ Table movies {
 Table cinemas {
   id bigserial [pk]
   galaxy_cinema_id varchar(100) [unique] // ID tham chiếu nguồn
+  site_id varchar(100) // Giữ mã rạp dạng chuỗi, kể cả số 0 đầu
+  slug varchar(255)
+  galaxy_city_id varchar(100)
   name varchar(255) [not null]
   address text [not null]
   city varchar(100) [not null]
+  latitude numeric(20,17)
+  longitude numeric(20,17)
+  phone varchar(50)
+  image_landscape varchar(1000)
+  image_portrait varchar(1000)
+  image_urls jsonb
+  cinema_type varchar(50)
+  display_order int
 }
 
 Table auditoriums {

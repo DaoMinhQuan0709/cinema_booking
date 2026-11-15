@@ -286,6 +286,154 @@ class GalaxyDataImporterTests {
         assertEquals("Hài, Tâm Lý", movie.getGenre());
     }
 
+    @Test
+    void importsCinemaCatalogWithoutSessionsAndUpdatesTheSameLocalId() throws Exception {
+        ArrayNode catalog = cinemaCatalog();
+        var empty = mapper.createArrayNode();
+        var result = importer.importData(empty, empty, empty, catalog, 1, false);
+        assertEquals(1, result.getTotalCinemasSynced());
+        assertEquals(0, result.getTotalAuditoriumsSynced());
+        assertEquals(0, result.getTotalShowtimesSynced());
+        Cinema cinema = cinemaStore.get("cinema-1");
+        Long id = cinema.getId();
+        assertEquals("0000001029", cinema.getSiteId());
+        assertEquals("galaxy-test", cinema.getSlug());
+        assertEquals("Hà Nội", cinema.getCity());
+        assertEquals("f4bf5f53-4e80-40c8-b1e0-f11ffa9a636a", cinema.getGalaxyCityId());
+        assertEquals(new BigDecimal("21.031587302213463"), cinema.getLatitude());
+        assertEquals(new BigDecimal("105.8309551052807"), cinema.getLongitude());
+        assertEquals("19002224", cinema.getPhone());
+        assertEquals("https://cdn.example/landscape.jpg", cinema.getImageLandscape());
+        assertEquals("https://cdn.example/portrait.jpg", cinema.getImagePortrait());
+        assertEquals(List.of("https://cdn.example/cinema-1.jpg", "https://cdn.example/cinema-2.jpg"), cinema.getImageUrls());
+        assertEquals("premium", cinema.getCinemaType());
+        assertEquals(0, cinema.getDisplayOrder());
+        ((com.fasterxml.jackson.databind.node.ObjectNode) catalog.get(0)).put("name", "Updated cinema");
+        importer.importData(empty, empty, empty, catalog, 0, true);
+        assertEquals(1, cinemaStore.size());
+        assertEquals(id, cinemaStore.get("cinema-1").getId());
+        assertEquals("Updated cinema", cinemaStore.get("cinema-1").getName());
+        verifyNoInteractions(auditoriums, bookings);
+    }
+
+    @Test
+    void dedicatedCinemaCatalogTakesPrecedenceOverSessionMetadata() throws Exception {
+        ArrayNode sessions = snapshot("session-1");
+        var embedded = (com.fasterxml.jackson.databind.node.ObjectNode) sessions.get(0).path("cinema");
+        embedded.put("phone", "outdated");
+        embedded.put("siteId", "old-code");
+        var result = importer.importData(sessions, null, null, cinemaCatalog(), 0, false);
+        assertEquals(1, result.getTotalCinemasSynced());
+        assertEquals(1, cinemaStore.size());
+        Cinema cinema = cinemaStore.get("cinema-1");
+        assertEquals("Galaxy catalog cinema", cinema.getName());
+        assertEquals("19002224", cinema.getPhone());
+        assertEquals("0000001029", cinema.getSiteId());
+        assertSame(cinema, showtimeStore.get("session-1").getAuditorium().getCinema());
+        verify(cinemas, times(1)).save(any());
+    }
+
+    @Test
+    void partialOfflinePayloadPreservesEnrichmentAndExistingAuditoriums() throws Exception {
+        ArrayNode sessions = snapshot("session-1");
+        importer.importData(sessions, null, null, cinemaCatalog(), 0, false);
+        Cinema cinema = cinemaStore.get("cinema-1");
+        Long id = cinema.getId();
+        Auditorium auditorium = showtimeStore.get("session-1").getAuditorium();
+        cinema.getAuditoriums().add(auditorium);
+        var embedded = (com.fasterxml.jackson.databind.node.ObjectNode) sessions.get(0).path("cinema");
+        embedded.remove("address");
+        embedded.putNull("phone");
+        embedded.putNull("imageUrls");
+        embedded.putNull("latitude");
+        importer.importData(sessions, null, 0, false);
+        assertEquals(id, cinema.getId());
+        assertEquals("Hà Nội", cinema.getCity());
+        assertEquals("175 Nguyễn Thái Học, Hà Nội", cinema.getAddress());
+        assertEquals("19002224", cinema.getPhone());
+        assertEquals("0000001029", cinema.getSiteId());
+        assertEquals("galaxy-test", cinema.getSlug());
+        assertEquals("premium", cinema.getCinemaType());
+        assertEquals(2, cinema.getImageUrls().size());
+        assertEquals(new BigDecimal("21.031587302213463"), cinema.getLatitude());
+        assertEquals(List.of(auditorium), cinema.getAuditoriums());
+    }
+
+    @Test
+    void adoptsLegacyCinemaByNameWithoutChangingItsLocalIdOrRooms() throws Exception {
+        Cinema legacy = Cinema.builder().id(42L).name("Galaxy catalog cinema")
+                .city("Hà Nội").address("Legacy address").build();
+        Auditorium room = Auditorium.builder().id(88L).name("Existing room").cinema(legacy).build();
+        legacy.getAuditoriums().add(room);
+        when(cinemas.findByName("Galaxy catalog cinema")).thenReturn(Optional.of(legacy));
+        var empty = mapper.createArrayNode();
+        importer.importData(empty, null, null, cinemaCatalog(), 0, false);
+        Cinema saved = cinemaStore.get("cinema-1");
+        assertSame(legacy, saved);
+        assertEquals(42L, saved.getId());
+        assertEquals(List.of(room), saved.getAuditoriums());
+    }
+
+    @Test
+    void sessionsStillImportCinemasMissingFromTheSeparateCatalog() throws Exception {
+        ArrayNode catalog = cinemaCatalog();
+        ((com.fasterxml.jackson.databind.node.ObjectNode) catalog.get(0)).put("id", "cinema-without-session");
+        ArrayNode sessions = snapshot("session-1");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) sessions.get(0).path("cinema")).put("code", "0000001005");
+        var result = importer.importData(sessions, null, null, catalog, 0, false);
+        assertEquals(2, result.getTotalCinemasSynced());
+        assertEquals("0000001005", cinemaStore.get("cinema-1").getSiteId());
+        assertNotNull(cinemaStore.get("cinema-without-session"));
+    }
+
+    @Test
+    void invalidCinemaMetadataIsRejectedBeforeAnyDatabaseInteraction() throws Exception {
+        for (String invalid : List.of(
+                "{\"latitude\":\"not-a-number\"}", "{\"latitude\":91}", "{\"longitude\":-181}",
+                "{\"imageUrls\":\"not-an-array\"}", "{\"imageUrls\":[123]}", "{\"phone\":123}",
+                "{\"order\":1.5}", "{\"order\":2147483648}", "{\"id\":\"\"}")) {
+            ArrayNode catalog = cinemaCatalog();
+            ((com.fasterxml.jackson.databind.node.ObjectNode) catalog.get(0)).setAll(
+                    (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(invalid));
+            assertThrows(AppException.class,
+                    () -> importer.importData(snapshot("session-1"), null, null, catalog, 0, false), invalid);
+        }
+        verifyNoInteractions(movies, cinemas, auditoriums, showtimes, bookings);
+    }
+
+    @Test
+    void duplicateCinemaIdsAreRejectedBeforeAnyDatabaseInteraction() throws Exception {
+        ArrayNode catalog = cinemaCatalog();
+        catalog.add(catalog.get(0).deepCopy());
+        assertThrows(AppException.class,
+                () -> importer.importData(snapshot("session-1"), null, null, catalog, 0, false));
+        verifyNoInteractions(movies, cinemas, auditoriums, showtimes, bookings);
+    }
+
+    @Test
+    void explicitEmptyGalleryClearsImagesAndAnAbsentCinemaIsNotDeleted() throws Exception {
+        var empty = mapper.createArrayNode();
+        ArrayNode catalog = cinemaCatalog();
+        importer.importData(empty, null, null, catalog, 0, false);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) catalog.get(0)).putArray("imageUrls");
+        importer.importData(empty, null, null, catalog, 0, false);
+        assertTrue(cinemaStore.get("cinema-1").getImageUrls().isEmpty());
+        importer.importData(empty, empty, empty, empty, 0, true);
+        assertEquals(1, cinemaStore.size());
+        verify(cinemas, never()).delete(any());
+    }
+
+    private ArrayNode cinemaCatalog() throws Exception {
+        return (ArrayNode) mapper.readTree("""
+                [{"id":"cinema-1","name":"Galaxy catalog cinema","siteId":"0000001029","slug":"galaxy-test",
+                  "address":"175 Nguyễn Thái Học, Hà Nội","cityId":"f4bf5f53-4e80-40c8-b1e0-f11ffa9a636a",
+                  "latitude":"21.031587302213463","longitude":105.8309551052807,"phone":"19002224",
+                  "imageLandscape":"https://cdn.example/landscape.jpg","imagePortrait":"https://cdn.example/portrait.jpg",
+                  "imageUrls":["https://cdn.example/cinema-1.jpg","https://cdn.example/cinema-2.jpg"],
+                  "cinemaType":"premium","order":0}]
+                """);
+    }
+
     private ArrayNode snapshot(String... ids) throws Exception {
         ArrayNode array = mapper.createArrayNode();
         for (int i = 0; i < ids.length; i++) {

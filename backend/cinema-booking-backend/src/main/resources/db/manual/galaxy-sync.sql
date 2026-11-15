@@ -10,6 +10,17 @@ ALTER TABLE movies ADD COLUMN IF NOT EXISTS galaxy_details_synced_at timestamptz
 ALTER TABLE movies ADD COLUMN IF NOT EXISTS galaxy_details_attempt_at timestamptz;
 ALTER TABLE movies ALTER COLUMN genre TYPE varchar(500);
 ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS galaxy_cinema_id varchar(100);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS site_id varchar(100);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS slug varchar(255);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS galaxy_city_id varchar(100);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS latitude numeric(20,17);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS longitude numeric(20,17);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS phone varchar(50);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS image_landscape varchar(1000);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS image_portrait varchar(1000);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS image_urls jsonb;
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS cinema_type varchar(50);
+ALTER TABLE cinemas ADD COLUMN IF NOT EXISTS display_order integer;
 ALTER TABLE showtimes ADD COLUMN IF NOT EXISTS galaxy_session_id varchar(100);
 ALTER TABLE showtimes ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_movies_galaxy_movie_id ON movies (galaxy_movie_id);

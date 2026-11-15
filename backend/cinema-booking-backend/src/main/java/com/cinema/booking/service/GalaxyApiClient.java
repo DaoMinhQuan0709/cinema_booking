@@ -34,6 +34,10 @@ public class GalaxyApiClient {
         return fetchList("/api/v2/mobile/sessions2?includeCinema=true&includeMovie=true", clientId);
     }
 
+    public JsonNode fetchCinemas(String clientId) {
+        return fetchList("/api/v2/mobile/cinemas", clientId);
+    }
+
     public JsonNode fetchNowShowing(String clientId) {
         return fetchList("/api/v2/mobile/movies/showing", clientId);
     }
