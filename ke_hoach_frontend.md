@@ -157,6 +157,19 @@ frontend/
 
 Chi tiết thiết kế và kiểm chứng: `docs/plans/2026-11-08-showtimes-design.md`.
 
+### 2.2. Trang Rạp Chiếu Phim (`/cinemas`)
+
+**[x] Đã triển khai và kiểm chứng ngày 15/11/2026.**
+
+*   Danh bạ công khai dùng metadata rạp đã đồng bộ: ảnh, tên, địa chỉ, tỉnh/thành và điện thoại.
+*   Tìm tên không dấu, lọc tỉnh/thành, giữ nhóm “Chưa xác định”; URL lưu `q`/`city`, hỗ trợ Back/Forward.
+*   Ảnh lazy-load và fallback; tải/rỗng/lỗi/thử lại/làm mới được phân biệt, lỗi làm mới giữ dữ liệu cũ có cảnh báo.
+*   “Xem lịch chiếu” truyền ID nội bộ, giữ rạp hợp lệ cả khi ngày đang chọn chưa có suất.
+*   Dùng service/cache hiện có, không gọi Galaxy hoặc tạo ghế/booking khi tra cứu; menu đổi thành “Rạp chiếu phim”.
+
+Thiết kế: [2026-11-15-cinemas-design.md](docs/plans/2026-11-15-cinemas-design.md).
+Tiến độ và kiểm chứng (mô phỏng tách API thật): [cinemas-implementation.md](cinemas-implementation.md).
+
 ### 3. Trang Chọn Ghế & Giữ Ghế Thời Gian Thực (`/booking/:showtimeId`) - **TRỌNG TÂM KỸ THUẬT**
 
 > Tiến độ phần dựng sơ đồ: đã có SVG màn hình, ma trận uốn cong, màu/trạng thái,

@@ -51,7 +51,7 @@ export const Header = () => {
     { name: 'Trang chủ', path: '/' },
     { name: 'Phim', path: '/movies' },
     { name: 'Lịch chiếu', path: '/showtimes' },
-    { name: 'Rạp & Giá vé', path: '/cinemas' },
+    { name: 'Rạp chiếu phim', path: '/cinemas' },
   ];
 
   const getNavLinkClass = ({ isActive }) =>

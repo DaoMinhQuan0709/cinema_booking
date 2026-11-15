@@ -58,17 +58,28 @@ export function getUpcomingShowtimes(showtimes, date, now = new Date()) {
   );
 }
 
-/** Keep URL selections while loading, and keep city when its metadata is unavailable. */
-export function resolveScheduleFilters(showtimes, cinemas, filters, { canReset = false, hasCinemaData = false } = {}) {
+/** Giữ rạp trong catalog kể cả ngày chưa có suất; không bỏ lọc khi metadata chưa xác minh được. */
+export function resolveScheduleFilters(showtimes, cinemas, filters, {
+  canReset = false, hasCinemaData = false, canResetCinema = canReset && hasCinemaData,
+} = {}) {
   const cityByCinema = new Map(cinemas.map(cinema => [String(cinema.id), cinema.city?.trim() ?? '']));
   const cinemaMap = new Map(showtimes.map(slot => [String(slot.cinemaId), {
     id: String(slot.cinemaId), label: slot.cinemaName, city: cityByCinema.get(String(slot.cinemaId)) ?? '',
   }]));
+  if (hasCinemaData) {
+    cinemas.forEach(cinema => {
+      const id = String(cinema.id);
+      cinemaMap.set(id, {
+        id, label: cinema.name?.trim() || cinemaMap.get(id)?.label || 'Rạp đã chọn',
+        city: cinema.city?.trim() ?? '',
+      });
+    });
+  }
   const allCinemas = [...cinemaMap.values()].sort((a, b) => COLLATOR.compare(a.label, b.label));
   const cities = [...new Set(allCinemas.map(cinema => cinema.city).filter(Boolean))].sort(COLLATOR.compare);
-  const city = canReset && hasCinemaData && !cities.includes(filters.city) ? '' : filters.city;
+  const city = canResetCinema && !cities.includes(filters.city) ? '' : filters.city;
   const cinemasInCity = allCinemas.filter(cinema => !hasCinemaData || !city || cinema.city === city);
-  const cinemaId = canReset && !cinemasInCity.some(cinema => cinema.id === filters.cinemaId) ? '' : filters.cinemaId;
+  const cinemaId = canResetCinema && !cinemasInCity.some(cinema => cinema.id === filters.cinemaId) ? '' : filters.cinemaId;
   const allowedCinemas = new Set(cinemasInCity.map(cinema => cinema.id));
   const locationSlots = showtimes.filter(slot =>
     allowedCinemas.has(String(slot.cinemaId)) && (!cinemaId || String(slot.cinemaId) === cinemaId)

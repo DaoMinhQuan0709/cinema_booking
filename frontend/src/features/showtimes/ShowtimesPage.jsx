@@ -121,6 +121,7 @@ export const ShowtimesPage = () => {
   const resolved = resolveScheduleFilters(upcoming, cinemas, requested, {
     canReset: dailyQuery.isSuccess && !dailyQuery.isFetching,
     hasCinemaData,
+    canResetCinema: dailyQuery.isSuccess && !dailyQuery.isFetching && cinemaQuery.isSuccess && !cinemaQuery.isFetching,
   });
   const { filters } = resolved;
   const groups = groupScheduleByMovie(resolved.showtimes, cinemas);
@@ -229,8 +230,8 @@ export const ShowtimesPage = () => {
         ) : (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-surfaceBorder px-5 py-16 text-center">
             <CalendarX aria-hidden="true" strokeWidth={1.5} className="mb-1 h-10 w-10 text-muted" />
-            <h2 className="text-lg font-semibold text-white">{hasFilters ? 'Không có suất chiếu phù hợp' : 'Chưa có suất chiếu trong ngày này'}</h2>
-            <p className="max-w-md text-sm leading-relaxed text-muted">{hasFilters ? 'Bạn hãy xóa bộ lọc hoặc chọn ngày khác để tìm thêm lịch chiếu.' : 'Bạn hãy chọn ngày khác hoặc quay lại sau để xem lịch mới.'}</p>
+            <h2 className="text-lg font-semibold text-white">{filters.cinemaId ? 'Rạp đã chọn chưa có suất chiếu phù hợp' : hasFilters ? 'Không có suất chiếu phù hợp' : 'Chưa có suất chiếu trong ngày này'}</h2>
+            <p className="max-w-md text-sm leading-relaxed text-muted">{filters.cinemaId ? 'Bạn hãy chọn ngày khác để xem lịch tại rạp này hoặc xóa bộ lọc.' : hasFilters ? 'Bạn hãy xóa bộ lọc hoặc chọn ngày khác để tìm thêm lịch chiếu.' : 'Bạn hãy chọn ngày khác hoặc quay lại sau để xem lịch mới.'}</p>
             {hasFilters && <button type="button" onClick={clearFilters} className={`mt-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primaryHover ${FOCUS_CLASS}`}>Xóa bộ lọc</button>}
           </div>
         ))}

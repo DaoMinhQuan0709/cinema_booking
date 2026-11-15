@@ -35,7 +35,7 @@ export function useShowtimes({ movieId, date, cinemaId } = {}) {
 export function useCinemas(params = {}, requestOptions = {}) {
   return useQuery({
     queryKey: cinemaKeys.list(params),
-    queryFn: () => cinemaService.getCinemas(params, requestOptions),
+    queryFn: ({ signal }) => cinemaService.getCinemas(params, { ...requestOptions, signal }),
     staleTime: 30 * 60 * 1000,
   });
 }

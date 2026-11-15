@@ -87,12 +87,40 @@ test('filters by city, cinema and film and offers films matching the selected lo
   assert.deepEqual(result.showtimes.map(slot => slot.id), [11]);
 });
 
-test('resets unavailable choices only after a successful response', () => {
+test('giữ tỉnh/thành và rạp hợp lệ trong catalog, chỉ bỏ phim không còn suất sau response thành công', () => {
   const selected = { ...filters, city: 'Hà Nội', cinemaId: '1', movieId: '10' };
   assert.deepEqual(resolveScheduleFilters([], cinemas, selected, { hasCinemaData: true }).filters, selected);
-  assert.deepEqual(resolveScheduleFilters([slots[4]], cinemas, selected, ready).filters, filters);
+  assert.deepEqual(resolveScheduleFilters([slots[4]], cinemas, selected, ready).filters, { ...selected, movieId: '' });
   const returned = resolveScheduleFilters(slots, cinemas, filters, ready);
   assert.deepEqual(returned.filters, filters);
+});
+
+test('rạp từ danh bạ chưa có suất vẫn nằm trong select và không chuyển sang lịch của rạp khác', () => {
+  const catalog = [...cinemas, { id: 3, name: 'Rạp chưa có suất', city: 'Huế' }];
+  const selected = { ...filters, cinemaId: '3' };
+  const result = resolveScheduleFilters(slots, catalog, selected, ready);
+  assert.equal(result.filters.cinemaId, '3');
+  assert.equal(result.showtimes.length, 0);
+  assert.ok(result.cinemas.some(cinema => cinema.id === '3' && cinema.label === 'Rạp chưa có suất'));
+  assert.equal(resolveScheduleFilters([], catalog, { ...selected, city: 'Huế' }, ready).filters.city, 'Huế');
+});
+
+test('đổi ngày không có suất giữ rạp/tỉnh hợp lệ; ID không tồn tại chỉ reset khi metadata đã xác minh', () => {
+  const selected = { ...filters, city: 'Hà Nội', cinemaId: '1' };
+  assert.deepEqual(resolveScheduleFilters([], cinemas, selected, ready).filters, selected);
+  const missing = { ...filters, cinemaId: '999' };
+  assert.deepEqual(resolveScheduleFilters(slots, cinemas, missing, ready).filters, filters);
+  assert.deepEqual(resolveScheduleFilters(slots, cinemas, missing, { ...ready, canResetCinema: false }).filters, missing);
+});
+
+test('metadata rạp lỗi/chưa tải không bỏ ID từ URL hoặc hiển thị lịch rạp khác thay thế', () => {
+  const selected = { ...filters, cinemaId: '3' };
+  const result = resolveScheduleFilters(slots, [], selected, { canReset: true });
+  assert.equal(result.filters.cinemaId, '3');
+  assert.equal(result.showtimes.length, 0);
+  const returned = resolveScheduleFilters(slots, [{ id: 3, name: 'Rạp mới' }], selected, ready);
+  assert.equal(returned.filters.cinemaId, '3');
+  assert.ok(returned.cinemas.some(cinema => cinema.id === '3'));
 });
 
 test('keeps a valid city but resets a cinema outside it and an unavailable film', () => {
