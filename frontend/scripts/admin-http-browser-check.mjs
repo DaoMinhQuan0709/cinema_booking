@@ -50,10 +50,10 @@ async function mobile() {
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 1000, mobile: true, deviceScaleFactor: 1 });
   await cdp.wait('document.documentElement.scrollWidth <= 390');
 }
-async function openShowtime() {
+async function openShowtime(price = '100000') {
   await cdp.click('Thêm suất chiếu'); await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`);
   await field('movieId', config.movieId); await field('cinemaId', config.cinemaId); await field('auditoriumId', config.roomId);
-  await field('startTime', `${config.day}T10:00`); await field('endTime', `${config.day}T12:00`); await field('basePrice', '100000');
+  await field('startTime', `${config.day}T10:00`); await field('endTime', `${config.day}T12:00`); await field('basePrice', price);
 }
 
 try {
@@ -98,15 +98,44 @@ try {
 
   await spa(`/admin/showtimes?date=${config.day}&cinemaId=${config.cinemaId}&movieId=${config.movieId}`);
   await cdp.wait(`document.querySelector('#admin-page-title')?.textContent === 'Quản lý suất chiếu' && ![...document.querySelectorAll('main button')].find(b => b.textContent.trim() === 'Thêm suất chiếu')?.disabled`);
-  await openShowtime(); await submit();
+  await openShowtime('89000');
+  const pricePoint = await cdp.evaluate(`(() => {
+    const input = document.querySelector('dialog [name=basePrice]'); input.scrollIntoView({ block: 'center' }); input.focus();
+    const rect = input.getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  })()`);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...pricePoint });
+  for (let index = 0; index < 2; index++) {
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...pricePoint, deltaX: 0, deltaY: 100 });
+  }
+  await cdp.wait(`document.querySelector('dialog [name=basePrice]').value === '89000'`);
+  await submit();
   await cdp.wait(`!document.querySelector('dialog[open]') && Boolean(document.querySelector('main table'))`);
   const schedule = await actual(`/showtimes?date=${config.day}&cinemaId=${config.cinemaId}&movieId=${config.movieId}`);
   assert.equal(schedule.length, 1); assert.equal(schedule[0].startTime, config.day + 'T10:00:00');
+  assert.equal(schedule[0].basePrice, 89000);
+  assert.equal(await cdp.evaluate(`document.querySelector('main tbody').textContent.includes('89.000đ')`), true);
+  passed.push('Giá 89000 không đổi khi cuộn ô đang focus, API đọc lại đúng 89000 và bảng hiện 89.000đ');
   await openShowtime(); await submit();
   await cdp.wait(`document.querySelector('dialog [role=alert]')?.textContent.includes('Xung dot')`);
   assert.equal(await cdp.evaluate(`document.querySelector('dialog [name=startTime]').value`), config.day + 'T10:00');
   assert.equal((await actual(`/showtimes?date=${config.day}&cinemaId=${config.cinemaId}&movieId=${config.movieId}`)).length, 1);
   await cdp.click('Hủy', 'dialog');
+
+  await openShowtime(); await field('movieId', savedId);
+  const beforeRelease = new Date(`${config.day}T12:00:00+07:00`);
+  beforeRelease.setUTCDate(beforeRelease.getUTCDate() - 1);
+  const beforeReleaseDay = beforeRelease.toISOString().slice(0, 10);
+  await field('startTime', `${beforeReleaseDay}T23:30`); await field('endTime', `${config.day}T01:45`);
+  const postedBefore = requests.filter(request => request.path === '/api/v1/admin/showtimes').length;
+  await submit(); await cdp.wait(`document.querySelector('dialog [name=startTime]').getAttribute('aria-invalid') === 'true'`);
+  assert.equal(requests.filter(request => request.path === '/api/v1/admin/showtimes').length, postedBefore);
+  assert.equal(await cdp.evaluate(`document.querySelector('dialog [name=startTime]').min`), config.day + 'T00:00');
+  await field('startTime', `${config.day}T00:00`); await field('endTime', `${config.day}T02:00`); await submit();
+  await cdp.wait(`!document.querySelector('dialog[open]')`);
+  const advance = await actual(`/showtimes?date=${config.day}&cinemaId=${config.cinemaId}&movieId=${savedId}`);
+  assert.equal(advance.length, 1); assert.equal(advance[0].startTime, config.day + 'T00:00:00');
+  passed.push('Phim COMING_SOON thật: UI chặn trước ngày phát hành dù qua nửa đêm; đúng 00:00 ngày phát hành ghi được vào PostgreSQL');
+
   await spa(`/showtimes?date=${config.day}&cinemaId=${config.cinemaId}&movieId=${config.movieId}`);
   await cdp.wait(`!document.querySelector('#admin-main') && Boolean(document.querySelector('a[href="/booking/${schedule[0].id}"]'))`);
   passed.push('UI xếp lịch giờ Việt Nam từ browser Los Angeles; PostgreSQL trả 409 giữ form, lịch khách có suất thật');

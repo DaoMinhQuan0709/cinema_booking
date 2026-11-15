@@ -51,6 +51,11 @@ sửa phòng/giờ. Timeout ghi không tự POST lại: đọc catalog/lịch đ
 trước khi chủ động gửi lại. Các màn hình có loading/rỗng/lỗi/thử lại, bảng
 cuộn ngang và điều hướng bàn phím ở 390px.
 
+Suất được thêm phải bắt đầu từ ngày phát hành phim trở đi theo ngày Việt Nam;
+đúng ngày phát hành được phép, kể cả phim COMING_SOON. Suất bắt đầu hôm trước
+dù kết thúc qua nửa đêm vẫn bị từ chối. Form nhắc ngày phát hành, backend trả
+400 khi gọi API trực tiếp với ngày chiếu không hợp lệ (bổ sung ngày 15/11/2026).
+
 Doanh thu tính theo **ngày tạo đơn CONFIRMED**, gồm combo; vé chỉ đếm vị trí
 BOOKED liên kết đơn đó. KPI và breakdown dùng cùng bộ lọc. Occupancy dùng ngày
 bắt đầu suất riêng, gồm cả lịch sử/inactive; mẫu số là tổng sức chứa, không

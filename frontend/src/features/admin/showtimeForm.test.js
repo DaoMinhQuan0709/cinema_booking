@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import process from 'node:process';
+import { formatCurrency } from '../../utils/formatCurrency.js';
 import { normalizeShowtimeTime, suggestShowtimeEnd, prepareShowtime, readShowtimeFilters, writeShowtimeFilters, toShowtimeForm, formatShowtimeTime } from './showtimeForm.js';
 
 const now = new Date('2026-11-12T03:00:00Z'); // 10:00 in Vietnam.
@@ -56,6 +57,16 @@ test('price matches positive DECIMAL(10,2) without exponents or implicit roundin
   for (const basePrice of ['0.01', '90000', '99999999.99']) assert.equal(prepareShowtime({ ...valid, basePrice }, options).errors.basePrice, undefined);
 });
 
+test('giá 89000 giữ nguyên trong JSON và định dạng bảng; số lẻ hợp lệ không bị làm tròn che sai lệch', () => {
+  for (const [basePrice, amount, label] of [['89000', 89000, '89.000đ'], ['89000.00', 89000, '89.000đ'],
+    ['89000.50', 89000.5, '89.000,5đ'], ['88999.98', 88999.98, '88.999,98đ']]) {
+    const { errors, payload } = prepareShowtime({ ...valid, basePrice }, options);
+    assert.deepEqual(errors, {});
+    assert.equal(JSON.parse(JSON.stringify(payload)).basePrice, amount);
+    assert.equal(formatCurrency(payload.basePrice), label);
+  }
+});
+
 test('filter URL defaults to Vietnam today, preserves unrelated params and accepts any valid calendar day', () => {
   const midnight = new Date('2026-11-12T18:00:00Z');
   assert.deepEqual(readShowtimeFilters(new URLSearchParams('date=2026-02-29&movieId=1e3&cinemaId=-1'), midnight), { date: '2026-11-13', movieId: '', cinemaId: '' });
@@ -70,4 +81,28 @@ test('new draft inherits selected movie/cinema and starts at a future half hour 
   assert.deepEqual(toShowtimeForm(filters, now), { movieId: '1', cinemaId: '2', auditoriumId: '', startTime: '2026-11-12T10:30', endTime: '', basePrice: '' });
   assert.equal(toShowtimeForm({ ...filters, date: '2026-11-13' }, now).startTime, '2026-11-13T10:00');
   assert.equal(toShowtimeForm(filters, new Date('2026-11-12T16:55:00Z')).startTime, '2026-11-13T00:00');
+});
+
+test('chặn ngày bắt đầu trước ngày phát hành dù suất kết thúc vào ngày phát hành và phim ở trạng thái nào', () => {
+  for (const status of ['COMING_SOON', 'NOW_SHOWING', 'ENDED']) {
+    const catalog = [{ ...movies[0], status, releaseDate: '2026-11-13' }];
+    const result = prepareShowtime(valid, { ...options, movies: catalog });
+    assert.match(result.errors.startTime, /ngày phát hành/);
+    assert.equal(result.errors.endTime, undefined);
+  }
+});
+
+test('phim Sắp chiếu được lên lịch đúng/sau ngày phát hành theo Việt Nam kể cả khi ngày UTC còn ở hôm trước', () => {
+  const previous = process.env.TZ;
+  try {
+    for (const zone of ['UTC', 'America/Los_Angeles', 'Asia/Tokyo']) {
+      process.env.TZ = zone;
+      const catalog = [{ ...movies[0], status: 'COMING_SOON', releaseDate: '2026-11-13' }];
+      for (const startTime of ['2026-11-13T00:00', '2026-11-13T23:30', '2026-11-14T10:00']) {
+        const result = prepareShowtime({ ...valid, startTime, endTime: suggestShowtimeEnd(startTime, 120) }, { ...options, movies: catalog });
+        assert.deepEqual(result.errors, {}, `${zone}: ${startTime}`);
+      }
+      assert.match(prepareShowtime({ ...valid, startTime: '2026-11-12T23:59:59' }, { ...options, movies: catalog }).errors.startTime, /ngày phát hành/);
+    }
+  } finally { if (previous === undefined) delete process.env.TZ; else process.env.TZ = previous; }
 });

@@ -244,3 +244,35 @@ Kế hoạch nghiệm thu chi tiết:
 - **Mô phỏng riêng — khách và backend:** checkout **18 nhóm/82 request**, CineBot **6 nhóm**, 0 lỗi runtime; tổng bảy bộ Edge là **117 nhóm**. Các lớp backend đơn vị/Mockito/MockMvc/transport cục bộ còn lại **147/147** trong lượt Maven trên; phần này không chứng minh Galaxy/Gemini/cổng thanh toán live hoạt động. Checkout artifact cuối `cinema-checkout-browser-NV5B9l`, CineBot `cinema-chatbot-browser-uMgXPg`; Admin `cinema-admin-browser-8eBiTY`, movies `cinema-admin-movies-arMPhD`, showtimes `cinema-admin-showtimes-dnV7Um`, reports `cinema-admin-reports-e9vql7`, sync `cinema-admin-sync-2PQchV`.
 - **Các lỗi kiểm thử đã xử lý:** lượt HTTP đầu giả định 3 phim từ fixture mô phỏng; sửa để đọc số ID phim duy nhất trong file thật (5). Lượt Maven đầy đủ đầu phát hiện ID ghế null trong fixture cũ; sửa entity trả về từ save. Lượt checkout đầu bấm trong refetch; thêm chờ điều kiện sẵn sàng. Số liệu ở trên là lượt cuối đã đạt, không thay đổi mã nghiệp vụ để che lỗi.
 - **Ranh giới nghiệm thu:** chạy ứng dụng và tài khoản thử thật trên PostgreSQL 18.6/Redis độc lập; đơn CONFIRMED lịch sử được seed trực tiếp, không phải giao dịch thanh toán thật. Không gọi Galaxy/Gemini/live payment, không ghi/đối soát dữ liệu vận hành hiện có. Cụm PostgreSQL thử đã dừng, container Redis thử đã dọn; cổng 8080/2005/6379 và PID ứng dụng ban đầu được kiểm tra giữ nguyên. Cả chín phần đã hoàn tất trong phạm vi kế hoạch; các chức năng mở rộng vẫn ngoài bản bàn giao.
+
+## Sửa lỗi ngày 15/11/2026 — Suất chiếu trước ngày phát hành
+
+Git trước khi sửa: working tree sạch trên `main`. Nguyên nhân: `AdminCatalogServiceImpl.createShowtime` và `prepareShowtime` chỉ kiểm tra giờ tương lai/thứ tự bắt đầu–kết thúc, chưa đối chiếu ngày bắt đầu suất với `Movie.releaseDate`.
+
+- [x] Bổ sung kiểm thử tái hiện: ngày bắt đầu trước ngày phát hành bị từ chối, kể cả suất qua nửa đêm; đúng/sau ngày phát hành vẫn được lên lịch cho phim COMING_SOON, theo ngày Việt Nam.
+- [x] Chặn tại service backend trước ghi dữ liệu, trả 400 khi gọi API trực tiếp; form báo lỗi tại giờ bắt đầu, hiển thị ngày phát hành/min phù hợp và bỏ lỗi cũ khi đổi phim.
+- [x] Chạy kiểm thử frontend/backend liên quan, Edge mô phỏng và HTTP/DB thật trên môi trường thử riêng; cập nhật quy tắc sử dụng và ghi kết quả từng loại sau khi đạt.
+
+Kết quả ngày 15/11/2026:
+
+- Hai kiểm thử frontend mới đã tái hiện lỗi trên mã cũ (thiếu lỗi ở startTime), rồi đạt sau sửa. `npm.cmd run lint`, `npm.cmd test` **91/91**, `npm.cmd run build` đều đạt. Kiểm tra trước/đúng/sau ngày phát hành, COMING_SOON/NOW_SHOWING/ENDED, qua nửa đêm và múi giờ UTC/Los Angeles/Tokyo.
+- **Mô phỏng riêng:** `test:admin-showtimes-browser` đạt **16 nhóm/106 request**, **0 lỗi runtime**; gồm case mới ở 390px/Los Angeles: trước ngày phát hành không POST, min theo phim, đổi phim xóa lỗi cũ và đúng 00:00 ngày phát hành vẫn lưu. Artifact temp `cinema-admin-showtimes-voPF7u`. Backend Mockito/MockMvc đạt **17/17** (8 AdminShowtimeServiceTests, 4 ShowtimeControllerTests, 5 SecurityAuthorizationTests).
+- **Tích hợp thật:** helper `test-admin-acceptance.ps1 -SkipFrontendChecks -Tests "AdminPortalHttpTests,AdminShowtimeServiceTests,ShowtimeControllerTests,SecurityAuthorizationTests"` đạt **25/25**, không skip; trong đó **8/8 HTTP thật** trên PostgreSQL/Redis thử độc lập. API từ chối suất COMING_SOON bắt đầu hôm trước dù kết thúc vào ngày phát hành, giữ nguyên số suất/inventory; đúng 00:00 ngày phát hành và ngày hôm sau được tạo, trạng thái phim vẫn COMING_SOON. Edge production bên trong có thêm hành trình dùng phim/DB thật: form chặn ngày sớm và tạo thành công vào ngày phát hành.
+- Quy tắc so ngày bắt đầu theo lịch Việt Nam, dùng ngày phát hành đang lưu ở backend, áp dụng khi phim có ngày phát hành; không thêm điều kiện bắt buộc phim phải là NOW_SHOWING. Cập nhật README Admin và tài liệu bàn giao. Môi trường thử đã dừng, không ghi vào DB ứng dụng hiện có; cần khởi động lại backend để áp dụng. Artifact HTTP/log ở temp `cinema-admin-acceptance-562ca6e7709b400bb580b6467c9ed309`. Đợt sửa này chạy các lớp liên quan, không chạy lại toàn bộ Maven hoặc mọi bộ Edge khác; số liệu nghiệm thu đầy đủ ngày 13/11 ở trên giữ nguyên.
+
+## Sửa lỗi ngày 15/11/2026 — Giá 89.000 thành 88.999,98
+
+Git trước khi sửa: còn 11 file thay đổi từ bản sửa ngày phát hành; giữ nguyên toàn bộ các thay đổi này.
+
+- [x] Tái hiện thao tác nhập 89000 và kiểm tra giá sau cuộn/phím mũi tên, payload, API và định dạng bảng; xác định nguyên nhân trước khi sửa.
+- [x] Sửa tối thiểu tại nguồn làm thay đổi giá, giữ khả năng nhập tối đa hai chữ số thập phân và các kiểm tra giá hiện có; không làm tròn để che dữ liệu sai.
+- [x] Kiểm thử hồi quy form/giá, lint/unit/build và HTTP/DB thử thật khi cần; ghi riêng mô phỏng và giữ nguyên dữ liệu vận hành.
+
+Kết quả ngày 15/11/2026:
+
+- **Nguyên nhân đã tái hiện:** trên Edge, ô `type=number` có `step=0.01` nhận thao tác tăng/giảm khi đang focus. Nhập `89000`, hai lần cuộn xuống cho `88999.98`; đặt lại `89000` rồi nhấn ArrowDown hai lần cũng cho `88999.98`. Bộ kiểm thử mới thất bại đúng hai giá trị này trước bản sửa (artifact `cinema-admin-showtimes-FbNXZ0`). Payload/formatter không tự trừ tiền. Đọc API ứng dụng chỉ GET xác nhận suất #14334, phim ABC, 18/11/2026 13:00 đã trả `basePrice=88999.98`.
+- **Bản sửa:** ô giá trong `ShowtimeFormModal` dùng `type=text` và `inputMode=decimal`, tránh tăng/giảm ngoài ý muốn khi cuộn hoặc dùng phím điều hướng. Giữ nguyên validation số dương/giới hạn DECIMAL(10,2) trong `prepareShowtime`, định dạng bảng và dữ liệu số lẻ hợp lệ; không làm tròn `88999.98` thành 89000 để che sai lệch. README Admin giải thích lý do dùng ô text. Bảo toàn bản sửa ngày phát hành trước đó.
+- **Kiểm tra frontend:** lint, build và unit test **92/92** đạt; test mới kiểm tra JSON/định dạng cho 89000, 89000.00, 89000.50 và 88999.98.
+- **Mô phỏng riêng:** `test:admin-showtimes-browser` đạt **17 nhóm/114 request**, **0 lỗi runtime**. Case mới phát sự kiện chuột/phím thật qua CDP, kiểm tra giá vẫn 89000, POST đúng 89000 và bảng hiện `89.000đ`; các case ngày phát hành/giá sai/số lẻ/409/mobile vẫn đạt. Lượt sau sửa đầu tiên có kỳ vọng thiếu một hàng đã có trong fixture; sửa số hàng kỳ vọng từ 1 sang 2, không đổi nghiệp vụ. Artifact cuối `cinema-admin-showtimes-QNfg0R`.
+- **HTTP/DB thật:** `test-admin-acceptance.ps1 -SkipFrontendChecks -Tests AdminPortalHttpTests` đạt **8/8**, không skip, gồm Edge production **8 nhóm/44 response thật**, **0 lỗi runtime** trên PostgreSQL/Redis thử riêng. UI nhập 89000 rồi cuộn hai lần, lưu thành công; GET lịch đọc đúng 89000, bảng hiện `89.000đ`, SQL độc lập đọc `base_price=89000.00`. Log/kết quả tại temp `cinema-admin-acceptance-d3c2140be21f4b0cb67dfc88e5655223`; môi trường thử đã dừng.
+- **Phạm vi dữ liệu:** chỉ đọc API ứng dụng để đối chiếu, không sửa bản ghi vận hành #14334 hoặc các giá đã lưu khác. Bản sửa ngăn ô nhập làm sai giá trong các lần nhập mới; không thể suy ra ý định ban đầu của mọi giá thập phân để tự sửa hàng loạt. Không chạy lại toàn bộ Maven hoặc các bộ Edge không liên quan.

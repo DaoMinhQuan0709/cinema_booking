@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -198,6 +199,12 @@ public class AdminCatalogServiceImpl implements AdminCatalogService {
         LocalDateTime vietnamNow = LocalDateTime.ofInstant(clock.instant(), BookingClockConfig.ZONE);
         if (!request.getStartTime().isAfter(vietnamNow)) {
             throw new BadRequestException("Thoi gian bat dau phai o tuong lai");
+        }
+
+        // startTime là giờ địa phương Việt Nam; so ngày bắt đầu, không lấy ngày kết thúc hoặc ngày UTC.
+        if (movie.getReleaseDate() != null && request.getStartTime().toLocalDate().isBefore(movie.getReleaseDate())) {
+            throw new BadRequestException("Ngày chiếu không được trước ngày phát hành phim ("
+                    + movie.getReleaseDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ").");
         }
 
         // Tinh end_time neu chua co (startTime + durationMinutes + 15 phut don dep phong)

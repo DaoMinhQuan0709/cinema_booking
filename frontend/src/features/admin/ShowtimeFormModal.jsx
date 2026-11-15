@@ -4,7 +4,7 @@ import { getVietnamClock } from '../showtimes/scheduleUtils';
 import AdminField from './components/AdminField';
 import AdminModal from './components/AdminModal';
 import { useCreateShowtime } from './hooks/useAdminMutations';
-import { ADMIN_MOVIE_STATUSES } from './movieForm';
+import { ADMIN_MOVIE_STATUSES, formatMovieDate, isCalendarDate } from './movieForm';
 import { prepareShowtime, suggestShowtimeEnd, toShowtimeForm } from './showtimeForm';
 
 const buttonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
@@ -27,12 +27,16 @@ export default function ShowtimeFormModal({ filters, movies, cinemas, onClose, o
   const cinema = cinemas.find(item => String(item.id) === values.cinemaId);
   const rooms = cinema?.auditoriums || [];
   const suggested = suggestShowtimeEnd(values.startTime, movie?.durationMinutes);
+  const releaseDate = isCalendarDate(movie?.releaseDate) ? movie.releaseDate : '';
+  const currentMinStart = getVietnamClock().dateTime.slice(0, 16);
+  const minStart = releaseDate && `${releaseDate}T00:00` > currentMinStart ? `${releaseDate}T00:00` : currentMinStart;
   const formId = useId();
 
   function change(event) {
     const { name, value } = event.target;
     const cleared = [name];
     if (name === 'endTime') setManualEnd(true);
+    if (name === 'movieId') cleared.push('startTime');
     if (name === 'cinemaId') cleared.push('auditoriumId');
     if (!manualEnd && (name === 'movieId' || name === 'startTime')) cleared.push('endTime');
     setValues(previous => {
@@ -111,8 +115,9 @@ export default function ShowtimeFormModal({ filters, movies, cinemas, onClose, o
               {rooms.map(room => <option key={room.id} value={room.id}>{room.name}</option>)}
             </select>
           </AdminField>
-          <div className="min-w-0"><AdminField label="Bắt đầu (giờ Việt Nam)" required error={errors.startTime}>
-            <input name="startTime" type="datetime-local" step="60" min={getVietnamClock().dateTime.slice(0, 16)} max="9999-12-31T23:59" value={values.startTime} onChange={change} className="min-w-0 [color-scheme:dark]" />
+          <div className="min-w-0"><AdminField label="Bắt đầu (giờ Việt Nam)" required error={errors.startTime}
+            hint={releaseDate ? `Ngày chiếu từ ngày phát hành ${formatMovieDate(releaseDate)} trở đi.` : undefined}>
+            <input name="startTime" type="datetime-local" step="60" min={minStart} max="9999-12-31T23:59" value={values.startTime} onChange={change} className="min-w-0 [color-scheme:dark]" />
           </AdminField></div>
           <div className="min-w-0 space-y-2"><AdminField label="Kết thúc (giờ Việt Nam)" required error={errors.endTime} hint={manualEnd ? 'Đang dùng giờ bạn chỉnh. Đổi phim/giờ bắt đầu sẽ giữ mốc này.' : 'Tự cập nhật theo phim và giờ bắt đầu; bạn có thể chỉnh lại.'}>
             <input name="endTime" type="datetime-local" step="60" max="9999-12-31T23:59" value={values.endTime} onChange={change} className="min-w-0 [color-scheme:dark]" />
@@ -120,7 +125,8 @@ export default function ShowtimeFormModal({ filters, movies, cinemas, onClose, o
             {manualEnd && suggested && <button type="button" onClick={useSuggestion} className="min-h-10 rounded-lg px-2 text-xs font-semibold text-white underline underline-offset-4 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Dùng giờ gợi ý</button>}
           </div>
           <div className="min-w-0 sm:col-span-2"><AdminField label="Giá vé cơ bản (VND)" required error={errors.basePrice} hint="Chưa gồm phụ thu loại ghế và combo.">
-            <input name="basePrice" type="number" inputMode="decimal" min="0.01" max="99999999.99" step="0.01" value={values.basePrice} onChange={change} placeholder="Ví dụ: 90000" />
+            {/* Ô tiền dùng text để cuộn/phím mũi tên không tự tăng giảm giá; prepareShowtime kiểm tra số và giới hạn. */}
+            <input name="basePrice" type="text" inputMode="decimal" value={values.basePrice} onChange={change} placeholder="Ví dụ: 90000" />
           </AdminField></div>
         </fieldset>
       </form>

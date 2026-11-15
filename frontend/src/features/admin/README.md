@@ -62,6 +62,15 @@ tháng và năm. Gợi ý tự cập nhật khi đổi phim/giờ bắt đầu; 
 kết thúc được giữ đến khi bấm Dùng giờ gợi ý. Form chặn thiếu phim/phòng, phòng
 không thuộc rạp, giờ bắt đầu không ở tương lai và kết thúc không sau bắt đầu.
 Giá phải dương, tối đa 99.999.999,99 và 2 chữ số thập phân theo DECIMAL(10,2).
+Ô giá dùng `text` với bàn phím decimal để cuộn trang/phím mũi tên không tự
+tăng giảm từng 0,01 VND. Validation vẫn nằm trong `prepareShowtime`; dữ liệu
+được gửi đúng giá nhập, không làm tròn các số lẻ hợp lệ khi hiển thị.
+
+Ngày bắt đầu suất phải từ ngày phát hành phim trở đi (theo lịch Việt Nam),
+kể cả khi phim đang Sắp chiếu. Có thể tạo lịch trước ngày phát hành nếu suất
+diễn ra đúng/sau ngày đó. Suất bắt đầu hôm trước rồi kết thúc qua ngày phát
+hành vẫn bị chặn. Form hiện ngày phát hành/min ở trường Bắt đầu, báo lỗi tại
+trường; backend kiểm tra lại ngày đang lưu trong DB và trả 400 trước khi ghi.
 
 POST chỉ gửi `movieId`, `auditoriumId`, `startTime`, `endTime`, `basePrice`.
 Hai mốc là `YYYY-MM-DDTHH:mm:ss` theo giờ Việt Nam (UTC+7), không chuyển sang

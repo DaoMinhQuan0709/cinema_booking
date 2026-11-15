@@ -1,6 +1,6 @@
 import { getVietnamClock } from '../showtimes/scheduleUtils.js';
 import { isInternalShowtimeId } from '../../utils/showtimeId.js';
-import { isCalendarDate } from './movieForm.js';
+import { formatMovieDate, isCalendarDate } from './movieForm.js';
 
 // LocalDateTime in the API is Vietnam wall time. Never serialize it with toISOString().
 export function normalizeShowtimeTime(value) {
@@ -55,6 +55,9 @@ export function prepareShowtime(values, { movies = [], cinemas = [], now = new D
   const endTime = normalizeShowtimeTime(values.endTime);
   if (!startTime) errors.startTime = 'Vui lòng nhập ngày giờ bắt đầu hợp lệ.';
   else if (Date.parse(`${startTime}+07:00`) <= now.getTime()) errors.startTime = 'Giờ bắt đầu phải ở tương lai theo giờ Việt Nam.';
+  else if (isCalendarDate(movie?.releaseDate) && startTime.slice(0, 10) < movie.releaseDate) {
+    errors.startTime = `Ngày chiếu không được trước ngày phát hành phim (${formatMovieDate(movie.releaseDate)}).`;
+  }
   if (!endTime) errors.endTime = 'Vui lòng nhập ngày giờ kết thúc hợp lệ.';
   else if (startTime && endTime <= startTime) errors.endTime = 'Giờ kết thúc phải sau giờ bắt đầu.';
   const price = String(values.basePrice ?? '').trim();

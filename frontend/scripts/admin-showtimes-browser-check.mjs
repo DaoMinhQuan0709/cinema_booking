@@ -57,7 +57,8 @@ async function intercept({ requestId, request }) {
   if (route === '/auth/refresh') return reply(requestId, 401, null, 'Hết phiên');
   if (route === '/movies') {
     const pageNo = Number(url.searchParams.get('page') || 0), pageSize = Number(url.searchParams.get('size') || 10);
-    return reply(requestId, scenario.movieStatus, { content: movies.slice(pageNo * pageSize, (pageNo + 1) * pageSize), pageNo, pageSize,
+    const catalog = movies.map(movie => ({ ...movie, releaseDate: scenario.releaseDates?.[movie.id] || movie.releaseDate }));
+    return reply(requestId, scenario.movieStatus, { content: catalog.slice(pageNo * pageSize, (pageNo + 1) * pageSize), pageNo, pageSize,
       totalElements: movies.length, totalPages: Math.ceil(movies.length / pageSize), last: (pageNo + 1) * pageSize >= movies.length }, 'Danh sách phim');
   }
   if (route === '/cinemas') return reply(requestId, scenario.cinemaStatus, cinemas, 'Danh sách rạp');
@@ -214,6 +215,42 @@ try {
   await cdp.wait(`document.querySelector('dialog [name=endTime]').getAttribute('aria-invalid') === 'true'`);
   assert.equal(scenario.writes, 0); await cdp.key('Escape');
   passed.push('required fields, positive price, Vietnam future and strict end order reject invalid form without POST');
+
+  reset(); await boot(); await waitTable(); await openCreate(); await fill({ basePrice: '89000' });
+  const pricePoint = await cdp.evaluate(`(() => {
+    const input = document.querySelector('dialog [name=basePrice]'); input.scrollIntoView({ block: 'center' }); input.focus();
+    const rect = input.getBoundingClientRect(); return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  })()`);
+  await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...pricePoint });
+  for (let index = 0; index < 2; index++) {
+    await cdp.send('Input.dispatchMouseEvent', { type: 'mouseWheel', ...pricePoint, deltaX: 0, deltaY: 100 }); await delay(100);
+  }
+  const afterPriceWheel = await cdp.evaluate(`document.querySelector('dialog [name=basePrice]').value`);
+  await field('basePrice', '89000'); await cdp.evaluate(`document.querySelector('dialog [name=basePrice]').focus()`);
+  for (let index = 0; index < 2; index++) {
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowDown', code: 'ArrowDown', windowsVirtualKeyCode: 40 });
+  }
+  const afterPriceArrows = await cdp.evaluate(`document.querySelector('dialog [name=basePrice]').value`);
+  assert.deepEqual({ afterPriceWheel, afterPriceArrows }, { afterPriceWheel: '89000', afterPriceArrows: '89000' }, 'Cuộn/phím mũi tên không được âm thầm thay giá vé');
+  await submit(); await cdp.wait(`!document.querySelector('dialog[open]')`); await waitTable(2);
+  assert.equal(requests.filter(request => request.route === '/admin/showtimes').at(-1).body.basePrice, 89000);
+  assert.equal(await cdp.evaluate(`document.querySelector('main tbody').textContent.includes('89.000đ')`), true);
+  passed.push('giá 89000 giữ nguyên sau hai lần cuộn/phím xuống khi focus; POST đúng 89000 và bảng hiện 89.000đ');
+
+  reset({ releaseDates: { 104: day2 } }); await boot({ width: 390, timezone: 'America/Los_Angeles' }); await waitTable(); await openCreate();
+  await fill({ movieId: '104' }); await submit();
+  await cdp.wait(`document.querySelector('dialog [name=startTime]').getAttribute('aria-invalid') === 'true'`);
+  assert.equal(scenario.writes, 0);
+  assert.equal(await cdp.evaluate(`document.querySelector('dialog').textContent.includes('Ngày chiếu không được trước ngày phát hành phim')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('dialog [name=startTime]').min`), `${day2}T00:00`);
+  await field('movieId', '1');
+  assert.notEqual(await cdp.evaluate(`document.querySelector('dialog [name=startTime]').getAttribute('aria-invalid')`), 'true');
+  await field('movieId', '104'); await field('startTime', `${day2}T00:00`); await submit();
+  await cdp.wait(`!document.querySelector('dialog[open]')`); await waitTable(1);
+  assert.equal(scenario.writes, 1);
+  assert.equal(requests.filter(request => request.route === '/admin/showtimes').at(-1).body.startTime, `${day2}T00:00:00`);
+  passed.push('Sắp chiếu ở 390px/Los Angeles: trước ngày phát hành không POST dù kết thúc qua nửa đêm, min theo phim và đổi phim bỏ lỗi cũ; đúng 00:00 ngày phát hành vẫn lưu');
 
   reset({ holdWrite: true }); await boot({ timezone: 'America/Los_Angeles' }); await waitTable(); await openCreate(); await fill({ movieId: '105' }); await submit(2); await waitHeld('write');
   assert.equal(scenario.writes, 1);

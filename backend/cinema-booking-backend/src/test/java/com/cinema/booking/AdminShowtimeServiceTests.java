@@ -3,6 +3,7 @@ package com.cinema.booking;
 import com.cinema.booking.dto.request.ShowtimeCreateRequest;
 import com.cinema.booking.entity.*;
 import com.cinema.booking.enums.SeatType;
+import com.cinema.booking.enums.MovieStatus;
 import com.cinema.booking.enums.ShowtimeSeatStatus;
 import com.cinema.booking.exception.BadRequestException;
 import com.cinema.booking.exception.ConflictException;
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -103,5 +105,28 @@ class AdminShowtimeServiceTests {
         when(showtimes.save(any())).thenAnswer(call -> call.getArgument(0));
         when(seats.findByAuditoriumIdOrderByRowCharAscSeatNumberAsc(3L)).thenReturn(List.of());
         assertEquals(request.getStartTime(), service.createShowtime(request).getStartTime());
+    }
+
+    @Test
+    void rejectsStartsBeforeReleaseEvenAcrossMidnightAndRegardlessOfMovieStatus() {
+        var request = request("2026-11-12T23:30:00", "2026-11-13T01:45:00");
+        for (MovieStatus status : MovieStatus.values()) {
+            when(movies.findById(1L)).thenReturn(Optional.of(Movie.builder().id(1L).title("Phim sắp chiếu")
+                    .durationMinutes(120).status(status).releaseDate(LocalDate.of(2026, 11, 13)).build()));
+            var error = assertThrows(BadRequestException.class, () -> service.createShowtime(request));
+            assertTrue(error.getMessage().contains("ngày phát hành"));
+        }
+        verifyNoInteractions(showtimes, seats, inventory);
+    }
+
+    @Test
+    void schedulesComingSoonOnOrAfterReleaseUsingVietnamCalendarRatherThanUtcDate() {
+        for (String start : List.of("2026-11-13T00:00:00", "2026-11-13T23:30:00", "2026-11-14T10:00:00")) {
+            var request = request(start, LocalDateTime.parse(start).plusMinutes(135).toString());
+            when(movies.findById(1L)).thenReturn(Optional.of(Movie.builder().id(1L).title("Phim sắp chiếu")
+                    .durationMinutes(120).status(MovieStatus.COMING_SOON).releaseDate(LocalDate.of(2026, 11, 13)).build()));
+            when(showtimes.save(any())).thenAnswer(call -> call.getArgument(0));
+            assertEquals(request.getStartTime(), service.createShowtime(request).getStartTime());
+        }
     }
 }

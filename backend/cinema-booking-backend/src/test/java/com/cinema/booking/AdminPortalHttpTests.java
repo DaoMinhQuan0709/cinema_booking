@@ -300,5 +300,31 @@ class AdminPortalHttpTests {
         assertEquals(1, jdbc.queryForObject("select count(*) from movies where title=? and status='COMING_SOON'", Long.class, browserMovieTitle + " đã sửa"));
         assertEquals(1, jdbc.queryForObject("select count(*) from showtimes where auditorium_id=? and start_time=?", Long.class,
                 secondRoomId, java.sql.Timestamp.valueOf(tomorrow.plusDays(1).atTime(10, 0))));
+        assertEquals(0, new BigDecimal("89000.00").compareTo(jdbc.queryForObject(
+                "select base_price from showtimes where auditorium_id=? and start_time=?", BigDecimal.class,
+                secondRoomId, java.sql.Timestamp.valueOf(tomorrow.plusDays(1).atTime(10, 0)))));
+    }
+
+    @Test @Order(8) void directHttpRejectsPreReleaseStartsAndKeepsComingSoonSchedulableFromReleaseDay() throws Exception {
+        LocalDate release = tomorrow.plusDays(3);
+        var film = movie("Phim phát hành tương lai " + suffix, "COMING_SOON");
+        film.put("releaseDate", release.toString());
+        long id = api("POST", "/admin/movies", adminToken, film, 201).path("id").asLong();
+        long before = showtimes.count(), beforeInventory = inventory.count();
+        var early = new LinkedHashMap<String, Object>(slot(release.minusDays(1), "23:30:00", "23:59:00"));
+        early.put("movieId", id);
+        // Kết thúc ở ngày phát hành cũng không hợp lệ nếu bắt đầu ở ngày hôm trước.
+        early.put("endTime", release + "T01:45:00");
+        api("POST", "/admin/showtimes", adminToken, early, 400);
+        assertEquals(before, showtimes.count());
+        assertEquals(beforeInventory, inventory.count());
+        for (LocalDate date : List.of(release, release.plusDays(1))) {
+            var allowed = new LinkedHashMap<String, Object>(slot(date, "00:00:00", "02:00:00"));
+            allowed.put("movieId", id);
+            long createdId = api("POST", "/admin/showtimes", adminToken, allowed, 201).path("id").asLong();
+            assertEquals(date.atStartOfDay(), showtimes.findById(createdId).orElseThrow().getStartTime());
+        }
+        assertEquals(before + 2, showtimes.count());
+        assertEquals(MovieStatus.COMING_SOON, movies.findById(id).orElseThrow().getStatus());
     }
 }
