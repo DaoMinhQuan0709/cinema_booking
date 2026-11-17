@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, RefreshCw } from 'lucide-react';
 import { buildScheduleDays } from '../showtimes/scheduleUtils';
 import { useCinemaShowtimes } from './hooks/useCinemaShowtimes';
+import CinemaMovieGrid from './CinemaMovieGrid';
 import {
   dropUnavailableMovie, getOpenShowtimes, getVietnamNowKey, groupMoviesFromShowtimes,
   normalizeDetailParams, readDetailSelection, writeDetailSelection,
@@ -95,6 +96,12 @@ const CinemaDetailSelection = ({ cinemaId }) => {
           {movies.map(movie => <option key={movie.movieId} value={movie.movieId}>{movie.title}</option>)}
         </select>
       </div>
+
+      {movies.length > 0 && !showtimeError && (
+        <div className="mt-8">
+          <CinemaMovieGrid movies={movies} selectedMovieId={movieId} onSelect={id => changeSelection({ movieId: id })} />
+        </div>
+      )}
 
       {query.isPending && <p role="status" className="mt-5 text-sm text-muted">Đang tải suất chiếu tại rạp…</p>}
       {query.isFetching && hasData && <p role="status" className="mt-5 text-sm text-muted">Đang làm mới suất chiếu…</p>}
