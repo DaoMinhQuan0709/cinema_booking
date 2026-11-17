@@ -12,6 +12,8 @@ export function useCinemaShowtimes({ cinemaId, date } = {}) {
     queryFn: ({ signal }) => showtimeService.getShowtimes(params, { signal, skipErrorToast: true }),
     enabled: isInternalShowtimeId(params.cinemaId) && Boolean(date),
     staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
     retry: retryShowtimeRequest,
   });
 }
