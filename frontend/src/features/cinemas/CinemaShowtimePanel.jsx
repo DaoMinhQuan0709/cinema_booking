@@ -26,17 +26,18 @@ const CinemaShowtimePanel = ({ movie }) => {
         <ul className="flex flex-wrap gap-3">
           {slots.map(slot => {
             const time = slot.startTime.slice(11, 16);
+            const price = slot.basePrice == null ? 'Xem giá vé' : `Giá cơ bản ${formatCurrency(slot.basePrice)}`;
             return (
               <li key={slot.id}>
                 <Link
                   to={`/booking/${slot.id}`}
                   title={slot.auditoriumName}
-                  aria-label={`${time}${slot.auditoriumName ? `, ${slot.auditoriumName}` : ''}`}
+                  aria-label={`${time}${slot.auditoriumName ? `, ${slot.auditoriumName}` : ''}, ${price}`}
                   className={`group flex min-h-11 min-w-[104px] flex-col items-center justify-center gap-1 rounded-lg border border-surfaceBorder bg-background px-4 py-3 transition-colors hover:border-primary hover:bg-primary/10 ${FOCUS_CLASS}`}
                 >
                   <time dateTime={slot.startTime} className="text-lg font-bold tabular-nums text-white transition-colors group-hover:text-primary">{time}</time>
                   {slot.auditoriumName && <span className="max-w-[140px] truncate text-[11px] text-neutral-300">{slot.auditoriumName}</span>}
-                  <span className="text-[11px] text-muted">{slot.basePrice == null ? 'Xem giá vé' : `từ ${formatCurrency(slot.basePrice)}`}</span>
+                  <span className="text-[11px] text-muted">{price}</span>
                 </Link>
               </li>
             );

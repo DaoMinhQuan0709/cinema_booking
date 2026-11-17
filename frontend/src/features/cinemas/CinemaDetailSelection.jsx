@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, RefreshCw } from 'lucide-react';
+import { isInternalShowtimeId } from '../../utils/showtimeId';
 import { buildScheduleDays } from '../showtimes/scheduleUtils';
 import { useCinemaShowtimes } from './hooks/useCinemaShowtimes';
 import CinemaMovieGrid from './CinemaMovieGrid';
@@ -41,7 +42,7 @@ const CinemaDetailSelection = ({ cinemaId }) => {
   const invalidData = query.isSuccess && !hasData;
   const showtimeError = query.isError || invalidData;
   const openShowtimes = getOpenShowtimes(hasData ? query.data : EMPTY_LIST, getVietnamNowKey(now))
-    .filter(slot => String(slot.cinemaId) === String(cinemaId) && slot.startTime.slice(0, 10) === date);
+    .filter(slot => isInternalShowtimeId(slot.id) && String(slot.cinemaId) === String(cinemaId) && slot.startTime.slice(0, 10) === date);
   const movies = groupMoviesFromShowtimes(openShowtimes);
   const selectedMovie = movies.find(movie => movie.movieId === movieId);
   const currentSearch = searchParams.toString();
@@ -89,7 +90,7 @@ const CinemaDetailSelection = ({ cinemaId }) => {
           id="cinema-detail-movie"
           value={movieId}
           onChange={event => changeSelection({ movieId: event.target.value })}
-          disabled={query.isFetching || showtimeError || !movies.length}
+          disabled={query.isFetching || !hasData || !movies.length}
           className={`w-full min-w-0 rounded-xl border border-surfaceBorder bg-surface px-3 py-3 text-sm text-white outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50 ${FOCUS_CLASS}`}
         >
           <option value="">Chọn phim…</option>
@@ -98,13 +99,13 @@ const CinemaDetailSelection = ({ cinemaId }) => {
         </select>
       </div>
 
-      {movies.length > 0 && !showtimeError && (
+      {movies.length > 0 && (
         <div className="mt-8">
           <CinemaMovieGrid movies={movies} selectedMovieId={movieId} onSelect={id => changeSelection({ movieId: id })} disabled={query.isFetching} />
         </div>
       )}
 
-      {selectedMovie && !showtimeError && <CinemaShowtimePanel movie={selectedMovie} />}
+      {selectedMovie && <CinemaShowtimePanel movie={selectedMovie} />}
 
       {query.isPending && <p role="status" className="mt-5 text-sm text-muted">Đang tải suất chiếu tại rạp…</p>}
       {query.isFetching && hasData && <p role="status" className="mt-5 text-sm text-muted">Đang làm mới suất chiếu…</p>}

@@ -42,6 +42,7 @@ const pickerCity = `${picker} > div:first-child select`;
 const pickerCinema = `${picker} > div:nth-child(2) select`;
 const detailSchedule = 'main section[aria-label="Chọn ngày và phim tại rạp"]';
 const movieGrid = `${detailSchedule} section[aria-label="Phim đang chiếu tại rạp"]`;
+const showtimePanel = `${detailSchedule} section[aria-labelledby="cinema-showtime-title"]`;
 
 async function reply(requestId, status, data) {
   await cdp.send('Fetch.fulfillRequest', { requestId, responseCode: status,
@@ -89,6 +90,8 @@ async function intercept(event) {
   if (scenario.showtimeMode === 'held') { scenario.heldShowtime = requestId; return; }
   if (scenario.showtimeMode === 'error') return reply(requestId, 503, null);
   if (scenario.showtimeMode === 'invalid') return reply(requestId, 200, { unexpected: true });
+  if (scenario.showtimeMode === 'invalidIds') return reply(requestId, 200, [{ ...mockSlots[0], id: 'galaxy-501' }, ...mockSlots]);
+  if (scenario.showtimeMode === 'onlyInvalidIds') return reply(requestId, 200, [{ ...mockSlots[0], id: 'galaxy-501' }]);
   return reply(requestId, 200, url.searchParams.get('date') === today ? mockSlots : []);
 }
 
@@ -413,6 +416,10 @@ async function runDetailSelectionMock() {
   assert.equal(await cdp.evaluate(`document.querySelector('#cinema-detail-movie').value`), '10');
   assert.equal(await cdp.evaluate(`document.querySelector('${movieGrid} button').getAttribute('aria-pressed')`), 'true');
   assert.equal(await cdp.evaluate('location.pathname'), '/cinemas/2');
+  await cdp.wait(`Boolean(document.querySelector('${showtimePanel} a[href="/booking/501"]'))`);
+  assert.equal(await cdp.evaluate(`document.querySelector('${showtimePanel} a').textContent.includes('Phòng 1')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('${showtimePanel} a').textContent.includes('Giá cơ bản 89.000đ')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('${showtimePanel} a').getAttribute('aria-label').includes('Giá cơ bản 89.000đ')`), true);
   await setField('#cinema-detail-movie', '');
   await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
   assert.equal(await cdp.evaluate(`document.querySelector('${movieGrid} button').getAttribute('aria-pressed')`), 'false');
@@ -421,6 +428,7 @@ async function runDetailSelectionMock() {
   assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('1 suất chiếu')`), true);
   passed.push('Chi tiết rạp tải suất theo đúng rạp/ngày; hôm nay mặc định, không tự chọn phim và giữ tham số URL khác');
   passed.push('Lưới chọn phim cập nhật URL và ô chọn cùng lúc, không mở trang phim; poster/nhãn tuổi lấy từ API phim');
+  passed.push('Panel hiện giờ, phòng, giá cơ bản và liên kết tới /booking/501 bằng ID nội bộ');
 
   const nextDayLabel = `${days[1].label}, ${days[1].fullDate}`;
   await cdp.evaluate(`document.querySelector('${detailSchedule} button[aria-label=${JSON.stringify(nextDayLabel)}]').click()`);
@@ -451,6 +459,18 @@ async function runDetailSelectionMock() {
   await cdp.wait(`document.querySelector('${movieGrid} img')?.src.endsWith('/showtime-poster.svg') && document.querySelector('${movieGrid} img').naturalWidth > 0`);
   assert.equal(await cdp.evaluate(`document.querySelector('${movieGrid} button').textContent.includes('C13')`), true);
   passed.push('Poster metadata tải lỗi chuyển sang poster của suất, nhãn tuổi vẫn giữ đúng');
+
+  scenario = { mode: 'ok', showtimeMode: 'invalidIds' };
+  await boot(`/cinemas/2?date=${today}&movieId=10`); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`Boolean(document.querySelector('${showtimePanel} a[href="/booking/501"]'))`);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('${showtimePanel} a').length`), 1);
+  assert.equal(await cdp.evaluate(`document.querySelector('${movieGrid} button').textContent.includes('1 suất chiếu')`), true);
+  scenario = { mode: 'ok', showtimeMode: 'onlyInvalidIds' };
+  await boot(`/cinemas/2?date=${today}&movieId=10`); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('${showtimePanel}'))`), false);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('${movieGrid}'))`), false);
+  passed.push('Suất có ID sai không được tính vào lưới/panel; chỉ còn ID sai thì xóa lựa chọn phim sau tải thành công');
 
   scenario = { mode: 'ok', showtimeMode: 'held' };
   await boot(`/cinemas/2?date=${days[1].date}&movieId=10`); await detailReady('Galaxy Hà Nội');

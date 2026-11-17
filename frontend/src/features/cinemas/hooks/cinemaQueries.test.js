@@ -106,7 +106,10 @@ test('cinema details use GET, retain metadata and cache separately by canonical 
 test('showtimes need no movieId and isolate cinema/date caches, including an empty day', async () => {
   const options = (cinemaId, date = '2026-11-16') => optionsFor(useCinemaShowtimes, { cinemaId, date });
   const slots = [{ id: 501, movieId: 10, cinemaId: 1, basePrice: 89000 }];
-  const observer = observe(options(1));
+  const initialOptions = options(1);
+  assert.equal(initialOptions.refetchInterval, 60 * 1000);
+  assert.equal(initialOptions.refetchOnWindowFocus, true);
+  const observer = observe(initialOptions);
   await reply(0, slots, observer);
   assert.equal(requests[0].config.method, 'get');
   assert.equal(requests[0].config.url, '/showtimes');
