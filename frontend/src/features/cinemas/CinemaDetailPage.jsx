@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Building2, MapPin, Phone, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, RefreshCw } from 'lucide-react';
 import { useCinemaDetail } from './hooks/useCinemaDetail';
 import CinemaGallery from './CinemaGallery';
-import { getCinemaCity, getCinemaDetailHref, getCinemaPhoneHref } from './cinemaUtils';
+import CinemaInfoHeader from './CinemaInfoHeader';
+import { getCinemaDetailHref } from './cinemaUtils';
 
 const FOCUS_CLASS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
 
@@ -31,7 +32,6 @@ const CinemaDetailPage = () => {
   const validId = Boolean(getCinemaDetailHref(id));
   const notFound = !validId || query.error?.response?.status === 404;
   const cinema = validId && String(query.data?.id) === id ? query.data : null;
-  const phoneHref = cinema ? getCinemaPhoneHref(cinema.phone) : null;
   // Router state preserves the list's filters without making a shared detail URL depend on them.
   const listHref = { pathname: '/cinemas', search: typeof location.state?.cinemasSearch === 'string' ? location.state.cinemasSearch : '' };
 
@@ -69,20 +69,7 @@ const CinemaDetailPage = () => {
             </div>
           )}
           <CinemaGallery cinema={cinema} />
-          <header className="border-b border-surfaceBorder pb-10 sm:pb-12">
-            <div className="border-l-4 border-primary pl-5 sm:pl-7">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">{getCinemaCity(cinema)}</p>
-              <h1 className="break-words font-display text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">{cinema.name?.trim() || 'Thông tin rạp'}</h1>
-              <div className="mt-6 flex max-w-3xl items-start gap-3 text-sm leading-relaxed text-muted sm:text-base">
-                <MapPin aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                <p className="min-w-0 break-words">{cinema.address?.trim() || 'Địa chỉ đang cập nhật'}</p>
-              </div>
-              <div className="mt-4 flex items-start gap-3 text-sm leading-relaxed text-muted sm:text-base">
-                <Phone aria-hidden="true" className="mt-1 h-5 w-5 shrink-0 text-primary" />
-                <p className="min-w-0 break-words">{phoneHref ? <>Hotline: <a href={phoneHref} className={`rounded text-white hover:text-primary ${FOCUS_CLASS}`}>{cinema.phone}</a></> : 'Điện thoại đang cập nhật'}</p>
-              </div>
-            </div>
-          </header>
+          <CinemaInfoHeader key={cinema.id} cinema={cinema} />
         </>
       )}
 

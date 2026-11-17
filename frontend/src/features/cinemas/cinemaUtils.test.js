@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  filterCinemas, getCinemaCities, getCinemaCity, getCinemaDetailHref, getCinemaGallerySources, getCinemaImageSources, getCinemaPhoneHref,
+  filterCinemas, getCinemaCities, getCinemaCity, getCinemaDetailHref, getCinemaGallerySources, getCinemaImageSources, getCinemaPhoneHref, getCinemaPickerState,
   getCinemaScheduleHref, normalizeCinemaSearch, readCinemaFilters, UNKNOWN_CITY, writeCinemaFilters,
 } from './cinemaUtils.js';
 
@@ -106,4 +106,25 @@ test('liên kết chi tiết chỉ nhận ID nội bộ và không mang tham s�
   for (const id of [undefined, null, '', 0, -1, '01', 'galaxy-ha-noi', '9223372036854775808', '1/2', '1?movieId=2']) {
     assert.equal(getCinemaDetailHref(id), null);
   }
+});
+
+test('bộ chọn rạp: lọc theo thành phố, không chọn sẵn rạp khác, vẫn giữ rạp hiện tại khi catalog chưa tải', () => {
+  const current = cinemas[2]; // Galaxy Hà Nội
+  const same = getCinemaPickerState(cinemas, current, 'Hà Nội');
+  assert.equal(same.selectedId, '1');
+  assert.deepEqual(same.options.map(cinema => cinema.id), [1]);
+  const other = getCinemaPickerState(cinemas, current, 'Đà Nẵng');
+  assert.equal(other.selectedId, '');
+  assert.deepEqual(other.options.map(cinema => cinema.id), [3]);
+  assert.deepEqual(getCinemaPickerState(cinemas, current, 'Huế').options, []);
+  const loading = getCinemaPickerState([], current, 'Hà Nội');
+  assert.deepEqual(loading.cities, ['Hà Nội']);
+  assert.equal(loading.selectedId, '1');
+  assert.deepEqual(loading.options.map(cinema => cinema.id), [1]);
+  const updatedCurrent = { ...current, city: 'Huế', name: 'Galaxy Huế' };
+  const staleCatalog = getCinemaPickerState(cinemas, updatedCurrent, 'Huế');
+  assert.equal(staleCatalog.selectedId, '1');
+  assert.deepEqual(staleCatalog.options, [updatedCurrent]);
+  assert.ok(staleCatalog.cities.includes('Huế'));
+  assert.deepEqual(getCinemaPickerState(cinemas, updatedCurrent, 'Hà Nội').options, []);
 });

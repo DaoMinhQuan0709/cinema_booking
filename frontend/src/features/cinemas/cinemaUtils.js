@@ -66,3 +66,13 @@ export const getCinemaScheduleHref = id => isInternalShowtimeId(id)
 
 export const getCinemaDetailHref = id => isInternalShowtimeId(id)
   ? `/cinemas/${encodeURIComponent(String(id))}` : null;
+
+export const getCinemaPickerState = (cinemas, current, city) => {
+  // The detail response is authoritative when the cached catalog has older cinema metadata.
+  const source = [...cinemas.filter(item => String(item.id) !== String(current.id)), current];
+  return {
+    cities: getCinemaCities(source),
+    options: filterCinemas(source, { city }),
+    selectedId: city === getCinemaCity(current) ? String(current.id) : '',
+  };
+};
