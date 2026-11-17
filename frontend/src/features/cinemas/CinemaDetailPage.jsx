@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Building2, RefreshCw } from 'lucide-react';
 import { useCinemaDetail } from './hooks/useCinemaDetail';
 import CinemaGallery from './CinemaGallery';
 import CinemaInfoHeader from './CinemaInfoHeader';
+import CinemaDetailSelection from './CinemaDetailSelection';
 import { getCinemaDetailHref } from './cinemaUtils';
 
 const FOCUS_CLASS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
@@ -70,6 +71,7 @@ const CinemaDetailPage = () => {
           )}
           <CinemaGallery cinema={cinema} />
           <CinemaInfoHeader key={cinema.id} cinema={cinema} />
+          <CinemaDetailSelection cinemaId={cinema.id} />
         </>
       )}
 

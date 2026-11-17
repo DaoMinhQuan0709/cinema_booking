@@ -38,6 +38,7 @@ const galleryViewport = `${gallery} > div[aria-label="Ảnh rạp"]`;
 const picker = 'main section[aria-label="Chọn rạp khác"]';
 const pickerCity = `${picker} > div:first-child select`;
 const pickerCinema = `${picker} > div:nth-child(2) select`;
+const detailSchedule = 'main section[aria-label="Chọn ngày và phim tại rạp"]';
 
 async function reply(requestId, status, data) {
   await cdp.send('Fetch.fulfillRequest', { requestId, responseCode: status,
@@ -77,6 +78,9 @@ async function intercept(event) {
     const cinema = fixtures.find(item => String(item.id) === route.split('/').at(-1));
     return reply(requestId, cinema ? 200 : 404, cinema ? { ...cinema, ...scenario.detailOverrides } : null);
   }
+  if (scenario.showtimeMode === 'held') { scenario.heldShowtime = requestId; return; }
+  if (scenario.showtimeMode === 'error') return reply(requestId, 503, null);
+  if (scenario.showtimeMode === 'invalid') return reply(requestId, 200, { unexpected: true });
   return reply(requestId, 200, url.searchParams.get('date') === today ? mockSlots : []);
 }
 
@@ -332,15 +336,15 @@ async function runInfoHeaderMock() {
   assert.equal(await cdp.evaluate('location.search'), '?ref=picker-check');
   passed.push('Bộ chọn dùng cache, đổi thành phố chỉ lọc rạp; chọn rạp mới đổi route/ảnh/thông tin, Back khôi phục rạp và bộ lọc');
 
-  await boot('/cinemas/2?date=2026-11-19&movieId=10'); await detailReady('Galaxy Hà Nội');
+  await boot(`/cinemas/2?date=${today}&movieId=10`); await detailReady('Galaxy Hà Nội');
   await cdp.wait(`document.querySelector('${pickerCity}')?.value === 'Hà Nội'`);
   await setField(pickerCity, 'Đà Nẵng');
   await cdp.wait(`document.querySelector('${pickerCinema}')?.value === ''`);
   await setField(pickerCinema, '1');
   await detailReady('Galaxy Đà Nẵng');
-  assert.equal(await cdp.evaluate('location.pathname + location.search'), '/cinemas/1?date=2026-11-19');
+  assert.equal(await cdp.evaluate('location.pathname + location.search'), `/cinemas/1?date=${today}`);
   await cdp.evaluate('history.back()'); await detailReady('Galaxy Hà Nội');
-  assert.equal(await cdp.evaluate('location.pathname + location.search'), '/cinemas/2?date=2026-11-19&movieId=10');
+  assert.equal(await cdp.evaluate('location.pathname + location.search'), `/cinemas/2?date=${today}&movieId=10`);
   passed.push('Đổi rạp giữ date, bỏ movieId; Back khôi phục URL trước đó');
 
   await cdp.evaluate(`(() => {
@@ -380,6 +384,71 @@ async function runInfoHeaderMock() {
   assert.equal(await cdp.evaluate(`document.querySelector('${pickerCinema}').value`), '2');
   assert.deepEqual(await cdp.evaluate(`[...document.querySelectorAll('${pickerCinema} option')].map(option => option.value)`), ['2']);
   passed.push('Thông tin chi tiết mới hơn cache danh sách vẫn giữ đúng thành phố và rạp hiện tại');
+}
+
+async function runDetailSelectionMock() {
+  scenario = { mode: 'ok' };
+  await boot('/cinemas/2?ref=share'); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`document.querySelectorAll('${detailSchedule} #cinema-detail-movie option').length === 2`);
+  assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule} button[aria-pressed="true"] time').dateTime`), today);
+  assert.equal(await cdp.evaluate(`document.querySelector('#cinema-detail-movie').value`), '');
+  assert.equal(await cdp.evaluate('location.search'), '?ref=share');
+  assert.ok(requests.some(request => request.route === '/showtimes' && request.search.includes(`cinemaId=2`) && request.search.includes(`date=${today}`)));
+  await setField('#cinema-detail-movie', '10');
+  await cdp.wait(`new URLSearchParams(location.search).get('movieId') === '10'`);
+  assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('1 suất chiếu')`), true);
+  passed.push('Chi tiết rạp tải suất theo đúng rạp/ngày; hôm nay mặc định, không tự chọn phim và giữ tham số URL khác');
+
+  const nextDayLabel = `${days[1].label}, ${days[1].fullDate}`;
+  await cdp.evaluate(`document.querySelector('${detailSchedule} button[aria-label=${JSON.stringify(nextDayLabel)}]').click()`);
+  await cdp.wait(`new URLSearchParams(location.search).get('date') === ${JSON.stringify(days[1].date)} && !new URLSearchParams(location.search).has('movieId')`);
+  assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('chưa có suất chiếu')`), true);
+  await cdp.evaluate('history.back()');
+  await cdp.wait(`document.querySelector('#cinema-detail-movie')?.value === '10'`);
+  assert.equal(await cdp.evaluate('location.search'), '?ref=share&movieId=10');
+  await cdp.evaluate('history.forward()');
+  await cdp.wait(`new URLSearchParams(location.search).get('date') === ${JSON.stringify(days[1].date)} && !new URLSearchParams(location.search).has('movieId')`);
+  assert.equal(await cdp.evaluate('location.pathname'), '/cinemas/2');
+  passed.push('Đổi ngày hết suất xóa phim sau phản hồi thành công; Back/Forward khôi phục ngày và phim, giữ ID rạp');
+
+  await boot('/cinemas/2?date=bad&movieId=galaxy&ref=share'); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`location.search === '?ref=share'`);
+  assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule} button[aria-pressed="true"] time').dateTime`), today);
+  passed.push('URL ngày và ID phim sai được chuẩn hóa bằng replace, không tự thêm ngày khi thiếu');
+
+  scenario = { mode: 'ok', showtimeMode: 'held' };
+  await boot(`/cinemas/2?date=${days[1].date}&movieId=10`); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('Đang tải suất chiếu')`);
+  assert.equal(await cdp.evaluate(`new URLSearchParams(location.search).get('movieId')`), '10');
+  assert.ok(scenario.heldShowtime);
+  scenario.showtimeMode = 'ok'; await reply(scenario.heldShowtime, 200, []);
+  await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
+  passed.push('Suất đang tải giữ lựa chọn phim; chỉ xóa khi phản hồi thành công xác nhận hết suất');
+
+  scenario = { mode: 'ok', showtimeMode: 'error' };
+  await boot(`/cinemas/2?date=${days[1].date}&movieId=10`); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`document.querySelector('${detailSchedule} [role="alert"]')?.textContent.includes('Không tải được suất chiếu')`, 20000);
+  assert.equal(await cdp.evaluate(`new URLSearchParams(location.search).get('movieId')`), '10');
+  scenario.showtimeMode = 'ok';
+  await cdp.evaluate(`document.querySelector('${detailSchedule} [role="alert"] button').click()`);
+  await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
+  passed.push('Lỗi suất giữ movieId và có Thử lại; phản hồi thành công mới chuẩn hóa lựa chọn');
+
+  scenario = { mode: 'ok', showtimeMode: 'invalid' };
+  await boot(`/cinemas/2?date=${days[1].date}&movieId=10`); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`document.querySelector('${detailSchedule} [role="alert"]')?.textContent.includes('Không tải được suất chiếu')`);
+  assert.equal(await cdp.evaluate(`new URLSearchParams(location.search).get('movieId')`), '10');
+  scenario.showtimeMode = 'ok';
+  await cdp.evaluate(`document.querySelector('${detailSchedule} [role="alert"] button').click()`);
+  await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
+  passed.push('Payload suất sai cấu trúc không xóa phim đã chọn; thử lại sau phản hồi hợp lệ');
+
+  scenario = { mode: 'ok' };
+  await boot(`/cinemas/1?date=${today}&movieId=10`); await detailReady('Galaxy Đà Nẵng');
+  await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
+  assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('chưa có suất chiếu')`), true);
+  assert.equal(await cdp.evaluate('location.pathname'), '/cinemas/1');
+  passed.push('Rạp không có suất giữ route/ID; không hiển thị phim hoặc suất của rạp khác');
 }
 
 async function galleryReady(position, total) {
@@ -575,7 +644,7 @@ try {
     if (error.message.includes('"code":-32602,"message":"Invalid InterceptionId."')) return;
     exceptions.push(error.stack); await cdp.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' }).catch(() => {});
   }); });
-  if (live) await runLive(); else { await runMock(); await runDetailMock(); await runInfoHeaderMock(); await runGalleryMock(); }
+  if (live) await runLive(); else { await runMock(); await runDetailMock(); await runInfoHeaderMock(); await runDetailSelectionMock(); await runGalleryMock(); }
   assert.deepEqual(exceptions, []);
   assert.ok(requests.every(request => ['GET', 'OPTIONS'].includes(request.method)));
   const report = { mode: live ? 'Edge production / API localhost thật chỉ đọc, không mô phỏng response' : 'Edge production / REST và ảnh mô phỏng, không xác nhận DB/HTTP thật',
