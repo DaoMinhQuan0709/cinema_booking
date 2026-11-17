@@ -10,6 +10,7 @@ export const showtimeKeys = {
 export const cinemaKeys = {
   all: ['cinemas'],
   list: (params) => [...cinemaKeys.all, 'list', params],
+  detail: (id) => [...cinemaKeys.all, 'detail', String(id)],
 };
 
 /**

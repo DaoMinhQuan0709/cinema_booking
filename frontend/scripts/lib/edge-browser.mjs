@@ -45,7 +45,9 @@ class CDP {
   }
   async key(key, modifiers = 0) {
     const windowsVirtualKeyCode = { Tab: 9, Enter: 13, Escape: 27 }[key];
-    await this.send('Input.dispatchKeyEvent', { type: 'keyDown', key, modifiers, windowsVirtualKeyCode });
+    // Include Enter's character so Chromium performs native button activation.
+    const text = key === 'Enter' ? '\r' : undefined;
+    await this.send('Input.dispatchKeyEvent', { type: 'keyDown', key, modifiers, windowsVirtualKeyCode, text });
     await this.send('Input.dispatchKeyEvent', { type: 'keyUp', key, modifiers, windowsVirtualKeyCode });
   }
 }

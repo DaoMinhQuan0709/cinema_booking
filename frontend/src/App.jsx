@@ -14,6 +14,7 @@ const MovieDetail = lazy(() => import('./features/movies/MovieDetail'));
 const MovieCatalog = lazy(() => import('./features/movies/MovieCatalog'));
 const ShowtimesPage = lazy(() => import('./features/showtimes/ShowtimesPage'));
 const CinemasPage = lazy(() => import('./features/cinemas/CinemasPage'));
+const CinemaDetailPage = lazy(() => import('./features/cinemas/CinemaDetailPage'));
 const SeatSelectionPage = lazy(() => import('./features/booking/SeatSelectionPage'));
 const CheckoutPage = lazy(() => import('./features/booking/CheckoutPage'));
 const VNPayReturnPage = lazy(() => import('./features/booking/VNPayReturnPage'));
@@ -125,6 +126,7 @@ export const App = () => {
             <Route path="booking" element={<SeatSelectionPage />} />
             <Route path="showtimes" element={<ShowtimesPage />} />
             <Route path="cinemas" element={<CinemasPage />} />
+            <Route path="cinemas/:id" element={<CinemaDetailPage />} />
             <Route path="profile/bookings" element={<PlaceholderPage title="Lịch Sử Vé Đã Đặt Của Bạn" />} />
           </Route>
 

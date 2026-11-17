@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowUpRight, Building2, MapPin, Phone } from 'lucide-react';
-import { getCinemaCity, getCinemaImageSources, getCinemaPhoneHref, getCinemaScheduleHref } from './cinemaUtils';
+import { getCinemaCity, getCinemaDetailHref, getCinemaImageSources, getCinemaPhoneHref } from './cinemaUtils';
 
 const FOCUS_CLASS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
 
 const CinemaCard = ({ cinema }) => {
+  const location = useLocation();
   const [failedSources, setFailedSources] = useState([]);
   const source = getCinemaImageSources(cinema).find(url => !failedSources.includes(url));
   const phoneHref = getCinemaPhoneHref(cinema.phone);
-  const scheduleHref = getCinemaScheduleHref(cinema.id);
+  const detailHref = getCinemaDetailHref(cinema.id);
 
   return (
     <article aria-labelledby={`cinema-name-${cinema.id}`} className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-surfaceBorder bg-surface/30 transition-colors hover:border-neutral-600">
@@ -46,10 +47,10 @@ const CinemaCard = ({ cinema }) => {
             <a href={phoneHref} aria-label={`Gọi ${cinema.name}: ${cinema.phone}`} className={`rounded text-neutral-300 transition-colors hover:text-white ${FOCUS_CLASS}`}>{cinema.phone}</a>
           ) : <span>Điện thoại đang cập nhật</span>}
         </div>
-        {scheduleHref && (
+        {detailHref && (
           <div className="mt-auto pt-6">
-            <Link to={scheduleHref} aria-label={`Xem lịch chiếu tại ${cinema.name}`} className={`flex min-h-11 items-center justify-between gap-3 rounded-xl border border-surfaceBorder bg-surface px-4 py-3 text-sm font-semibold text-white transition-colors hover:border-primary hover:bg-primary ${FOCUS_CLASS}`}>
-              Xem lịch chiếu <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+            <Link to={detailHref} state={{ cinemasSearch: location.search }} aria-label={`Xem chi tiết ${cinema.name}`} className={`flex min-h-11 items-center justify-between gap-3 rounded-xl border border-surfaceBorder bg-surface px-4 py-3 text-sm font-semibold text-white transition-colors hover:border-primary hover:bg-primary ${FOCUS_CLASS}`}>
+              Xem chi tiết rạp <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0" />
             </Link>
           </div>
         )}

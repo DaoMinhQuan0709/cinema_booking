@@ -10,7 +10,7 @@ export const cinemaService = {
   /**
    * @param {Object} [params]
    * @param {string} [params.city]
-   * @param {Object} [options] Axios options (skipErrorToast)
+   * @param {Object} [options] Axios options (signal, skipErrorToast)
    * @returns {Promise<object[]>}
    */
   getCinemas: async (params = {}, options = {}) => {
@@ -21,9 +21,11 @@ export const cinemaService = {
 
   /**
    * @param {number|string} id
+   * @param {Object} [options] Axios options (signal, skipErrorToast)
+   * @returns {Promise<object>}
    */
-  getCinemaById: async (id) => {
-    const { data } = await axiosInstance.get(`/cinemas/${id}`);
+  getCinemaById: async (id, options = {}) => {
+    const { data } = await axiosInstance.get(`/cinemas/${id}`, options);
     return data;
   },
 };

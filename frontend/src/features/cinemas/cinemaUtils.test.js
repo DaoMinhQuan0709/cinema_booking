@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  filterCinemas, getCinemaCities, getCinemaCity, getCinemaImageSources, getCinemaPhoneHref,
+  filterCinemas, getCinemaCities, getCinemaCity, getCinemaDetailHref, getCinemaGallerySources, getCinemaImageSources, getCinemaPhoneHref,
   getCinemaScheduleHref, normalizeCinemaSearch, readCinemaFilters, UNKNOWN_CITY, writeCinemaFilters,
 } from './cinemaUtils.js';
 
@@ -74,6 +74,15 @@ test('điện thoại chỉ tạo tel cho số hợp lệ, giữ được đầu
   }
 });
 
+test('gallery giữ thứ tự imageUrls, loại trùng/URL sai và bổ sung ảnh đại diện', () => {
+  assert.deepEqual(getCinemaGallerySources({
+    imageUrls: [' https://example.com/gallery.jpg ', 'https://example.com/wide.jpg', 'javascript:alert(1)', null, 'https://example.com/gallery.jpg'],
+    imageLandscape: 'https://example.com/wide.jpg', imagePortrait: 'https://example.com/tall.jpg',
+  }), ['https://example.com/gallery.jpg', 'https://example.com/wide.jpg', 'https://example.com/tall.jpg']);
+  assert.deepEqual(getCinemaGallerySources({ imageUrls: 'invalid', imageLandscape: 'https://example.com/only.jpg' }), ['https://example.com/only.jpg']);
+  assert.deepEqual(getCinemaGallerySources({ imageUrls: [null, {}, 'data:image/png;base64,abc', '/relative.jpg'] }), []);
+});
+
 test('liên kết lịch dùng bigint nội bộ, từ chối mã Galaxy, số 0, dấu âm và tràn ID', () => {
   assert.equal(getCinemaScheduleHref(12), '/showtimes?cinemaId=12');
   assert.equal(getCinemaScheduleHref('9223372036854775807'), '/showtimes?cinemaId=9223372036854775807');
@@ -87,4 +96,12 @@ test('tìm/lọc danh sách 200 rạp giữ đúng kết quả mà không cắt 
   assert.equal(filterCinemas(input).length, 200);
   assert.equal(filterCinemas(input, { city: 'Hà Nội' }).length, 100);
   assert.equal(filterCinemas(input, { q: 'rap so 199' })[0].id, 200);
+});
+
+test('liên kết chi tiết chỉ nhận ID nội bộ và không mang tham số lọc lịch', () => {
+  assert.equal(getCinemaDetailHref(12), '/cinemas/12');
+  assert.equal(getCinemaDetailHref('9223372036854775807'), '/cinemas/9223372036854775807');
+  for (const id of [undefined, null, '', 0, -1, '01', 'galaxy-ha-noi', '9223372036854775808', '1/2', '1?movieId=2']) {
+    assert.equal(getCinemaDetailHref(id), null);
+  }
 });

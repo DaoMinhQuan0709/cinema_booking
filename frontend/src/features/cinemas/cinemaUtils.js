@@ -41,13 +41,19 @@ export const filterCinemas = (cinemas, { q = '', city = '' } = {}) => {
     });
 };
 
-export const getCinemaImageSources = cinema => [...new Set([
-  cinema.imageLandscape, cinema.imagePortrait, ...(Array.isArray(cinema.imageUrls) ? cinema.imageUrls : []),
-].filter(value => {
+const getValidImageSources = sources => [...new Set(sources.filter(value => {
   if (typeof value !== 'string' || !value.trim()) return false;
   try { return ['https:', 'http:'].includes(new URL(value.trim()).protocol); }
   catch { return false; }
 }).map(value => value.trim()))];
+
+export const getCinemaImageSources = cinema => getValidImageSources([
+  cinema.imageLandscape, cinema.imagePortrait, ...(Array.isArray(cinema.imageUrls) ? cinema.imageUrls : []),
+]);
+
+export const getCinemaGallerySources = cinema => getValidImageSources([
+  ...(Array.isArray(cinema.imageUrls) ? cinema.imageUrls : []), cinema.imageLandscape, cinema.imagePortrait,
+]);
 
 export const getCinemaPhoneHref = phone => {
   if (typeof phone !== 'string' || !/^\+?[\d\s().-]+$/.test(phone.trim())) return null;
@@ -57,3 +63,6 @@ export const getCinemaPhoneHref = phone => {
 
 export const getCinemaScheduleHref = id => isInternalShowtimeId(id)
   ? `/showtimes?cinemaId=${encodeURIComponent(String(id))}` : null;
+
+export const getCinemaDetailHref = id => isInternalShowtimeId(id)
+  ? `/cinemas/${encodeURIComponent(String(id))}` : null;
