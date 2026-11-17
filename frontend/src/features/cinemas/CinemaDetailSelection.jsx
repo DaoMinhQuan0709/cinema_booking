@@ -99,7 +99,7 @@ const CinemaDetailSelection = ({ cinemaId }) => {
 
       {movies.length > 0 && !showtimeError && (
         <div className="mt-8">
-          <CinemaMovieGrid movies={movies} selectedMovieId={movieId} onSelect={id => changeSelection({ movieId: id })} />
+          <CinemaMovieGrid movies={movies} selectedMovieId={movieId} onSelect={id => changeSelection({ movieId: id })} disabled={query.isFetching} />
         </div>
       )}
 

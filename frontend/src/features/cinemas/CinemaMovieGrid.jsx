@@ -14,7 +14,7 @@ const FOCUS_CLASS = 'focus-visible:outline focus-visible:outline-2 focus-visible
  * @param {{ movies: { movieId: string, title: string, posterUrl?: string|null, showtimes: object[] }[],
  *           selectedMovieId: string, onSelect: (movieId: string) => void }} props
  */
-const CinemaMovieGrid = ({ movies, selectedMovieId, onSelect }) => {
+const CinemaMovieGrid = ({ movies, selectedMovieId, onSelect, disabled = false }) => {
   const nowShowing = useNowShowingMovies();
   const comingSoon = useComingSoonMovies();
   const lookup = buildMovieLookup(nowShowing.data, comingSoon.data);
@@ -31,13 +31,14 @@ const CinemaMovieGrid = ({ movies, selectedMovieId, onSelect }) => {
             <li key={movie.movieId} className="min-w-0">
               <button
                 type="button"
+                disabled={disabled}
                 aria-pressed={selected}
                 aria-label={`${movie.title}${rating ? `, ${rating}` : ''}, ${movie.showtimes.length} suất chiếu`}
                 onClick={() => onSelect(movie.movieId)}
-                className={`group flex w-full cursor-pointer flex-col gap-3 rounded-xl text-left ${FOCUS_CLASS}`}
+                className={`group flex w-full cursor-pointer flex-col gap-3 rounded-xl text-left disabled:cursor-wait disabled:opacity-70 ${FOCUS_CLASS}`}
               >
                 <span className={`relative block overflow-hidden rounded-xl border-2 transition-colors ${selected ? 'border-primary' : 'border-transparent group-hover:border-neutral-600'}`}>
-                  <MovieImage src={info?.posterUrl || movie.posterUrl} alt="" loading="lazy" className="aspect-[2/3] w-full object-cover" />
+                  <MovieImage src={info?.posterUrl} fallbackSrc={movie.posterUrl} alt="" loading="lazy" className="aspect-[2/3] w-full object-cover" />
                   {rating && (
                     <span className={`absolute left-2 top-2 rounded border px-1.5 py-0.5 text-[10px] font-bold ${AGE_RATING_STYLE[rating] ?? 'border-surfaceBorder bg-surface text-neutral-300'}`}>{rating}</span>
                   )}
