@@ -71,7 +71,7 @@ const CinemaDetailPage = () => {
           )}
           <CinemaGallery cinema={cinema} />
           <CinemaInfoHeader key={cinema.id} cinema={cinema} />
-          <CinemaDetailSelection cinemaId={cinema.id} />
+          <CinemaDetailSelection cinema={cinema} />
         </>
       )}
 

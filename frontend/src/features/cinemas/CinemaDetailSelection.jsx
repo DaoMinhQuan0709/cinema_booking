@@ -6,6 +6,8 @@ import { buildScheduleDays } from '../showtimes/scheduleUtils';
 import { useCinemaShowtimes } from './hooks/useCinemaShowtimes';
 import CinemaMovieGrid from './CinemaMovieGrid';
 import CinemaShowtimePanel from './CinemaShowtimePanel';
+import CinemaPricingInfo from './CinemaPricingInfo';
+import CinemaLocation from './CinemaLocation';
 import {
   dropUnavailableMovie, getOpenShowtimes, getVietnamNowKey, groupMoviesFromShowtimes,
   normalizeDetailParams, readDetailSelection, writeDetailSelection,
@@ -32,7 +34,8 @@ function useCinemaClock() {
   return now;
 }
 
-const CinemaDetailSelection = ({ cinemaId }) => {
+const CinemaDetailSelection = ({ cinema }) => {
+  const cinemaId = cinema.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const now = useCinemaClock();
   const days = buildScheduleDays(now);
@@ -124,6 +127,16 @@ const CinemaDetailSelection = ({ cinemaId }) => {
             : `${movies.length} phim có suất chiếu. Hãy chọn phim để xem lịch.`}
         </p>
       )}
+
+      <div className="mt-12 grid gap-5 border-t border-surfaceBorder pt-10 sm:mt-14 sm:pt-12 lg:grid-cols-2 lg:gap-6">
+        <CinemaPricingInfo
+          movies={movies}
+          dateLabel={`ngày ${days.find(day => day.date === date)?.fullDate || date}`}
+          isLoading={query.isPending || (query.isFetching && !hasData)}
+          isError={showtimeError}
+        />
+        <CinemaLocation key={cinemaId} cinema={cinema} />
+      </div>
     </section>
   );
 };

@@ -24,6 +24,7 @@ const fixtures = [
   { id: 1, name: 'Galaxy Đà Nẵng', address: 'Tầng 3, đường Điện Biên Phủ', city: 'Đà Nẵng', phone: '1900 2224', displayOrder: 2,
     imageLandscape: 'https://images.example.invalid/broken.jpg', imagePortrait: 'https://images.example.invalid/portrait.svg' },
   { id: 2, name: 'Galaxy Hà Nội', address: '175 Nguyễn Thái Học, Hà Nội', city: 'Hà Nội', phone: '+84 (28) 1234-5678', displayOrder: 0,
+    latitude: 21.033, longitude: 105.839,
     imageLandscape: 'https://images.example.invalid/hanoi.svg',
     imageUrls: ['https://images.example.invalid/hanoi.svg', 'https://images.example.invalid/auditorium.svg', 'https://images.example.invalid/foyer.svg', 'https://images.example.invalid/hanoi.svg'] },
   { id: 3, name: 'Rạp Chưa Có Suất', address: '', city: 'Chưa xác định', phone: null },
@@ -43,6 +44,8 @@ const pickerCinema = `${picker} > div:nth-child(2) select`;
 const detailSchedule = 'main section[aria-label="Chọn ngày và phim tại rạp"]';
 const movieGrid = `${detailSchedule} section[aria-label="Phim đang chiếu tại rạp"]`;
 const showtimePanel = `${detailSchedule} section[aria-labelledby="cinema-showtime-title"]`;
+const pricingPanel = `${detailSchedule} section[aria-labelledby="cinema-pricing-title"]`;
+const locationPanel = `${detailSchedule} section[aria-labelledby="cinema-location-title"]`;
 
 async function reply(requestId, status, data) {
   await cdp.send('Fetch.fulfillRequest', { requestId, responseCode: status,
@@ -62,6 +65,12 @@ async function intercept(event) {
     const broken = url.pathname.startsWith('/broken');
     return cdp.send('Fetch.fulfillRequest', { requestId, responseCode: broken ? 404 : 200,
       responseHeaders: [{ name: 'Content-Type', value: 'image/svg+xml' }], body: Buffer.from(broken ? 'ảnh lỗi mô phỏng' : svg).toString('base64') });
+  }
+  if (url.hostname === 'www.openstreetmap.org' && url.pathname === '/export/embed.html') {
+    const html = '<!doctype html><html lang="vi"><meta charset="utf-8"><body style="margin:0;display:grid;place-items:center;height:100vh;background:#222f35;color:white;font:16px sans-serif">OpenStreetMap mô phỏng</body></html>';
+    return cdp.send('Fetch.fulfillRequest', { requestId, responseCode: 200,
+      responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }],
+      body: Buffer.from(html).toString('base64') });
   }
   const route = url.pathname.replace(/^\/api\/v1/, '');
   requests.push({ method: request.method, route, search: url.search });
@@ -420,6 +429,17 @@ async function runDetailSelectionMock() {
   assert.equal(await cdp.evaluate(`document.querySelector('${showtimePanel} a').textContent.includes('Phòng 1')`), true);
   assert.equal(await cdp.evaluate(`document.querySelector('${showtimePanel} a').textContent.includes('Giá cơ bản 89.000đ')`), true);
   assert.equal(await cdp.evaluate(`document.querySelector('${showtimePanel} a').getAttribute('aria-label').includes('Giá cơ bản 89.000đ')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('${pricingPanel}').textContent.includes('Giá cơ bản') && document.querySelector('${pricingPanel}').textContent.includes('89.000đ')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('${pricingPanel} li').length`), 1);
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('175 Nguyễn Thái Học, Hà Nội')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel} a[href^="tel:"]').getAttribute('href')`), 'tel:+842812345678');
+  assert.equal(await cdp.evaluate(`new URL(document.querySelector('${locationPanel} a[href^="https://www.google.com/maps/dir/"]').href).searchParams.get('destination')`), '21.033,105.839');
+  assert.equal(await cdp.evaluate(`(() => { const map = document.querySelector('${locationPanel} iframe'); return map?.loading === 'lazy' && map.referrerPolicy === 'strict-origin-when-cross-origin'; })()`), true);
+  assert.equal(await cdp.evaluate(`new URL(document.querySelector('${locationPanel} iframe').src).searchParams.get('marker')`), '21.033,105.839');
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('© OpenStreetMap contributors')`), true);
+  await cdp.evaluate(`document.querySelector('${pricingPanel}').scrollIntoView({ block: 'start' })`);
+  await cdp.evaluate('window.scrollBy(0, -160)');
+  await screenshot('cinema-pricing-location-1440-mock.png');
   await setField('#cinema-detail-movie', '');
   await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
   assert.equal(await cdp.evaluate(`document.querySelector('${movieGrid} button').getAttribute('aria-pressed')`), 'false');
@@ -429,11 +449,13 @@ async function runDetailSelectionMock() {
   passed.push('Chi tiết rạp tải suất theo đúng rạp/ngày; hôm nay mặc định, không tự chọn phim và giữ tham số URL khác');
   passed.push('Lưới chọn phim cập nhật URL và ô chọn cùng lúc, không mở trang phim; poster/nhãn tuổi lấy từ API phim');
   passed.push('Panel hiện giờ, phòng, giá cơ bản và liên kết tới /booking/501 bằng ID nội bộ');
+  passed.push('Khối giá và vị trí lấy đúng rạp/ngày; OpenStreetMap lazy không cần key, chỉ đường dùng tọa độ');
 
   const nextDayLabel = `${days[1].label}, ${days[1].fullDate}`;
   await cdp.evaluate(`document.querySelector('${detailSchedule} button[aria-label=${JSON.stringify(nextDayLabel)}]').click()`);
   await cdp.wait(`new URLSearchParams(location.search).get('date') === ${JSON.stringify(days[1].date)} && !new URLSearchParams(location.search).has('movieId')`);
   assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('chưa có suất chiếu')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('${pricingPanel} [role="status"]')?.textContent.includes('Chưa có giá cơ bản')`), true);
   await cdp.evaluate('history.back()');
   await cdp.wait(`document.querySelector('#cinema-detail-movie')?.value === '10'`);
   assert.equal(await cdp.evaluate('location.search'), '?ref=share&movieId=10');
@@ -470,11 +492,13 @@ async function runDetailSelectionMock() {
   await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
   assert.equal(await cdp.evaluate(`Boolean(document.querySelector('${showtimePanel}'))`), false);
   assert.equal(await cdp.evaluate(`Boolean(document.querySelector('${movieGrid}'))`), false);
+  assert.equal(await cdp.evaluate(`document.querySelector('${pricingPanel} [role="status"]')?.textContent.includes('Chưa có giá cơ bản')`), true);
   passed.push('Suất có ID sai không được tính vào lưới/panel; chỉ còn ID sai thì xóa lựa chọn phim sau tải thành công');
 
   scenario = { mode: 'ok', showtimeMode: 'held' };
   await boot(`/cinemas/2?date=${days[1].date}&movieId=10`); await detailReady('Galaxy Hà Nội');
   await cdp.wait(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('Đang tải suất chiếu')`);
+  assert.equal(await cdp.evaluate(`document.querySelector('${pricingPanel} [role="status"]')?.textContent.includes('Đang tải giá cơ bản')`), true);
   assert.equal(await cdp.evaluate(`new URLSearchParams(location.search).get('movieId')`), '10');
   assert.ok(scenario.heldShowtime);
   scenario.showtimeMode = 'ok'; await reply(scenario.heldShowtime, 200, []);
@@ -484,6 +508,7 @@ async function runDetailSelectionMock() {
   scenario = { mode: 'ok', showtimeMode: 'error' };
   await boot(`/cinemas/2?date=${days[1].date}&movieId=10`); await detailReady('Galaxy Hà Nội');
   await cdp.wait(`document.querySelector('${detailSchedule} [role="alert"]')?.textContent.includes('Không tải được suất chiếu')`, 20000);
+  assert.equal(await cdp.evaluate(`document.querySelector('${pricingPanel} [role="status"]')?.textContent.includes('Chưa tải được giá cơ bản')`), true);
   assert.equal(await cdp.evaluate(`new URLSearchParams(location.search).get('movieId')`), '10');
   scenario.showtimeMode = 'ok';
   await cdp.evaluate(`document.querySelector('${detailSchedule} [role="alert"] button').click()`);
@@ -504,7 +529,22 @@ async function runDetailSelectionMock() {
   await cdp.wait(`!new URLSearchParams(location.search).has('movieId')`);
   assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('chưa có suất chiếu')`), true);
   assert.equal(await cdp.evaluate('location.pathname'), '/cinemas/1');
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('Tầng 3, đường Điện Biên Phủ')`), true);
+  assert.equal(await cdp.evaluate(`new URL(document.querySelector('${locationPanel} a[href^="https://www.google.com/maps/dir/"]').href).searchParams.get('destination').includes('Galaxy Đà Nẵng')`), true);
   passed.push('Rạp không có suất giữ route/ID; không hiển thị phim hoặc suất của rạp khác');
+
+  await boot('/cinemas/3'); await detailReady('Rạp Chưa Có Suất');
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('Địa chỉ đang cập nhật')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('Điện thoại đang cập nhật')`), true);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('${locationPanel} a[href^="https://www.google.com/maps/dir/"]'))`), false);
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel} [role="status"]')?.textContent.includes('Vị trí rạp đang cập nhật')`), true);
+  passed.push('Thiếu giá, địa chỉ và tọa độ có thông báo; không tạo liên kết chỉ đường sai');
+
+  await boot('/cinemas/2', 390); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`Boolean(document.querySelector('${pricingPanel} li'))`);
+  await cdp.evaluate(`document.querySelector('${pricingPanel}').scrollIntoView({ block: 'start' })`);
+  await cdp.evaluate('window.scrollBy(0, -120)');
+  await screenshot('cinema-pricing-location-390-mock.png');
 }
 
 async function galleryReady(position, total) {
@@ -694,7 +734,10 @@ try {
     const url = new URL(event.response.url);
     if (url.pathname.startsWith('/api/v1/')) responses.push({ route: url.pathname, status: event.response.status });
   });
-  await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/v1/*' }, ...(!live ? [{ urlPattern: 'https://images.example.invalid/*' }] : [])] });
+  await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/v1/*' }, ...(!live ? [
+    { urlPattern: 'https://images.example.invalid/*' },
+    { urlPattern: 'https://www.openstreetmap.org/export/embed.html*' },
+  ] : [])] });
   cdp.on('Fetch.requestPaused', event => { void intercept(event).catch(async error => {
     // A page navigation can cancel an image request before its mocked response is sent.
     if (error.message.includes('"code":-32602,"message":"Invalid InterceptionId."')) return;

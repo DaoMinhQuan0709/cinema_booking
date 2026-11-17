@@ -4,7 +4,7 @@ Mục tiêu: giữ `/cinemas` làm danh sách tìm/lọc rạp, thêm trang chi 
 
 **Bố cục:** carousel ảnh → tên/địa chỉ/hotline + chọn thành phố/rạp → ngày/phim/giờ chiếu → hai cột giá vé và thông tin/bản đồ → Footer. Theo xác nhận của người dùng, phần kết thúc là Footer; dùng Footer của `MainLayout` đúng một lần. Dùng màu nền tối/đỏ hiện có, responsive 6/3/2 cột phim và một cột thông tin trên mobile.
 
-**Dữ liệu:** dùng API Spring Boot hiện có. Điểm đánh giá, bài giới thiệu dài và ảnh bảng giá chưa có trường nguồn: không tự tạo nội dung. Khối giá lấy `basePrice` theo ngày, ghi rõ giá cơ bản; giá cuối theo ghế/đơn. Bản đồ động dự kiến dùng Maps Embed API, cần key cấu hình và giới hạn tên miền; thiếu cấu hình phải ghi nhận phần nhúng chưa hoàn tất.
+**Dữ liệu:** dùng API Spring Boot hiện có. Điểm đánh giá, bài giới thiệu dài và ảnh bảng giá chưa có trường nguồn: không tự tạo nội dung. Khối giá lấy `basePrice` theo ngày, ghi rõ giá cơ bản; giá cuối theo ghế/đơn. Bản đồ nhúng OpenStreetMap khi rạp có tọa độ; Google Maps Embed API là tùy chọn cần key/billing và giới hạn tên miền.
 
 **Thứ tự:** dữ liệu → route → chọn rạp/ngày/phim → chọn suất → thông tin cuối trang → kiểm chứng. Có thể chuẩn bị carousel và khối thông tin độc lập sau khi chốt dữ liệu; hoàn thành trang đích trước [kế hoạch header](header-my-tickets-navigation-plan.md).
 
@@ -17,7 +17,7 @@ Mục tiêu: giữ `/cinemas` làm danh sách tìm/lọc rạp, thêm trang chi 
 - [x] 5. Thêm xử lý `?date=&movieId=` trong `cinemaDetailUtils.js`: mặc định hôm nay theo giờ Việt Nam, dải 7 ngày, nhóm phim từ suất tương ứng → đổi rạp/ngày xóa chọn phim không còn phù hợp; rạp hết suất vẫn giữ đúng ID; Back/Forward khôi phục lựa chọn.
 - [x] 6. Tạo `CinemaMovieGrid.jsx`: poster/tên và nhãn tuổi lấy bổ sung từ API phim có cache; dùng thao tác chọn phim riêng → không chuyển sang `/movies/:id` khi chọn, không bịa điểm đánh giá, phim đã chọn có trạng thái rõ ràng.
 - [x] 7. Tạo `CinemaShowtimePanel.jsx` dưới lưới, hiện giờ/phòng/giá của phim đã chọn → bấm tới `/booking/:showtimeId` bằng ID nội bộ; loại suất đã bắt đầu, làm mới lịch định kỳ, xử lý tải/rỗng/lỗi độc lập với thông tin rạp.
-- [ ] 8. Tạo `CinemaPricingInfo.jsx` và `CinemaLocation.jsx` theo khối cuối ảnh 3 → giá bám dữ liệu suất; địa chỉ/hotline/map thuộc đúng rạp, iframe tải khi gần khung nhìn, có nút chỉ đường. Thiếu giá/địa chỉ/ảnh có thông báo; không sao chép chính sách giá chưa được backend áp dụng.
+- [x] 8. Tạo `CinemaPricingInfo.jsx` và `CinemaLocation.jsx` theo khối cuối ảnh 3 → giá bám dữ liệu suất; địa chỉ/hotline/map thuộc đúng rạp, iframe tải khi gần khung nhìn, có nút chỉ đường. Thiếu giá/địa chỉ/ảnh có thông báo; không sao chép chính sách giá chưa được backend áp dụng.
 - [ ] 9. Cập nhật `features/cinemas/README.md`, unit test logic URL/ngày/nhóm suất và `scripts/cinemas-browser-check.mjs` → bổ sung fixture chi tiết rạp/phim, đổi rạp nhanh, lỗi từng API, ảnh thiếu, một Footer, Tab/Enter và màn hình 390/768/1440px; chế độ live chỉ đọc catalog, không gọi tạo ghế/booking/sync.
 
 ## Kiểm chứng cuối
@@ -72,3 +72,14 @@ Mục tiêu: giữ `/cinemas` làm danh sách tìm/lọc rạp, thêm trang chi 
 
 - `CinemaShowtimePanel.jsx` nằm dưới lưới phim, hiện giờ/phòng và `basePrice` với nhãn “Giá cơ bản”; mỗi suất dùng liên kết `/booking/:showtimeId` bằng ID nội bộ, ID sai không được tính vào lưới hoặc panel. Không gọi API ghế cho đến khi người dùng mở trang đặt vé.
 - Suất đã bắt đầu được loại theo giờ Việt Nam, cập nhật đồng hồ mỗi phút và khi quay lại tab; `useCinemaShowtimes` tự làm mới mỗi phút và khi focus. Lỗi làm mới giữ và hiển thị snapshot cũ có cảnh báo; dữ liệu tải/rỗng/lỗi tách khỏi thông tin rạp. `changeSelection` trên `main` chỉ có một lệnh `setSearchParams`, không có dòng trùng cần xóa. Lint, **126/126 test**, build và **47 nhóm Edge mô phỏng** đạt, không có lỗi JavaScript; kết quả tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-wZmH0E`.
+
+**Phần 8 — hoàn tất ngày 17/11/2026.**
+
+- `CinemaPricingInfo.jsx` hiển thị khoảng `basePrice` theo từng phim từ suất còn mở bán của đúng rạp/ngày; bỏ ID suất hoặc giá sai, có trạng thái tải/lỗi/thiếu giá. Ghi rõ đây là giá cơ bản, giá cuối tính khi chọn ghế và xác nhận đơn; không tạo bảng giá hoặc chính sách ngoài dữ liệu backend.
+- `CinemaLocation.jsx` lấy địa chỉ, hotline, tọa độ từ chi tiết rạp hiện tại. Chỉ đường ưu tiên tọa độ hợp lệ, nếu thiếu thì dùng tên/địa chỉ/thành phố; thiếu cả hai thì không tạo liên kết. Maps Embed API cần `VITE_GOOGLE_MAPS_EMBED_API_KEY` với HTTP referrer giới hạn theo domain; iframe dùng `loading="lazy"`, thiếu key hiện thông báo và vẫn có nút chỉ đường. Gallery đã xử lý ảnh thiếu ở phần 3. Chưa xác nhận Maps thật vì chưa có key cấu hình.
+- Bổ sung 3 unit test helper giá/bản đồ, kiểm tra Edge cho giá/ngày/rạp, vị trí/chỉ đường, thiếu dữ liệu và ảnh chụp khối cuối trang desktop/mobile. Lint, **129/129 test**, build và **49 nhóm Edge mô phỏng** đạt, không có lỗi JavaScript; kết quả tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-EZjjyL`. Chưa kiểm tra API/DB thật.
+
+**Bổ sung mục 8 — bản đồ không cần billing ngày 17/11/2026.**
+
+- Khi không có Google Maps key, rạp có tọa độ sẽ nhúng OpenStreetMap với marker và ghi nguồn, dùng iframe tải chậm. Rạp chỉ có địa chỉ vẫn có nút chỉ đường nhưng không đặt marker theo địa chỉ chưa xác minh. Google Maps Embed API giữ làm tùy chọn có key/billing; bản đồ công cộng OpenStreetMap cần tuân thủ chính sách tile khi triển khai lưu lượng lớn.
+- Kiểm tra lại lint, build, **130/130 unit test** và **49 nhóm Edge mô phỏng** đều đạt, không lỗi JavaScript; iframe OpenStreetMap trong Edge được mô phỏng để không phụ thuộc mạng. Kết quả và ảnh chụp tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-9kmkPD`. Bản đồ OpenStreetMap thật và API backend thật chưa được kiểm tra.
