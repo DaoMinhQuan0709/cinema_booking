@@ -4,6 +4,7 @@ import { CalendarDays, RefreshCw } from 'lucide-react';
 import { buildScheduleDays } from '../showtimes/scheduleUtils';
 import { useCinemaShowtimes } from './hooks/useCinemaShowtimes';
 import CinemaMovieGrid from './CinemaMovieGrid';
+import CinemaShowtimePanel from './CinemaShowtimePanel';
 import {
   dropUnavailableMovie, getOpenShowtimes, getVietnamNowKey, groupMoviesFromShowtimes,
   normalizeDetailParams, readDetailSelection, writeDetailSelection,
@@ -102,6 +103,8 @@ const CinemaDetailSelection = ({ cinemaId }) => {
           <CinemaMovieGrid movies={movies} selectedMovieId={movieId} onSelect={id => changeSelection({ movieId: id })} disabled={query.isFetching} />
         </div>
       )}
+
+      {selectedMovie && !showtimeError && <CinemaShowtimePanel movie={selectedMovie} />}
 
       {query.isPending && <p role="status" className="mt-5 text-sm text-muted">Đang tải suất chiếu tại rạp…</p>}
       {query.isFetching && hasData && <p role="status" className="mt-5 text-sm text-muted">Đang làm mới suất chiếu…</p>}
