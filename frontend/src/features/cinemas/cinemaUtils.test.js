@@ -74,12 +74,14 @@ test('điện thoại chỉ tạo tel cho số hợp lệ, giữ được đầu
   }
 });
 
-test('gallery giữ thứ tự imageUrls, loại trùng/URL sai và bổ sung ảnh đại diện', () => {
+test('gallery chỉ dùng imageUrls, giữ thứ tự và loại trùng/URL sai', () => {
   assert.deepEqual(getCinemaGallerySources({
     imageUrls: [' https://example.com/gallery.jpg ', 'https://example.com/wide.jpg', 'javascript:alert(1)', null, 'https://example.com/gallery.jpg'],
     imageLandscape: 'https://example.com/wide.jpg', imagePortrait: 'https://example.com/tall.jpg',
-  }), ['https://example.com/gallery.jpg', 'https://example.com/wide.jpg', 'https://example.com/tall.jpg']);
-  assert.deepEqual(getCinemaGallerySources({ imageUrls: 'invalid', imageLandscape: 'https://example.com/only.jpg' }), ['https://example.com/only.jpg']);
+  }), ['https://example.com/gallery.jpg', 'https://example.com/wide.jpg']);
+  for (const imageUrls of [undefined, null, [], 'invalid']) {
+    assert.deepEqual(getCinemaGallerySources({ imageUrls, imageLandscape: 'https://example.com/wide.jpg', imagePortrait: 'https://example.com/tall.jpg' }), []);
+  }
   assert.deepEqual(getCinemaGallerySources({ imageUrls: [null, {}, 'data:image/png;base64,abc', '/relative.jpg'] }), []);
 });
 

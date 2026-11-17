@@ -385,7 +385,7 @@ async function runGalleryMock() {
   await cdp.send('Emulation.setEmulatedMedia', { features: [] });
   passed.push('Chế độ giảm chuyển động vẫn điều hướng được gallery, không có tự chuyển ảnh');
 
-  scenario.detailImages = { imageUrls: [], imageLandscape: 'https://images.example.invalid/hanoi.svg', imagePortrait: null };
+  scenario.detailImages = { imageUrls: ['https://images.example.invalid/hanoi.svg'], imageLandscape: 'https://images.example.invalid/landscape.svg', imagePortrait: 'https://images.example.invalid/portrait.svg' };
   await boot('/cinemas/2'); await galleryReady(1, 1);
   assert.equal(await cdp.evaluate(`document.querySelectorAll('${gallery} button').length`), 0);
   assert.equal(await cdp.evaluate(`document.querySelector('${galleryViewport}').hasAttribute('tabindex')`), false);
@@ -395,23 +395,29 @@ async function runGalleryMock() {
   await galleryClick('Ảnh tiếp theo'); await galleryReady(1, 2);
   passed.push('Một ảnh ẩn toàn bộ điều hướng; hai ảnh vẫn quay vòng đúng mà không nhân đôi số ảnh');
 
-  delete scenario.detailImages;
+  scenario.detailImages = { imageUrls: ['https://images.example.invalid/broken.jpg', 'https://images.example.invalid/danang.svg'] };
   await boot('/cinemas/1'); await detailReady('Galaxy Đà Nẵng'); await galleryReady(1, 1);
-  assert.equal(await cdp.evaluate(`document.querySelector('${gallery} [aria-roledescription="slide"] img').src.endsWith('/portrait.svg')`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('${gallery} [aria-roledescription="slide"] img').src.endsWith('/danang.svg')`), true);
   assert.equal(await cdp.evaluate(`document.querySelectorAll('${gallery} button').length`), 0);
+  scenario.detailImages = { imageLandscape: 'https://images.example.invalid/landscape.svg', imagePortrait: 'https://images.example.invalid/portrait.svg' };
   await boot('/cinemas/4'); await detailReady('Rạp Sắp Có Lịch');
   await cdp.wait(`document.querySelector('${gallery}').textContent.includes('Chưa tải được ảnh rạp')`);
   assert.equal(await cdp.evaluate(`document.querySelectorAll('${gallery} img, ${gallery} button').length`), 0);
+  scenario.detailImages.imageUrls = [];
   await boot('/cinemas/3'); await detailReady('Rạp Chưa Có Suất');
   assert.equal(await cdp.evaluate(`document.querySelector('${gallery}').textContent.includes('Ảnh rạp đang cập nhật')`), true);
   assert.equal(await cdp.evaluate(`document.querySelectorAll('${gallery} button').length`), 0);
-  passed.push('Ảnh chính lỗi chuyển sang ảnh đại diện còn dùng được; thiếu ảnh/toàn bộ ảnh lỗi có fallback và ẩn điều hướng');
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('${gallery} img').length`), 0);
+  delete scenario.detailImages;
+  passed.push('Gallery chỉ dùng imageUrls; bỏ ảnh lỗi, không dùng ảnh ngang/dọc khi gallery rỗng hoặc toàn bộ ảnh lỗi');
 
   await boot(); await ready(4); await openDetail(2, 'Galaxy Hà Nội'); await galleryReady(1, 3);
   await galleryClick('Xem ảnh 3'); await galleryReady(3, 3);
   // Switch the route without unmounting the detail page, as the upcoming cinema selector will do.
   await cdp.evaluate(`history.pushState(null, '', '/cinemas/1'); dispatchEvent(new PopStateEvent('popstate'))`);
-  await detailReady('Galaxy Đà Nẵng'); await galleryReady(1, 1);
+  await detailReady('Galaxy Đà Nẵng');
+  await cdp.wait(`document.querySelector('${gallery}').textContent.includes('Ảnh rạp đang cập nhật')`);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('${gallery} img').length`), 0);
   await cdp.evaluate(`history.back()`); await detailReady('Galaxy Hà Nội'); await galleryReady(1, 3);
   assert.equal(await cdp.evaluate(`document.querySelector('${gallery} [aria-roledescription="slide"] img').src.endsWith('/hanoi.svg')`), true);
   passed.push('Đổi route rạp và Back đặt lại ảnh đầu, không giữ ảnh hoặc lỗi ảnh của rạp trước');

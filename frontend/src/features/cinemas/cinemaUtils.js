@@ -51,9 +51,9 @@ export const getCinemaImageSources = cinema => getValidImageSources([
   cinema.imageLandscape, cinema.imagePortrait, ...(Array.isArray(cinema.imageUrls) ? cinema.imageUrls : []),
 ]);
 
-export const getCinemaGallerySources = cinema => getValidImageSources([
-  ...(Array.isArray(cinema.imageUrls) ? cinema.imageUrls : []), cinema.imageLandscape, cinema.imagePortrait,
-]);
+export const getCinemaGallerySources = cinema => getValidImageSources(
+  Array.isArray(cinema.imageUrls) ? cinema.imageUrls : [],
+);
 
 export const getCinemaPhoneHref = phone => {
   if (typeof phone !== 'string' || !/^\+?[\d\s().-]+$/.test(phone.trim())) return null;
