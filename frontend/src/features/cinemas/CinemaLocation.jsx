@@ -1,13 +1,14 @@
 import { ExternalLink, MapPin, Phone } from 'lucide-react';
 import { getCinemaPhoneHref } from './cinemaUtils';
 import { getCinemaMapLinks } from './cinemaDetailInfoUtils';
+import { cinemaGoogleMapEmbeds } from './cinemaGoogleMapEmbeds';
 
 const FOCUS_CLASS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
 
 const CinemaLocation = ({ cinema }) => {
   const address = typeof cinema.address === 'string' ? cinema.address.trim() : '';
   const phoneHref = getCinemaPhoneHref(cinema.phone);
-  const { embedUrl, embedProvider, directionsUrl } = getCinemaMapLinks(cinema, import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY);
+  const { embedUrl, directionsUrl } = getCinemaMapLinks(cinema, cinemaGoogleMapEmbeds[String(cinema.id)]);
 
   return (
     <section aria-labelledby="cinema-location-title" className="min-w-0 rounded-2xl border border-surfaceBorder bg-surface/60 p-5 sm:p-7">
@@ -36,16 +37,10 @@ const CinemaLocation = ({ cinema }) => {
           />
         ) : (
           <p role="status" className="flex min-h-[220px] items-center justify-center px-5 text-center text-sm leading-relaxed text-muted">
-            {directionsUrl ? 'Rạp chưa có tọa độ để hiển thị bản đồ. Bạn có thể mở chỉ đường để xem vị trí rạp.' : 'Vị trí rạp đang cập nhật.'}
+            {directionsUrl ? 'Bản đồ Google Maps của rạp đang cập nhật. Bạn có thể mở chỉ đường để xem vị trí rạp.' : 'Vị trí rạp đang cập nhật.'}
           </p>
         )}
       </div>
-
-      {embedProvider === 'openstreetmap' && (
-        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className={`mt-2 inline-block text-xs text-muted hover:text-white ${FOCUS_CLASS}`}>
-          © OpenStreetMap contributors<span className="sr-only"> (mở trong tab mới)</span>
-        </a>
-      )}
 
       {directionsUrl && (
         <a href={directionsUrl} target="_blank" rel="noopener noreferrer" className={`mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primaryHover ${FOCUS_CLASS}`}>

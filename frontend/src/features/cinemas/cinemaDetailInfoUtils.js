@@ -28,8 +28,24 @@ const validCoordinate = (value, limit) => {
   return Number.isFinite(coordinate) && Math.abs(coordinate) <= limit ? coordinate : null;
 };
 
-/** Chỉ dùng tọa độ hợp lệ; thiếu key Google thì nhúng OpenStreetMap khi có tọa độ. */
-export function getCinemaMapLinks(cinema, apiKey = '') {
+/** Chỉ nhận URL iframe được Google Maps cấp qua "Chia sẻ → Nhúng bản đồ". */
+export function getManualGoogleEmbedUrl(value) {
+  if (typeof value !== 'string') return null;
+  const input = value.trim();
+  const source = input.startsWith('<iframe')
+    ? /\bsrc\s*=\s*(?:"([^"]+)"|'([^']+)')/i.exec(input)?.slice(1).find(Boolean)
+    : input;
+  if (!source) return null;
+  try {
+    const url = new URL(source.replaceAll('&amp;', '&'));
+    return url.protocol === 'https:' && url.hostname === 'www.google.com'
+      && url.pathname === '/maps/embed' && url.searchParams.has('pb') && url.searchParams.get('pb')
+      && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
+/** URL iframe lấy từ cấu hình thủ công, còn nút chỉ đường lấy tọa độ/địa chỉ của rạp. */
+export function getCinemaMapLinks(cinema, manualEmbed = '') {
   const latitude = validCoordinate(cinema.latitude, 90);
   const longitude = validCoordinate(cinema.longitude, 180);
   const address = typeof cinema.address === 'string' ? cinema.address.trim() : '';
@@ -38,24 +54,9 @@ export function getCinemaMapLinks(cinema, apiKey = '') {
   const destination = latitude !== null && longitude !== null
     ? `${latitude},${longitude}`
     : address ? [name, address, city].filter(Boolean).join(', ') : '';
-  if (!destination) return { embedUrl: null, embedProvider: null, directionsUrl: null };
-
-  const directionsUrl = `https://www.google.com/maps/dir/?${new URLSearchParams({ api: '1', destination })}`;
-  const key = typeof apiKey === 'string' ? apiKey.trim() : '';
-  if (key) return {
-    embedUrl: `https://www.google.com/maps/embed/v1/place?${new URLSearchParams({ key, q: destination })}`,
-    embedProvider: 'google',
-    directionsUrl,
-  };
-  if (latitude === null || longitude === null || Math.abs(latitude) >= 85 || Math.abs(longitude) >= 180) {
-    return { embedUrl: null, embedProvider: null, directionsUrl };
-  }
-
-  const bbox = [longitude - 0.005, latitude - 0.003, longitude + 0.005, latitude + 0.003]
-    .map(value => value.toFixed(6)).join(',');
+  const embedUrl = getManualGoogleEmbedUrl(manualEmbed);
   return {
-    embedUrl: `https://www.openstreetmap.org/export/embed.html?${new URLSearchParams({ bbox, layer: 'mapnik', marker: `${latitude},${longitude}` })}`,
-    embedProvider: 'openstreetmap',
-    directionsUrl,
+    embedUrl,
+    directionsUrl: destination ? `https://www.google.com/maps/dir/?${new URLSearchParams({ api: '1', destination })}` : null,
   };
 }

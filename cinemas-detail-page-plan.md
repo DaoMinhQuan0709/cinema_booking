@@ -4,7 +4,7 @@ Mục tiêu: giữ `/cinemas` làm danh sách tìm/lọc rạp, thêm trang chi 
 
 **Bố cục:** carousel ảnh → tên/địa chỉ/hotline + chọn thành phố/rạp → ngày/phim/giờ chiếu → hai cột giá vé và thông tin/bản đồ → Footer. Theo xác nhận của người dùng, phần kết thúc là Footer; dùng Footer của `MainLayout` đúng một lần. Dùng màu nền tối/đỏ hiện có, responsive 6/3/2 cột phim và một cột thông tin trên mobile.
 
-**Dữ liệu:** dùng API Spring Boot hiện có. Điểm đánh giá, bài giới thiệu dài và ảnh bảng giá chưa có trường nguồn: không tự tạo nội dung. Khối giá lấy `basePrice` theo ngày, ghi rõ giá cơ bản; giá cuối theo ghế/đơn. Bản đồ nhúng OpenStreetMap khi rạp có tọa độ; Google Maps Embed API là tùy chọn cần key/billing và giới hạn tên miền.
+**Dữ liệu:** dùng API Spring Boot hiện có. Điểm đánh giá, bài giới thiệu dài và ảnh bảng giá chưa có trường nguồn: không tự tạo nội dung. Khối giá lấy `basePrice` theo ngày, ghi rõ giá cơ bản; giá cuối theo ghế/đơn. Bản đồ dùng mã iframe sao chép thủ công từ Google Maps theo ID rạp, không dùng Maps Embed API key. Mã chưa được cung cấp thì hiện thông báo và giữ nút chỉ đường.
 
 **Thứ tự:** dữ liệu → route → chọn rạp/ngày/phim → chọn suất → thông tin cuối trang → kiểm chứng. Có thể chuẩn bị carousel và khối thông tin độc lập sau khi chốt dữ liệu; hoàn thành trang đích trước [kế hoạch header](header-my-tickets-navigation-plan.md).
 
@@ -76,10 +76,10 @@ Mục tiêu: giữ `/cinemas` làm danh sách tìm/lọc rạp, thêm trang chi 
 **Phần 8 — hoàn tất ngày 17/11/2026.**
 
 - `CinemaPricingInfo.jsx` hiển thị khoảng `basePrice` theo từng phim từ suất còn mở bán của đúng rạp/ngày; bỏ ID suất hoặc giá sai, có trạng thái tải/lỗi/thiếu giá. Ghi rõ đây là giá cơ bản, giá cuối tính khi chọn ghế và xác nhận đơn; không tạo bảng giá hoặc chính sách ngoài dữ liệu backend.
-- `CinemaLocation.jsx` lấy địa chỉ, hotline, tọa độ từ chi tiết rạp hiện tại. Chỉ đường ưu tiên tọa độ hợp lệ, nếu thiếu thì dùng tên/địa chỉ/thành phố; thiếu cả hai thì không tạo liên kết. Maps Embed API cần `VITE_GOOGLE_MAPS_EMBED_API_KEY` với HTTP referrer giới hạn theo domain; iframe dùng `loading="lazy"`, thiếu key hiện thông báo và vẫn có nút chỉ đường. Gallery đã xử lý ảnh thiếu ở phần 3. Chưa xác nhận Maps thật vì chưa có key cấu hình.
+- `CinemaLocation.jsx` lấy địa chỉ, hotline, tọa độ từ chi tiết rạp hiện tại. Chỉ đường ưu tiên tọa độ hợp lệ, nếu thiếu thì dùng tên/địa chỉ/thành phố; thiếu cả hai thì không tạo liên kết. Iframe dùng `loading="lazy"`, mã nhúng Google Maps được cấu hình thủ công theo ID rạp. Gallery đã xử lý ảnh thiếu ở phần 3. Chưa xác nhận bản đồ thật vì chưa có mã iframe của rạp.
 - Bổ sung 3 unit test helper giá/bản đồ, kiểm tra Edge cho giá/ngày/rạp, vị trí/chỉ đường, thiếu dữ liệu và ảnh chụp khối cuối trang desktop/mobile. Lint, **129/129 test**, build và **49 nhóm Edge mô phỏng** đạt, không có lỗi JavaScript; kết quả tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-EZjjyL`. Chưa kiểm tra API/DB thật.
 
-**Bổ sung mục 8 — bản đồ không cần billing ngày 17/11/2026.**
+**Điều chỉnh mục 8 — Google Maps iframe thủ công ngày 17/11/2026.**
 
-- Khi không có Google Maps key, rạp có tọa độ sẽ nhúng OpenStreetMap với marker và ghi nguồn, dùng iframe tải chậm. Rạp chỉ có địa chỉ vẫn có nút chỉ đường nhưng không đặt marker theo địa chỉ chưa xác minh. Google Maps Embed API giữ làm tùy chọn có key/billing; bản đồ công cộng OpenStreetMap cần tuân thủ chính sách tile khi triển khai lưu lượng lớn.
-- Kiểm tra lại lint, build, **130/130 unit test** và **49 nhóm Edge mô phỏng** đều đạt, không lỗi JavaScript; iframe OpenStreetMap trong Edge được mô phỏng để không phụ thuộc mạng. Kết quả và ảnh chụp tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-9kmkPD`. Bản đồ OpenStreetMap thật và API backend thật chưa được kiểm tra.
+- Theo lựa chọn mới của người dùng, bỏ nhánh OpenStreetMap và Maps Embed API có key. `cinemaGoogleMapEmbeds.js` nhận HTML iframe sao chép từ Google Maps theo ID rạp; chỉ lấy URL `src` HTTPS thuộc `www.google.com/maps/embed?pb=...`. Chưa có mã iframe nên chưa thể điền rạp thật. Rạp thiếu mã vẫn hiện địa chỉ/hotline/chỉ đường; hướng dẫn điền trong README.
+- Lint, build, **131/131 unit test** và **49 nhóm Edge mô phỏng** đạt, không lỗi JavaScript; kết quả tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-LYDL2K`. Chưa kiểm tra iframe Google Maps thật vì cấu hình chưa có mã rạp.

@@ -66,12 +66,6 @@ async function intercept(event) {
     return cdp.send('Fetch.fulfillRequest', { requestId, responseCode: broken ? 404 : 200,
       responseHeaders: [{ name: 'Content-Type', value: 'image/svg+xml' }], body: Buffer.from(broken ? 'ảnh lỗi mô phỏng' : svg).toString('base64') });
   }
-  if (url.hostname === 'www.openstreetmap.org' && url.pathname === '/export/embed.html') {
-    const html = '<!doctype html><html lang="vi"><meta charset="utf-8"><body style="margin:0;display:grid;place-items:center;height:100vh;background:#222f35;color:white;font:16px sans-serif">OpenStreetMap mô phỏng</body></html>';
-    return cdp.send('Fetch.fulfillRequest', { requestId, responseCode: 200,
-      responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }],
-      body: Buffer.from(html).toString('base64') });
-  }
   const route = url.pathname.replace(/^\/api\/v1/, '');
   requests.push({ method: request.method, route, search: url.search });
   assert.ok(['GET', 'OPTIONS'].includes(request.method), 'Kiểm tra danh bạ không được ghi dữ liệu');
@@ -434,9 +428,8 @@ async function runDetailSelectionMock() {
   assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('175 Nguyễn Thái Học, Hà Nội')`), true);
   assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel} a[href^="tel:"]').getAttribute('href')`), 'tel:+842812345678');
   assert.equal(await cdp.evaluate(`new URL(document.querySelector('${locationPanel} a[href^="https://www.google.com/maps/dir/"]').href).searchParams.get('destination')`), '21.033,105.839');
-  assert.equal(await cdp.evaluate(`(() => { const map = document.querySelector('${locationPanel} iframe'); return map?.loading === 'lazy' && map.referrerPolicy === 'strict-origin-when-cross-origin'; })()`), true);
-  assert.equal(await cdp.evaluate(`new URL(document.querySelector('${locationPanel} iframe').src).searchParams.get('marker')`), '21.033,105.839');
-  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('© OpenStreetMap contributors')`), true);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('${locationPanel} iframe'))`), false);
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel} [role="status"]')?.textContent.includes('Bản đồ Google Maps của rạp đang cập nhật')`), true);
   await cdp.evaluate(`document.querySelector('${pricingPanel}').scrollIntoView({ block: 'start' })`);
   await cdp.evaluate('window.scrollBy(0, -160)');
   await screenshot('cinema-pricing-location-1440-mock.png');
@@ -449,7 +442,7 @@ async function runDetailSelectionMock() {
   passed.push('Chi tiết rạp tải suất theo đúng rạp/ngày; hôm nay mặc định, không tự chọn phim và giữ tham số URL khác');
   passed.push('Lưới chọn phim cập nhật URL và ô chọn cùng lúc, không mở trang phim; poster/nhãn tuổi lấy từ API phim');
   passed.push('Panel hiện giờ, phòng, giá cơ bản và liên kết tới /booking/501 bằng ID nội bộ');
-  passed.push('Khối giá và vị trí lấy đúng rạp/ngày; OpenStreetMap lazy không cần key, chỉ đường dùng tọa độ');
+  passed.push('Khối giá và vị trí lấy đúng rạp/ngày; chưa có iframe thủ công thì giữ chỉ đường bằng tọa độ');
 
   const nextDayLabel = `${days[1].label}, ${days[1].fullDate}`;
   await cdp.evaluate(`document.querySelector('${detailSchedule} button[aria-label=${JSON.stringify(nextDayLabel)}]').click()`);
@@ -736,7 +729,6 @@ try {
   });
   await cdp.send('Fetch.enable', { patterns: [{ urlPattern: '*/api/v1/*' }, ...(!live ? [
     { urlPattern: 'https://images.example.invalid/*' },
-    { urlPattern: 'https://www.openstreetmap.org/export/embed.html*' },
   ] : [])] });
   cdp.on('Fetch.requestPaused', event => { void intercept(event).catch(async error => {
     // A page navigation can cancel an image request before its mocked response is sent.

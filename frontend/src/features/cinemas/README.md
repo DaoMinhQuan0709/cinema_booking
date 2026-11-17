@@ -11,7 +11,7 @@
 - `CinemaMovieGrid.jsx` và `movieGridUtils.js`: lưới phim có suất trong ngày theo 2/3/6 cột, bấm chọn phim cập nhật `movieId` trên URL mà không mở trang phim. Poster/nhãn tuổi lấy thêm từ cache API phim đang chiếu và sắp chiếu; thiếu metadata thì dùng poster từ suất và ẩn nhãn, poster API lỗi cũng có fallback. Phim được chọn có viền và trạng thái rõ, không hiển thị điểm đánh giá không có dữ liệu.
 - `CinemaShowtimePanel.jsx`: giờ/phòng/giá cơ bản của phim đã chọn (`/booking/:showtimeId` bằng ID nội bộ), bỏ suất đã bắt đầu theo giờ Việt Nam tính lại mỗi phút. Suất có ID sai không được tính vào lưới hoặc panel. `useCinemaShowtimes` tự làm mới mỗi phút và khi quay lại tab; lỗi làm mới vẫn hiện dữ liệu cũ cùng cảnh báo, tải/rỗng/lỗi của lịch tách khỏi thông tin rạp.
 - `CinemaPricingInfo.jsx`: giá cơ bản theo từng phim từ các suất còn mở bán của đúng rạp/ngày; chỉ hiện giá dương hợp lệ, bỏ suất có ID sai. Khi thiếu giá hoặc lịch chiếu đang tải/lỗi có thông báo; giá cuối được tính khi chọn ghế và xác nhận đơn, không hiển thị chính sách giá chưa có dữ liệu.
-- `CinemaLocation.jsx`: địa chỉ, hotline và chỉ đường của rạp đang xem. Ưu tiên tọa độ hợp lệ, nếu thiếu thì dùng tên/địa chỉ/thành phố cho nút chỉ đường; thiếu vị trí không tạo liên kết sai. Khi không có Google key và rạp có tọa độ, iframe nhúng OpenStreetMap với marker, ghi nguồn và `loading="lazy"`; không cần billing. Rạp chỉ có địa chỉ thì không đoán tọa độ để đặt marker, hiện thông báo và giữ nút chỉ đường. `VITE_GOOGLE_MAPS_EMBED_API_KEY` vẫn là tùy chọn cho Google Maps Embed API; cần billing và giới hạn HTTP referrer theo domain. Dùng bản đồ công cộng với lưu lượng vừa phải theo [chính sách tile của OpenStreetMap](https://operations.osmfoundation.org/policies/tiles/); nếu triển khai lưu lượng lớn, chọn nhà cung cấp tile phù hợp. Chưa xác nhận bản đồ thật trong kiểm tra mô phỏng.
+- `CinemaLocation.jsx`: địa chỉ, hotline và chỉ đường của rạp đang xem. Bản đồ Google Maps lấy iframe sao chép thủ công từ `cinemaGoogleMapEmbeds.js`, tra theo ID trên `/cinemas/:id`; chỉ dùng `src` HTTPS của đường dẫn `/maps/embed?pb=...` thuộc `www.google.com`. Iframe dùng `loading="lazy"`. Khi chưa có mã, hiện thông báo và vẫn cho chỉ đường bằng tọa độ hoặc địa chỉ. Không gọi Maps Embed API và không dùng OpenStreetMap.
 - `useCinemaDetail` cache thông tin rạp theo ID với stale time 30 phút; `useCinemaShowtimes` lấy dữ liệu theo rạp/ngày với stale time 1 phút. Cả hai truyền AbortSignal xuống Axios, không trộn snapshot khi đổi khóa và không yêu cầu `movieId`.
 - `cinemaUtils.js`: xử lý Unicode, sắp `displayOrder` rồi tên, giữ nhóm “Chưa xác định”, kiểm tra URL ảnh và số điện thoại.
 - Dùng `cinemaService`/`useCinemas` hiện có; cache 30 phút dùng chung. Làm mới chủ động lấy lại API; lỗi làm mới giữ snapshot cũ có cảnh báo.
@@ -19,6 +19,21 @@
 - Trang không gọi Galaxy, API sơ đồ ghế hoặc API ghi. Ảnh HTTP(S) lấy trực tiếp từ CDN nguồn và giữ tỷ lệ; thẻ/ảnh bên cạnh lazy-load, ảnh chính của gallery tải ngay. Thiếu metadata có thông báo dự phòng.
 
 Trang lịch chiếu kết hợp danh sách rạp trong catalog và trong các suất: rạp hợp lệ chưa có suất trong ngày vẫn được giữ trong select/URL. Khi metadata chưa có hoặc lỗi, ID đã chọn không tự bị bỏ để hiển thị lịch rạp khác. Rạp sai tỉnh/thành hoặc không tồn tại được chuẩn hóa khi đủ dữ liệu thành công.
+
+## Thêm bản đồ Google Maps thủ công
+
+1. Mở đúng rạp trên Google Maps ở máy tính → **Chia sẻ** → **Nhúng bản đồ** → **Sao chép HTML**. Xác nhận marker/địa chỉ trùng với rạp trong hệ thống.
+2. Lấy ID rạp từ URL trang chi tiết, ví dụ `/cinemas/2` có ID `2`.
+3. Mở `cinemaGoogleMapEmbeds.js` và thêm một mục theo ID. Dán nguyên mã thật vào chuỗi template; có thể dán riêng URL `src` thay cho toàn bộ iframe.
+4. Build lại frontend. Component chỉ dùng `src` đã kiểm tra; không thực thi HTML đã dán. Rạp chưa có mục trong file sẽ hiện thông báo thay bản đồ, nút Chỉ đường vẫn hoạt động khi có tọa độ/địa chỉ.
+
+Mã nhúng thủ công này khác URL Maps Embed API `/maps/embed/v1/...` có `key`; không dùng API key trong `.env`. ID trong file cần cập nhật nếu dữ liệu được tạo lại với ID mới.
+
+```js
+export const cinemaGoogleMapEmbeds = {
+  '2': `<iframe src="https://www.google.com/maps/embed?pb=..." width="600" height="450"></iframe>`,
+};
+```
 
 ## Kiểm thử lặp lại
 
@@ -32,7 +47,7 @@ npm.cmd run test:cinemas-browser
 npm.cmd run test:cinemas-live
 ```
 
-`test:cinemas-browser`: Edge headless với bản production, REST/ảnh và iframe OpenStreetMap mô phỏng; bao phủ thành công, lỗi, cache, response chậm/sai cấu trúc, ảnh lỗi, URL/Back/Forward, 390px/Tab/Enter và lịch chưa có suất. Bổ sung CTA tới chi tiết, mở trực tiếp/reload, giữ bộ lọc khi quay lại, ID sai/404/503, loading và một Footer. Gallery được kiểm tra vị trí ảnh hé hai bên, nút/chấm/bàn phím/vuốt, cuộn dọc, một/hai/nhiều ảnh, fallback và đổi route rạp. Bộ chọn rạp được kiểm tra với cache, đổi thành phố/rạp, giữ `date`/bỏ `movieId`, Back, thành phố hết rạp và lỗi/tải danh sách. Chọn ngày/phim được kiểm tra với URL/Back/Forward, ngày sai, rạp hết suất và API suất tải chậm/lỗi/sai cấu trúc. Lưới phim được kiểm tra chọn phim, nhãn tuổi, poster fallback và 2/3/6 cột. Panel được kiểm tra giờ/phòng/giá cơ bản, URL đặt vé và ID suất sai. Khối cuối trang được kiểm tra giá đúng ngày/rạp, vị trí và chỉ đường, thiếu dữ liệu/cấu hình; có ảnh chụp desktop/mobile. Kết quả này không xác nhận backend/DB hay Maps thật.
+`test:cinemas-browser`: Edge headless với bản production, REST/ảnh mô phỏng; bao phủ thành công, lỗi, cache, response chậm/sai cấu trúc, ảnh lỗi, URL/Back/Forward, 390px/Tab/Enter và lịch chưa có suất. Bổ sung CTA tới chi tiết, mở trực tiếp/reload, giữ bộ lọc khi quay lại, ID sai/404/503, loading và một Footer. Gallery được kiểm tra vị trí ảnh hé hai bên, nút/chấm/bàn phím/vuốt, cuộn dọc, một/hai/nhiều ảnh, fallback và đổi route rạp. Bộ chọn rạp được kiểm tra với cache, đổi thành phố/rạp, giữ `date`/bỏ `movieId`, Back, thành phố hết rạp và lỗi/tải danh sách. Chọn ngày/phim được kiểm tra với URL/Back/Forward, ngày sai, rạp hết suất và API suất tải chậm/lỗi/sai cấu trúc. Lưới phim được kiểm tra chọn phim, nhãn tuổi, poster fallback và 2/3/6 cột. Panel được kiểm tra giờ/phòng/giá cơ bản, URL đặt vé và ID suất sai. Khối cuối trang được kiểm tra giá đúng ngày/rạp, vị trí và chỉ đường, thiếu mã nhúng; có ảnh chụp desktop/mobile. Kết quả này không xác nhận backend/DB hay Maps thật.
 
 `test:cinemas-live`: Edge production với API localhost và ảnh CDN thật; chỉ cho GET/OPTIONS `/cinemas`, `/cinemas/:id`, `/showtimes` và `/movies`. Cần backend đang chạy và dữ liệu rạp đã có. Không khởi động lại backend, gọi sync, tạo ghế/booking hoặc sửa DB. Mặc định API `http://localhost:8080/api/v1`; có thể đặt `CINEMAS_TEST_API_BASE` sang địa chỉ loopback/cổng khác.
 
