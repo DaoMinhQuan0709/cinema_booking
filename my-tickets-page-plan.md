@@ -39,4 +39,18 @@ Mục tiêu: thay trang tạm bằng danh sách đơn đặt vé của tài kho�
 
 ## Tiến độ
 
-Chưa triển khai. File này ghi kế hoạch thiết kế và các tiêu chí kiểm chứng; cập nhật kết quả thực tế sau từng mục.
+File này ghi kế hoạch thiết kế và các tiêu chí kiểm chứng; cập nhật kết quả thực tế sau từng mục.
+
+### Mục 1 — đã dựng khung, chưa nghiệm thu (18/11/2026)
+
+Nhánh `feature/my-tickets-routing`. Đã làm:
+
+- `frontend/src/routes/MyTicketsRoute.jsx`: guard cho `/profile/bookings/**`. Chỉ mount `<Outlet />` khi `sessionStatus === 'authenticated'` (sau `GET /users/me`); khách thấy “Đăng nhập để xem vé” và nút mở modal hiện có, URL giữ nguyên; lỗi xác minh có “Thử lại xác minh”/“Đổi tài khoản”. Trang con được remount theo `user.id:sessionId`.
+- `frontend/src/features/tickets/MyTicketsPage.jsx` và `TicketDetailPage.jsx`: khung lazy-load dưới `MainLayout`, breadcrumb, `h1`, chưa có dữ liệu vé/QR và chưa gọi API. Trang chi tiết từ chối mã đơn sai định dạng bằng trạng thái “Không tìm thấy vé”.
+- `frontend/src/features/tickets/ticketUtils.js` (+ test): `isBookingCode`, `getTicketDetailHref`, `MY_TICKETS_PATH`; mã đơn khớp quy tắc `BK` + 18 ký tự của Checkout.
+- `frontend/src/App.jsx`: thay `PlaceholderPage` bằng route lồng `profile/bookings` (index + `:bookingCode`); bỏ component và import `Ticket` không còn dùng. Mục “Vé của tôi” trong Header dùng `NavLink` nên tự active ở cả hai trang.
+
+Kiểm tra đã chạy: `node --test src/features/tickets/ticketUtils.test.js` (3/3 đạt) và ESLint lõi (cú pháp JSX, biến chưa khai báo, import thừa) trên các file đổi — sạch.
+
+Chưa kiểm chứng (cần `npm ci` và Edge): `npm run lint` đầy đủ, `npm test`, `npm run build`, và kiểm tra trình duyệt mở trực tiếp/reload hai URL, active header, modal đăng nhập, một Header/Footer. Vì vậy mục 1 ở trên chưa được đánh dấu `[x]`.
+

@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, Outlet } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
-import { Film, Sparkles, Ticket } from 'lucide-react';
+import { Film, Sparkles } from 'lucide-react';
 import MainLayout from './layouts/MainLayout';
 import AuthModal from './features/auth/AuthModal';
 import { useAuthStore } from './features/auth/authStore';
@@ -10,6 +10,7 @@ import { MovieShowcase } from './features/movies/MovieShowcase';
 import { queryClient } from './config/queryClient';
 import AdminRoute, { AdminIndexRedirect } from './routes/AdminRoute';
 import LegacyShowtimesRedirect from './routes/LegacyShowtimesRedirect';
+import MyTicketsRoute from './routes/MyTicketsRoute';
 
 const MovieDetail = lazy(() => import('./features/movies/MovieDetail'));
 const MovieCatalog = lazy(() => import('./features/movies/MovieCatalog'));
@@ -18,6 +19,8 @@ const CinemaDetailPage = lazy(() => import('./features/cinemas/CinemaDetailPage'
 const SeatSelectionPage = lazy(() => import('./features/booking/SeatSelectionPage'));
 const CheckoutPage = lazy(() => import('./features/booking/CheckoutPage'));
 const VNPayReturnPage = lazy(() => import('./features/booking/VNPayReturnPage'));
+const MyTicketsPage = lazy(() => import('./features/tickets/MyTicketsPage'));
+const TicketDetailPage = lazy(() => import('./features/tickets/TicketDetailPage'));
 
 // Admin Portal: chi tai sau khi AdminRoute xac minh quyen ADMIN
 const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
@@ -84,14 +87,6 @@ const HomePage = () => {
   );
 };
 
-const PlaceholderPage = ({ title }) => (
-  <div className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center">
-    <Ticket className="w-12 h-12 text-primary/40 mb-3" />
-    <h2 className="text-2xl font-bold text-white mb-2">{title}</h2>
-    <p className="text-sm text-muted">Trang đang trong lộ trình hoàn thiện ở các bước tiếp theo.</p>
-  </div>
-);
-
 /**
  * Vo toi gian cho khu Admin (khong dung Header/Footer/CineBot cua website khach).
  * Giu AuthModal de man hinh "Dang nhap de vao quan tri" cua AdminRoute mo duoc form dang nhap.
@@ -127,7 +122,11 @@ export const App = () => {
             <Route path="showtimes" element={<LegacyShowtimesRedirect />} />
             <Route path="cinemas" element={<CinemasPage />} />
             <Route path="cinemas/:id" element={<CinemaDetailPage />} />
-            <Route path="profile/bookings" element={<PlaceholderPage title="Lịch Sử Vé Đã Đặt Của Bạn" />} />
+            {/* Vé của tôi: MyTicketsRoute chờ xác minh phiên rồi mới mount trang con */}
+            <Route path="profile/bookings" element={<MyTicketsRoute />}>
+              <Route index element={<MyTicketsPage />} />
+              <Route path=":bookingCode" element={<TicketDetailPage />} />
+            </Route>
           </Route>
 
           {/* Admin Portal: AdminRoute xac minh ADMIN truoc, sau do moi tai AdminLayout va man hinh con */}
