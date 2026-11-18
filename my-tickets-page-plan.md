@@ -18,7 +18,7 @@ Mục tiêu: thay trang tạm bằng danh sách đơn đặt vé của tài kho�
 
 ## Công việc
 
-- [ ] **1. Nối hai trang vào router.** Thay placeholder trong `frontend/src/App.jsx` bằng trang danh sách và chi tiết lazy-load dưới `MainLayout`. Khách thấy “Đăng nhập để xem vé”, mở modal hiện có và giữ nguyên URL; chỉ tải dữ liệu sau khi xác minh phiên thành công. → Kiểm tra mở trực tiếp/reload cả hai URL, active header, modal đăng nhập và một Header/Footer; giai đoạn này chỉ dựng khung, chưa hiển thị dữ liệu vé/QR.
+- [x] **1. Nối hai trang vào router.** Thay placeholder trong `frontend/src/App.jsx` bằng trang danh sách và chi tiết lazy-load dưới `MainLayout`. Khách thấy “Đăng nhập để xem vé”, mở modal hiện có và giữ nguyên URL; chỉ tải dữ liệu sau khi xác minh phiên thành công. → Kiểm tra mở trực tiếp/reload cả hai URL, active header, modal đăng nhập và một Header/Footer; giai đoạn này chỉ dựng khung, chưa hiển thị dữ liệu vé/QR.
 
 - [ ] **2. Thêm truy vấn và danh sách vé.** Dùng `GET /api/v1/users/me/bookings` cho danh sách và `GET /api/v1/bookings/{bookingCode}` cho chi tiết; giữ cấu trúc response hiện có. Dựng thẻ ngang, bộ lọc/đếm trạng thái, liên kết chi tiết/checkout và bố cục chi tiết theo thiết kế trên. Lưu bộ lọc khi về danh sách; hỗ trợ Back/Forward/reload. → Kiểm tra bốn trạng thái đơn, ghế/combo chỉ ở chi tiết, đơn không có combo, trường dữ liệu thiếu và không có truy vấn chi tiết hàng loạt.
 
@@ -41,7 +41,7 @@ Mục tiêu: thay trang tạm bằng danh sách đơn đặt vé của tài kho�
 
 File này ghi kế hoạch thiết kế và các tiêu chí kiểm chứng; cập nhật kết quả thực tế sau từng mục.
 
-### Mục 1 — đã dựng khung, chưa nghiệm thu (18/11/2026)
+### Mục 1 — hoàn thành và kiểm chứng bằng API mô phỏng (18/11/2026)
 
 Nhánh `feature/my-tickets-routing`. Đã làm:
 
@@ -50,7 +50,21 @@ Nhánh `feature/my-tickets-routing`. Đã làm:
 - `frontend/src/features/tickets/ticketUtils.js` (+ test): `isBookingCode`, `getTicketDetailHref`, `MY_TICKETS_PATH`; mã đơn khớp quy tắc `BK` + 18 ký tự của Checkout.
 - `frontend/src/App.jsx`: thay `PlaceholderPage` bằng route lồng `profile/bookings` (index + `:bookingCode`); bỏ component và import `Ticket` không còn dùng. Mục “Vé của tôi” trong Header dùng `NavLink` nên tự active ở cả hai trang.
 
-Kiểm tra đã chạy: `node --test src/features/tickets/ticketUtils.test.js` (3/3 đạt) và ESLint lõi (cú pháp JSX, biến chưa khai báo, import thừa) trên các file đổi — sạch.
+Sau rà soát:
 
-Chưa kiểm chứng (cần `npm ci` và Edge): `npm run lint` đầy đủ, `npm test`, `npm run build`, và kiểm tra trình duyệt mở trực tiếp/reload hai URL, active header, modal đăng nhập, một Header/Footer. Vì vậy mục 1 ở trên chưa được đánh dấu `[x]`.
+- Sửa `MyTicketsRoute`: trạng thái `forbidden` từ API Admin vẫn giữ user trong store, không đồng nghĩa người dùng mất quyền xem vé. Guard xác minh lại `/users/me` trước khi mount trang con. Nếu chính `/users/me` trả 403 thì user bị xóa và guard dừng, không lặp xác minh. Đã tái hiện ca lỗi bằng Edge trước khi sửa và kiểm tra lại thành công.
+- Cập nhật `scripts/cinemas-browser-check.mjs`: kiểm tra `h1` và lời mời đăng nhập/khung danh sách mới thay vì placeholder cũ; kiểm tra reload chờ tài liệu mới thực sự tải.
+- Thêm `scripts/my-tickets-routing-check.mjs`, chạy bằng `npm run test:my-tickets-routing` sau `npm run build`. Script kiểm tra bản production với API xác thực mô phỏng; API vé/QR hay API ngoài phạm vi làm kiểm tra thất bại.
+
+Kiểm tra đã chạy:
+
+- `npm run lint`: đạt với cấu hình đầy đủ.
+- `npm test`: 139/139 đạt, gồm 3 test của `ticketUtils`.
+- `npm run build`: đạt.
+- `npm run test:my-tickets-routing`: 20 nhóm kiểm tra đạt, không có lỗi JavaScript. Bao gồm khách/đã xác thực, mở trực tiếp và reload hai URL tại 390/768/1440px, một Header/Footer, active header, không tràn ngang, Enter mở modal/Escape đóng modal và giữ URL; đăng nhập chờ `/users/me`, lỗi 503/thử lại/đổi tài khoản, 401/403, mã đơn sai, đổi phiên khi xác minh đang chờ, bỏ phản hồi cũ, remount khi đăng nhập lại cùng tài khoản, đăng xuất qua storage và hồi quy lỗi quyền Admin.
+- `npm run test:cinemas-browser`: 64 nhóm kiểm tra đạt, không có lỗi JavaScript; gồm Header/Footer, menu tài khoản, Back/Forward/reload tới “Vé của tôi” cho khách và người đã đăng nhập.
+
+Báo cáo cục bộ: `C:/Users/LOQ/AppData/Local/Temp/cinema-tickets-routing-xpk1JL/results.json` và `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-5d1LUM/results.json`.
+
+Giới hạn: kiểm tra trình duyệt dùng API mô phỏng, chưa xác nhận đăng nhập với backend thật. Mục 1 chỉ xác nhận guard và khung trang; truy vấn vé, cách ly query cache, bộ lọc, chi tiết dữ liệu và QR tiếp tục ở các mục 2–6.
 

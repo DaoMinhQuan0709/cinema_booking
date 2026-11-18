@@ -143,7 +143,7 @@ async function boot(route = '/cinemas', width = 1366) {
   await cdp.send('Page.navigate', { url: 'about:blank' });
   await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 1000, deviceScaleFactor: 1, mobile: false });
   await cdp.send('Page.navigate', { url: origin + route });
-  await cdp.wait(`Boolean(document.querySelector('main #cinema-search')) || Boolean(document.querySelector('main nav [aria-current="page"]')) || location.pathname === '/profile/bookings' && Boolean(document.querySelector('main h2'))`);
+  await cdp.wait(`Boolean(document.querySelector('main #cinema-search')) || Boolean(document.querySelector('main nav [aria-current="page"]')) || location.pathname === '/profile/bookings' && Boolean(document.querySelector('main h1'))`);
 }
 
 async function ready(count) { await cdp.wait(`${cards}.length === ${count}`); }
@@ -295,6 +295,7 @@ async function runMock() {
 async function runNavigationMock() {
   scenario = { mode: 'ok' };
   for (const authenticated of [false, true]) {
+    const ticketsReady = `location.pathname === '/profile/bookings' && document.querySelector('main h1')?.textContent === ${JSON.stringify(authenticated ? 'Vé của tôi.' : 'Đăng nhập để xem vé')}`;
     let sessionScript;
     if (authenticated) {
       sessionScript = (await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `
@@ -317,7 +318,7 @@ async function runNavigationMock() {
         assert.equal(await cdp.evaluate(`document.querySelectorAll('header a[href="/showtimes"], footer a[href="/showtimes"]').length`), 0);
         assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true, `Header at ${width}px`);
         await cdp.evaluate(`[...document.querySelectorAll('header nav a[href="/profile/bookings"]')].find(a => a.offsetWidth > 0).click()`);
-        await cdp.wait(`location.pathname === '/profile/bookings' && Boolean(document.querySelector('main h2'))`);
+        await cdp.wait(ticketsReady);
         if (mobile) {
           assert.equal(await cdp.evaluate(`document.querySelector('button[aria-label="Toggle menu"]').getAttribute('aria-expanded')`), 'false');
           await cdp.evaluate(`document.querySelector('button[aria-label="Toggle menu"]').click()`);
@@ -335,8 +336,9 @@ async function runNavigationMock() {
           await cdp.evaluate('history.back()'); await detailReady('Galaxy Hà Nội');
         }
         await cdp.evaluate(`document.querySelector('footer a[href="/profile/bookings"]').click()`);
-        await cdp.wait(`location.pathname === '/profile/bookings' && document.querySelector('main').textContent.includes('Trang đang trong lộ trình hoàn thiện')`);
-        await cdp.send('Page.reload'); await cdp.wait(`Boolean(document.querySelector('main h2'))`);
+        await cdp.wait(ticketsReady);
+        await cdp.evaluate('window.__beforeTicketsReload = true');
+        await cdp.send('Page.reload'); await cdp.wait(`!window.__beforeTicketsReload && (${ticketsReady})`);
         assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
         passed.push(`Header/footer Vé của tôi, active rạp/ vé, menu và Back/Forward/reload: ${authenticated ? 'đã đăng nhập' : 'khách'}, ${width}px`);
       }

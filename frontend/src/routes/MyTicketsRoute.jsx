@@ -28,12 +28,15 @@ export default function MyTicketsRoute() {
   const error = useAuthStore(state => state.sessionError);
   const verify = useAuthStore(state => state.fetchCurrentUser);
   const openAuthModal = useAuthStore(state => state.openAuthModal);
+  // Admin 403 giữ user trong store; nó không chứng minh người dùng mất quyền xem vé.
+  // /users/me 403 xóa user, nên không tự thử lại và tạo vòng lặp khi phiên thật sự bị từ chối.
+  const needsVerification = status === 'idle' || (status === 'forbidden' && user?.id != null);
 
   useEffect(() => {
-    if (status === 'idle') void verify();
-  }, [status, verify]);
+    if (needsVerification) void verify();
+  }, [needsVerification, verify]);
 
-  if (status === 'idle' || status === 'checking') {
+  if (needsVerification || status === 'checking') {
     return <p role="status" className="px-6 py-16 text-center text-sm text-muted">Đang xác minh phiên đăng nhập…</p>;
   }
 

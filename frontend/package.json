@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
+    "test:my-tickets-routing": "node scripts/my-tickets-routing-check.mjs",
     "test:cinemas-browser": "node scripts/cinemas-browser-check.mjs",
     "test:cinemas-live": "node scripts/cinemas-browser-check.mjs --live",
     "test:cinemas-map-audit": "node scripts/cinemas-map-audit.mjs",
