@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { tokenStorage } from '../../config/tokenStorage';
 import { STORAGE_KEYS } from '../../config/constants';
-import { clearAdminCache } from '../../config/queryClient';
+import { clearAdminCache, clearTicketCache } from '../../config/queryClient';
 import { authService } from '../../services/authService';
 
 let pendingVerification = null;
@@ -12,6 +12,7 @@ export const useAuthStore = create((set, get) => {
   const acceptSession = ({ accessToken, refreshToken, user }) => {
     pendingVerification = null;
     clearAdminCache();
+    clearTicketCache(); // Xóa cache vé phiên cũ trước khi thiết lập phiên mới.
     tokenStorage.startSession({ accessToken, refreshToken, user });
     set({
       user, accessToken, sessionId: tokenStorage.getSessionId(),
@@ -71,6 +72,7 @@ export const useAuthStore = create((set, get) => {
       pendingVerification = null;
       tokenStorage.clearSession();
       clearAdminCache();
+      clearTicketCache(); // Xóa toàn bộ cache vé khi đăng xuất; không để dữ liệu cũ hiện với người dùng khác.
       set({
         user: null, accessToken: null, sessionId: null,
         isAuthenticated: false, sessionStatus: 'anonymous', sessionError: null,
@@ -89,9 +91,12 @@ export const useAuthStore = create((set, get) => {
       const accessToken = tokenStorage.getAccessToken();
       const sessionId = tokenStorage.getSessionId();
       if (sessionId === get().sessionId && accessToken === get().accessToken) return;
+      const previousSessionId = get().sessionId;
       authOperation++;
       pendingVerification = null;
       clearAdminCache();
+      // Xóa cache của phiên cũ; phiên mới sẽ tự tải dữ liệu mới khi query enabled.
+      if (previousSessionId) clearTicketCache(previousSessionId); else clearTicketCache();
       set({
         user: tokenStorage.getUser(), accessToken, sessionId,
         isAuthenticated: Boolean(accessToken),

@@ -1,3 +1,11 @@
+/**
+ * Cách ly dữ liệu vé theo phiên (Mục 3):
+ * - queryKey bắt đầu bằng ['my-tickets', sessionId] → dữ liệu của từng phiên tách biệt hoàn toàn.
+ * - gcTime: 0 → cache bị GC ngay sau khi observer cuối cùng unsubscribe (component unmount).
+ * - AbortSignal → request đang bay bị hủy khi query bị cancel (logout/đổi tài khoản).
+ * - clearTicketCache() trong authStore → cancel + remove query ngay khi đổi/xóa phiên,
+ *   không chờ GC tự nhiên, không để dữ liệu cũ làm placeholder cho phiên mới.
+ */
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../auth/authStore';
 import { ticketService } from './ticketService';

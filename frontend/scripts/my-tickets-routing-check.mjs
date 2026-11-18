@@ -1,4 +1,4 @@
-// Mục 1–2: bản production với API xác thực/vé mô phỏng; không đọc/ghi backend thật.
+// Mục 1–3: bản production với API xác thực/vé mô phỏng; không đọc/ghi backend thật.
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -61,6 +61,10 @@ async function intercept({ request, requestId }) {
   if (route === '/users/me/bookings' || /^\/bookings\/BK[a-zA-Z0-9]{18}$/.test(route)) {
     assert.equal(request.method, 'GET', 'Trang vé chỉ đọc dữ liệu');
     assert.ok(scenario.verified.has(request.headers.Authorization), 'Phải xác minh phiên trước khi đọc vé');
+    if (scenario.holdTickets) {
+      scenario.heldTickets.push({ requestId, route });
+      return;
+    }
     if (route === '/users/me/bookings') return reply(requestId, scenario.historyStatus || 200, scenario.history);
     return reply(requestId, scenario.detailStatus || 200, { ...ticketDetail(route.split('/').at(-1)), ...scenario.detailOverrides });
   }
@@ -73,8 +77,9 @@ async function intercept({ request, requestId }) {
 }
 
 async function boot({ user = customer, route = list, width = 1440, ...options } = {}) {
-  scenario = { user, status: 200, holdMe: false, me: 0, held: [], history: ticketHistory, verified: new Set(), ...options };
   await cdp.send('Page.navigate', { url: 'about:blank' });
+  await cdp.wait('location.href === "about:blank"');
+  scenario = { user, status: 200, holdMe: false, holdTickets: false, me: 0, held: [], heldTickets: [], history: ticketHistory, verified: new Set(), ...options };
   const marker = ++sequence;
   const script = await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
     source: `if (location.origin === ${JSON.stringify(origin)}) {
@@ -100,6 +105,27 @@ async function release() {
   assert.ok(held);
   if (held.status === 200) scenario.verified.add(held.bearer);
   await reply(held.requestId, held.status, held.user);
+}
+
+async function waitHeldTickets(count = 1) {
+  const deadline = Date.now() + 10000;
+  while (scenario.heldTickets.length < count) {
+    assert.ok(Date.now() < deadline, 'GET /users/me/bookings must be held');
+    await delay(50);
+  }
+}
+
+async function releaseHeldTicket(overrideData) {
+  const held = scenario.heldTickets.shift();
+  assert.ok(held);
+  const data = overrideData !== undefined ? overrideData : scenario.history;
+  await reply(held.requestId, 200, data);
+}
+
+async function failHeldTicket() {
+  const held = scenario.heldTickets.shift();
+  // Giả lập request bị abort hoặc thất bại từ server sau khi phiên đổi
+  await cdp.send('Fetch.failRequest', { requestId: held.requestId, errorReason: 'Aborted' }).catch(() => {});
 }
 
 async function reload(ready) {
@@ -234,6 +260,76 @@ async function checkTicketData() {
   passed.push('Tiếp tục đơn mở checkout hiện có; mọi request trong luồng trang vé đều GET, không lấy QR');
 }
 
+/**
+ * Mục 3: kiểm chứng cách ly dữ liệu giữa các phiên.
+ * Các ca: đổi tài khoản khi request vé đang chờ, phản hồi đến muộn, logout và đăng nhập lại.
+ */
+async function checkSessionIsolation() {
+  const historyA = ticketHistory.map(item => ({ ...item, movieTitle: `[A] ${item.movieTitle}` }));
+  const historyB = ticketHistory.map(item => ({ ...item, movieTitle: `[B] ${item.movieTitle}` }));
+
+  // --- Ca 1: đổi tài khoản trong khi request danh sách vé đang chờ phản hồi ---
+  // Mô phỏng: A đã xác minh, request /users/me/bookings đang bị giữ,
+  // sau đó B đăng nhập từ tab khác (storage event). Guard kích hoạt xác minh B (cũng bị giữ).
+  // Ta nhả ticket-A (abort), xác minh B xong, nhả ticket-B → chỉ dữ liệu B được hiển thị.
+  await boot({ history: historyA, holdTickets: true });
+  await cdp.wait(heading('Vé của tôi.')); // header h1 đã render, vé chưa về vì holdTickets
+  await waitHeldTickets(1); // request danh sách của A đang bị giữ
+  // Bật holdMe TRƯỚC khi đổi phiên để /users/me của B cũng bị giữ
+  scenario.holdMe = true;
+  scenario.history = historyB;
+  await switchSession(otherCustomer);
+  await waitHeld(); // chờ /users/me của B bị giữ
+  // Nhả (abort) response ticket của A — đến muộn sau khi phiên đã đổi
+  if (scenario.heldTickets.length) await failHeldTicket();
+  // Xác minh B xong; B sẽ gửi request danh sách mới
+  await release();
+  await waitHeldTickets(1); // request danh sách của B đang bị giữ
+  scenario.holdTickets = false;
+  await releaseHeldTicket(historyB); // trả dữ liệu B
+  await cdp.wait(listReady);
+  // Dữ liệu hiển thị phải là của B, không phải A
+  const titlesShown = await cdp.evaluate(`[...document.querySelectorAll('main article h2')].map(e => e.textContent)`);
+  assert.ok(titlesShown.every(t => t.startsWith('[B]')), `Phải hiển thị vé của B, không phải A: ${JSON.stringify(titlesShown)}`);
+  assert.ok(!titlesShown.some(t => t.startsWith('[A]')), 'Dữ liệu A không được lọt vào trang B');
+  passed.push('Đổi tài khoản khi request vé đang chờ: dữ liệu A bị bỏ, hiển thị đúng dữ liệu B');
+
+  // --- Ca 2: phản hồi vé đến muộn sau khi đăng xuất → không hiển thị ---
+  // Đăng xuất qua storage event không cần xác minh lại → không cần holdMe.
+  await boot({ history: historyA, holdTickets: true });
+  await cdp.wait(heading('Vé của tôi.'));
+  await waitHeldTickets(1); // request đang bay
+  // Đăng xuất (mô phỏng qua storage event xóa localStorage)
+  await switchSession(null);
+  await cdp.wait(guestReady); // guard chuyển về màn guest
+  // Fail/abort response danh sách cũ của A về sau khi đã logout
+  if (scenario.heldTickets.length) await failHeldTicket();
+  // Chờ để đảm bảo không có state update nào từ response muộn
+  await delay(300);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main article'))`), false, 'Không hiển thị vé sau logout');
+  assert.equal(await cdp.evaluate(heading('Đăng nhập để xem vé')), true, 'Phải ở màn guest sau logout');
+  passed.push('Phản hồi vé đến muộn sau logout không làm lộ dữ liệu cũ');
+
+  // --- Ca 3: đăng xuất và đăng nhập lại cùng tài khoản → tải dữ liệu mới (không cache cũ) ---
+  const historyV1 = ticketHistory.slice(0, 2);
+  const historyV2 = ticketHistory.slice(0, 3); // Lần 2 có 3 đơn → nếu dùng cache cũ sẽ chỉ thấy 2
+  await boot({ history: historyV1 });
+  await cdp.wait(listReady);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('main article').length`), 2, 'Lần đầu: 2 vé');
+  // Logout qua storage event
+  await switchSession(null);
+  await cdp.wait(guestReady);
+  // Đăng nhập lại cùng tài khoản; bật holdMe để kiểm soát thời điểm xác minh
+  scenario.history = historyV2;
+  scenario.holdMe = true;
+  await switchSession(customer);
+  await waitHeld();
+  await release(); // xác minh xong → query sẽ chạy với sessionId mới
+  await cdp.wait(listReady);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('main article').length`), 3, 'Đăng nhập lại: phải tải mới, 3 vé từ API mới');
+  passed.push('Đăng xuất và đăng nhập lại cùng tài khoản: cache bị xóa, tải dữ liệu mới từ API');
+}
+
 try {
   browser = await startEdgeBrowser({ root, port: 4210, debugPort: 9243, artifacts, executable: process.env.ADMIN_EDGE_PATH });
   cdp = browser.cdp;
@@ -317,14 +413,15 @@ try {
   passed.push('403 của Admin không tước quyền xem vé; xác minh lại /users/me trước khi cho vào');
 
   await checkTicketData();
+  await checkSessionIsolation();
   assert.deepEqual(exceptions, []);
-  const report = { mode: 'Edge production / API xác thực và vé mô phỏng, chưa kiểm tra backend thật', passed,
+  const report = { mode: 'Edge production / API xác thực và vé mô phỏng, chưa kiểm tra backend thật — Mục 1–3', passed,
     requests, runtimeExceptions: exceptions.length, artifacts };
   await writeFile(path.join(artifacts, 'results.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ ...report, requests: requests.length }, null, 2));
 } catch (error) {
   await writeFile(path.join(artifacts, 'failure.json'), JSON.stringify({ passed, requests, exceptions,
     body: await cdp?.evaluate('document.body.innerText').catch(() => '') }, null, 2));
-  console.error(`Kiểm tra mục 1 thất bại: ${artifacts}`);
+  console.error(`Kiểm tra mục 1–3 thất bại: ${artifacts}`);
   throw error;
 } finally { await browser?.close(); }

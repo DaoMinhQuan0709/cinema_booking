@@ -22,7 +22,7 @@ Mục tiêu: thay trang tạm bằng danh sách đơn đặt vé của tài kho�
 
 - [x] **2. Thêm truy vấn và danh sách vé.** Dùng `GET /api/v1/users/me/bookings` cho danh sách và `GET /api/v1/bookings/{bookingCode}` cho chi tiết; giữ cấu trúc response hiện có. Dựng thẻ ngang, bộ lọc/đếm trạng thái, liên kết chi tiết/checkout và bố cục chi tiết theo thiết kế trên. Lưu bộ lọc khi về danh sách; hỗ trợ Back/Forward/reload. → Kiểm tra bốn trạng thái đơn, ghế/combo chỉ ở chi tiết, đơn không có combo, trường dữ liệu thiếu và không có truy vấn chi tiết hàng loạt.
 
-- [ ] **3. Cách ly dữ liệu theo phiên.** Query key bắt đầu bằng `['my-tickets', sessionId]`, phân biệt danh sách/chi tiết/QR; truyền AbortSignal, đặt `gcTime: 0`, không lưu dữ liệu vé vào localStorage. Khi đổi tài khoản/đăng xuất, hủy truy vấn và bỏ dữ liệu phiên trước; không dùng dữ liệu cũ làm placeholder cho phiên mới. → Kiểm tra đổi tài khoản khi request còn chờ, phản hồi muộn, đăng xuất và đăng nhập lại cùng tài khoản.
+- [x] **3. Cách ly dữ liệu theo phiên.** Query key bắt đầu bằng `['my-tickets', sessionId]`, phân biệt danh sách/chi tiết/QR; truyền AbortSignal, đặt `gcTime: 0`, không lưu dữ liệu vé vào localStorage. Khi đổi tài khoản/đăng xuất, hủy truy vấn và bỏ dữ liệu phiên trước; không dùng dữ liệu cũ làm placeholder cho phiên mới. → Kiểm tra đổi tài khoản khi request còn chờ, phản hồi muộn, đăng xuất và đăng nhập lại cùng tài khoản.
 
 - [ ] **4. Cập nhật trạng thái và xử lý lỗi.** Stale time 30 giây, tải lại khi focus; danh sách có đơn chờ và chi tiết đơn chờ làm mới mỗi 30 giây khi tab đang mở. Sau tạo đơn, hủy giữ chỗ hoặc xác nhận thanh toán, invalidate dữ liệu vé của phiên hiện tại. Có skeleton, danh sách rỗng với “Khám phá phim”, bộ lọc không có kết quả, lỗi/thử lại; lỗi làm mới giữ dữ liệu cũ kèm cảnh báo. Chi tiết 403/404 có lối về danh sách. Trạng thái lạ hiện “Chưa xác định”, không mở QR hoặc thao tác thanh toán. → Kiểm tra lỗi từng API, phục hồi, cập nhật sau checkout và không tự gọi API ghi từ trang vé.
 
@@ -104,5 +104,38 @@ Báo cáo và ảnh chụp cục bộ:
 - `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-5Ei7NI/results.json`.
 - `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-Ds1LVc/`.
 
-Giới hạn: tất cả kiểm tra Edge ở trên dùng REST mô phỏng; chưa xác nhận dữ liệu vé với backend/DB thật. Mục 3–6 chưa được đánh dấu hoàn thành.
+Giới hạn: tất cả kiểm tra Edge ở trên dùng REST mô phỏng; chưa xác nhận dữ liệu vé với backend/DB thật.
+
+### Mục 3 — hoàn thành và kiểm chứng bằng API mô phỏng (18/11/2026)
+
+Đã triển khai:
+
+- `frontend/src/config/queryClient.js`: thêm hàm `clearTicketCache(sessionId?)` hỗ trợ hủy các query đang chạy (`cancelQueries`) và xóa sạch cache (`removeQueries`) của toàn bộ vé hoặc theo `sessionId` cụ thể.
+- `frontend/src/features/auth/authStore.js`:
+  - Trong `acceptSession`: gọi `clearTicketCache()` để xóa cache vé cũ trước khi phiên mới bắt đầu.
+  - Trong `logout`: gọi `clearTicketCache()` để dọn sạch toàn bộ cache vé khỏi bộ nhớ, bảo đảm người dùng kế tiếp không thấy dữ liệu vé cũ.
+  - Trong `syncSessionFromStorage`: gọi `clearTicketCache(previousSessionId)` khi phát hiện `sessionId` thay đổi qua storage event giữa các tab.
+- `frontend/src/features/tickets/useTicketQueries.js`: ghi chú rõ ràng về kiến trúc cách ly theo phiên (`['my-tickets', sessionId, ...]`, `gcTime: 0`, `AbortSignal`, và `clearTicketCache`).
+- `frontend/scripts/my-tickets-routing-check.mjs`: bổ sung kiểm thử tự động với Edge mô phỏng bao quát 3 ca cách ly dữ liệu:
+  - **Ca 1:** Đổi tài khoản khi request danh sách vé đang chờ phản hồi → phản hồi của phiên cũ bị hủy, chỉ dữ liệu của phiên mới được render.
+  - **Ca 2:** Phản hồi vé đến muộn sau khi đăng xuất → không hiển thị vé và không rò rỉ dữ liệu sau logout.
+  - **Ca 3:** Đăng xuất rồi đăng nhập lại cùng một tài khoản → cache vé cũ bị xóa, dữ liệu mới được tải lại hoàn toàn từ API (không dùng cache cũ làm placeholder).
+
+Kiểm tra đã chạy:
+
+| Lệnh | Kết quả |
+| --- | --- |
+| `npm run lint` | Đạt (0 warnings) |
+| `npm test` | 145/145 đạt |
+| `npm run build` | Đạt |
+| `npm run test:my-tickets-routing` | 33 nhóm đạt (bao gồm 3 ca Mục 3), 0 lỗi JavaScript |
+| `npm run test:cinemas-browser` | 64 nhóm đạt, không lỗi JavaScript |
+| `npm run test:checkout-browser` | 18 nhóm đạt, không lỗi JavaScript |
+
+Báo cáo cục bộ:
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-tickets-routing-b7HnWr/results.json`
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-d0P8xb/results.json`
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-Q0gaMN/results.json`
+
+Giới hạn: các kiểm thử ở trên dùng REST mô phỏng, chưa gọi backend/database thật. Mục 4–6 tiếp tục thực hiện ở các bước sau.
 

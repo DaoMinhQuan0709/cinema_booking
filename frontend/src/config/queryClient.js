@@ -18,3 +18,16 @@ export function clearAdminCache() {
     if (mutation.options.mutationKey?.[0] === 'admin') mutations.remove(mutation);
   });
 }
+
+/**
+ * Hủy và xóa cache vé khỏi queryClient để không lộ dữ liệu giữa các phiên.
+ * - Nếu truyền sessionId: chỉ xóa cache của phiên đó (dùng khi biết phiên cũ).
+ * - Nếu không truyền: xóa toàn bộ cache my-tickets (dùng khi logout hoàn toàn).
+ * gcTime: 0 đảm bảo GC sạch sau khi observer unsubscribe, nhưng cancel + remove
+ * ngay tại đây để request đang chờ bị abort và dữ liệu không được đọc bởi phiên mới.
+ */
+export function clearTicketCache(sessionId) {
+  const queryKey = sessionId ? ['my-tickets', sessionId] : ['my-tickets'];
+  void queryClient.cancelQueries({ queryKey });
+  queryClient.removeQueries({ queryKey });
+}
