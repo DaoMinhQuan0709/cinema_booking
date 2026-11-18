@@ -20,7 +20,7 @@ Mục tiêu: thay trang tạm bằng danh sách đơn đặt vé của tài kho�
 
 - [x] **1. Nối hai trang vào router.** Thay placeholder trong `frontend/src/App.jsx` bằng trang danh sách và chi tiết lazy-load dưới `MainLayout`. Khách thấy “Đăng nhập để xem vé”, mở modal hiện có và giữ nguyên URL; chỉ tải dữ liệu sau khi xác minh phiên thành công. → Kiểm tra mở trực tiếp/reload cả hai URL, active header, modal đăng nhập và một Header/Footer; giai đoạn này chỉ dựng khung, chưa hiển thị dữ liệu vé/QR.
 
-- [ ] **2. Thêm truy vấn và danh sách vé.** Dùng `GET /api/v1/users/me/bookings` cho danh sách và `GET /api/v1/bookings/{bookingCode}` cho chi tiết; giữ cấu trúc response hiện có. Dựng thẻ ngang, bộ lọc/đếm trạng thái, liên kết chi tiết/checkout và bố cục chi tiết theo thiết kế trên. Lưu bộ lọc khi về danh sách; hỗ trợ Back/Forward/reload. → Kiểm tra bốn trạng thái đơn, ghế/combo chỉ ở chi tiết, đơn không có combo, trường dữ liệu thiếu và không có truy vấn chi tiết hàng loạt.
+- [x] **2. Thêm truy vấn và danh sách vé.** Dùng `GET /api/v1/users/me/bookings` cho danh sách và `GET /api/v1/bookings/{bookingCode}` cho chi tiết; giữ cấu trúc response hiện có. Dựng thẻ ngang, bộ lọc/đếm trạng thái, liên kết chi tiết/checkout và bố cục chi tiết theo thiết kế trên. Lưu bộ lọc khi về danh sách; hỗ trợ Back/Forward/reload. → Kiểm tra bốn trạng thái đơn, ghế/combo chỉ ở chi tiết, đơn không có combo, trường dữ liệu thiếu và không có truy vấn chi tiết hàng loạt.
 
 - [ ] **3. Cách ly dữ liệu theo phiên.** Query key bắt đầu bằng `['my-tickets', sessionId]`, phân biệt danh sách/chi tiết/QR; truyền AbortSignal, đặt `gcTime: 0`, không lưu dữ liệu vé vào localStorage. Khi đổi tài khoản/đăng xuất, hủy truy vấn và bỏ dữ liệu phiên trước; không dùng dữ liệu cũ làm placeholder cho phiên mới. → Kiểm tra đổi tài khoản khi request còn chờ, phản hồi muộn, đăng xuất và đăng nhập lại cùng tài khoản.
 
@@ -67,4 +67,42 @@ Kiểm tra đã chạy:
 Báo cáo cục bộ: `C:/Users/LOQ/AppData/Local/Temp/cinema-tickets-routing-xpk1JL/results.json` và `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-5d1LUM/results.json`.
 
 Giới hạn: kiểm tra trình duyệt dùng API mô phỏng, chưa xác nhận đăng nhập với backend thật. Mục 1 chỉ xác nhận guard và khung trang; truy vấn vé, cách ly query cache, bộ lọc, chi tiết dữ liệu và QR tiếp tục ở các mục 2–6.
+
+### Mục 2 — hoàn thành và kiểm chứng bằng API mô phỏng (18/11/2026)
+
+Đã triển khai:
+
+- `frontend/src/features/tickets/ticketService.js` và `useTicketQueries.js`: đọc danh sách từ `/users/me/bookings`, tái sử dụng `bookingService.getBooking` cho chi tiết. Giữ nguyên DTO backend; báo lỗi nếu response danh sách không phải mảng hoặc chi tiết không khớp mã yêu cầu. Chỉ chạy truy vấn sau xác minh phiên; không gọi chi tiết từng đơn từ danh sách.
+- `MyTicketsPage.jsx`: thẻ ngang gồm phim/rạp/phòng, suất chiếu/ngày đặt, trạng thái/tổng tiền và thao tác. Giữ thứ tự API, có nút làm mới và năm bộ lọc kèm số lượng. `status` lưu trong URL; giá trị sai/trùng được chuẩn hóa bằng replace, giữ query khác và hash. Chuyển lọc không gọi thêm API.
+- `TicketDetailPage.jsx`: bố cục hai cột trên desktop, một cột trên mobile; hiển thị phim/rạp/phòng, giờ chiếu, ghế/loại ghế/giá, combo/số lượng/đơn giá/thành tiền, ngày đặt, hạn giữ chỗ cho đơn chờ và tổng tiền. Phân biệt không có combo với thiếu dữ liệu combo. Breadcrumb và liên kết quay về giữ bộ lọc qua router state, kể cả khi reload trang chi tiết; mở URL chi tiết trực tiếp vẫn có lối về danh sách.
+- `TicketUI.jsx` và `ticketUtils.js`: nhãn bốn trạng thái, trạng thái chưa xác định, liên kết chi tiết/checkout, định dạng VND và giờ Việt Nam. `LocalDateTime` không phụ thuộc múi giờ máy người dùng; trường thiếu hiện “Chưa cập nhật”, không biến thành 0đ. Chỉ đơn `PENDING` có mã hợp lệ được “Tiếp tục đơn”, dùng checkout hiện có.
+- Giao diện giữ nền tối/đỏ, font Plus Jakarta Sans và Be Vietnam Pro; đường nét đứt chia thông tin đơn với trạng thái/tổng tiền. Đã xem ảnh chụp danh sách desktop và chi tiết mobile, đồng thời kiểm tra không tràn ngang ở 390/768/1440px.
+- Mở rộng `scripts/my-tickets-routing-check.mjs` bằng fixture `scripts/fixtures/tickets.mjs` để kiểm tra dữ liệu mục 2 cùng guard mục 1. Cập nhật fixture của `scripts/cinemas-browser-check.mjs` cho request lịch sử vé mới.
+
+Phần nền tảng cho các mục tiếp theo:
+
+- Query key đã dùng `['my-tickets', sessionId, 'list' | 'detail', ...]`, truyền `AbortSignal`, `gcTime: 0`, không lưu dữ liệu vé vào localStorage. Mục 3 vẫn cần kiểm chứng đầy đủ hủy/xóa cache và phản hồi truy vấn vé muộn khi đổi phiên.
+- Có trạng thái tải, rỗng, lỗi/thử lại cơ bản và lỗi 403/404 với lối về danh sách. Polling, refetch khi focus, invalidation sau checkout và kiểm thử làm mới thuộc mục 4.
+- Vùng mã vé hiện thông báo theo trạng thái; chưa tải/sinh QR hay dùng `qrCodeUrl`. API bảo vệ QR và nút tải ảnh thuộc mục 5. Không đổi backend hoặc quy trình thanh toán.
+
+Kiểm tra đã chạy:
+
+| Lệnh | Kết quả |
+| --- | --- |
+| `npm run lint` | Đạt |
+| `npm test` | 145/145, gồm 9 test utility vé |
+| `npm run build` | Đạt |
+| `npm run test:my-tickets-routing` | 30 nhóm đạt, không lỗi JavaScript |
+| `npm run test:cinemas-browser` | 64 nhóm đạt, không lỗi JavaScript |
+| `npm run test:checkout-browser` | 18 nhóm đạt, không lỗi JavaScript |
+
+Các ca mục 2 gồm bốn trạng thái/đếm/lọc, thứ tự API, không truy vấn chi tiết hàng loạt, dữ liệu ghế/combo, đơn không combo, trường thiếu/trạng thái lạ, URL sai/trùng, Back/Forward/reload, trở về bộ lọc cũ và mở checkout. Luồng trang vé chỉ gửi GET; đăng nhập trong kiểm tra guard dùng API xác thực mô phỏng.
+
+Báo cáo và ảnh chụp cục bộ:
+
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-tickets-routing-yKDGf6/`: `results.json`, ảnh danh sách/chi tiết tại 390/768/1440px.
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-5Ei7NI/results.json`.
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-Ds1LVc/`.
+
+Giới hạn: tất cả kiểm tra Edge ở trên dùng REST mô phỏng; chưa xác nhận dữ liệu vé với backend/DB thật. Mục 3–6 chưa được đánh dấu hoàn thành.
 

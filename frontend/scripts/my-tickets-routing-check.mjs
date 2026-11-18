@@ -1,10 +1,11 @@
-// Mục 1: chạy bản production với API xác thực mô phỏng; không đọc/ghi backend thật.
+// Mục 1–2: bản production với API xác thực/vé mô phỏng; không đọc/ghi backend thật.
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { delay, startEdgeBrowser } from './lib/edge-browser.mjs';
+import { ticketHistory, ticketDetail } from './fixtures/tickets.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const origin = 'http://127.0.0.1:4210';
@@ -19,8 +20,8 @@ let browser, cdp, sequence = 0, scenario;
 
 const includes = text => `document.querySelector('main')?.textContent.includes(${JSON.stringify(text)})`;
 const heading = text => `document.querySelector('main h1')?.textContent === ${JSON.stringify(text)}`;
-const listReady = heading('Vé của tôi.');
-const detailReady = heading('Đơn đặt vé');
+const listReady = `${heading('Vé của tôi.')} && Boolean(document.querySelector('main article'))`;
+const detailReady = `${heading('Đơn đặt vé')} && Boolean(document.querySelector('#ticket-showtime'))`;
 const guestReady = heading('Đăng nhập để xem vé');
 
 function sessionSource(user, sessionId) {
@@ -51,20 +52,28 @@ async function intercept({ request, requestId }) {
   if (route === '/users/me') {
     scenario.me++;
     if (scenario.holdMe) {
-      scenario.held.push({ requestId, status: scenario.status, user: scenario.user });
+      scenario.held.push({ requestId, status: scenario.status, user: scenario.user, bearer: request.headers.Authorization });
       return;
     }
+    if (scenario.status === 200) scenario.verified.add(request.headers.Authorization);
     return reply(requestId, scenario.status, scenario.user);
   }
+  if (route === '/users/me/bookings' || /^\/bookings\/BK[a-zA-Z0-9]{18}$/.test(route)) {
+    assert.equal(request.method, 'GET', 'Trang vé chỉ đọc dữ liệu');
+    assert.ok(scenario.verified.has(request.headers.Authorization), 'Phải xác minh phiên trước khi đọc vé');
+    if (route === '/users/me/bookings') return reply(requestId, scenario.historyStatus || 200, scenario.history);
+    return reply(requestId, scenario.detailStatus || 200, { ...ticketDetail(route.split('/').at(-1)), ...scenario.detailOverrides });
+  }
+  if (route === '/products' && scenario.allowCheckout) return reply(requestId, 200, []);
   if (route === '/auth/login') return reply(requestId, 200, {
     accessToken: 'login-token', refreshToken: 'login-refresh', user: scenario.user,
   });
   if (route === '/auth/refresh') return reply(requestId, 401, null);
-  throw new Error(`API ngoài phạm vi mục 1: ${route}`);
+  throw new Error(`API ngoài phạm vi kiểm tra vé: ${route}`);
 }
 
 async function boot({ user = customer, route = list, width = 1440, ...options } = {}) {
-  scenario = { user, status: 200, holdMe: false, me: 0, held: [], ...options };
+  scenario = { user, status: 200, holdMe: false, me: 0, held: [], history: ticketHistory, verified: new Set(), ...options };
   await cdp.send('Page.navigate', { url: 'about:blank' });
   const marker = ++sequence;
   const script = await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
@@ -89,6 +98,7 @@ async function waitHeld() {
 async function release() {
   const held = scenario.held.shift();
   assert.ok(held);
+  if (held.status === 200) scenario.verified.add(held.bearer);
   await reply(held.requestId, held.status, held.user);
 }
 
@@ -127,6 +137,101 @@ async function login() {
     })()`);
   }
   await cdp.evaluate(`document.querySelector('form button[type="submit"]').click()`);
+}
+
+async function chooseFilter(label) {
+  await cdp.evaluate(`(() => {
+    const button = [...document.querySelectorAll('main [role="group"] button')].find(item => item.textContent.startsWith(${JSON.stringify(label)}));
+    button.focus(); button.click();
+  })()`);
+}
+
+async function screenshot(name) {
+  await writeFile(path.join(artifacts, name), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'));
+}
+
+async function checkTicketData() {
+  const start = requests.length;
+  await boot({ route: `${list}?ref=history#tickets` }); await cdp.wait(listReady);
+  assert.deepEqual(await cdp.evaluate(`[...document.querySelectorAll('main article h2')].map(item => item.textContent)`), ticketHistory.map(item => item.movieTitle));
+  assert.deepEqual(await cdp.evaluate(`[...document.querySelectorAll('main [role="group"] button span')].map(item => item.textContent)`), ['4', '1', '1', '1', '1']);
+  assert.equal(requests.slice(start).filter(item => item.route.startsWith('/bookings/')).length, 0);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('main img, main a[href^="/checkout/"]').length`), 1, 'Chỉ một đơn pending có CTA, không có poster/QR');
+  assert.equal(await cdp.evaluate(`document.querySelector('main').textContent.includes('Ghế đã đặt')`), false);
+  for (const [index, label] of ['Đã xác nhận', 'Chờ thanh toán', 'Đã hủy', 'Hết hạn'].entries()) {
+    await chooseFilter(label);
+    await cdp.wait(`document.querySelectorAll('main article').length === 1 && document.querySelector('main article h2').textContent === ${JSON.stringify(ticketHistory[index].movieTitle)}`);
+    assert.equal(await cdp.evaluate(`document.querySelector('main [aria-pressed="true"]').textContent`), `${label}1`);
+  }
+  assert.equal(requests.slice(start).filter(item => item.route === '/users/me/bookings').length, 1, 'Lọc không gọi lại API');
+  await cdp.evaluate('history.back()'); await cdp.wait(`location.search.includes('CANCELLED')`);
+  await cdp.evaluate('history.forward()'); await cdp.wait(`location.search.includes('EXPIRED')`);
+  passed.push('Bốn trạng thái/đếm/lọc giữ thứ tự API, không poster/ghế hay N+1, Back/Forward đúng bộ lọc');
+
+  await chooseFilter('Chờ thanh toán');
+  await cdp.wait(`location.search.includes('PENDING')`);
+  const filteredUrl = await cdp.evaluate('location.pathname + location.search + location.hash');
+  await cdp.evaluate(`document.querySelector('main article a[href^="/profile/bookings/"]').click()`); await cdp.wait(detailReady);
+  assert.equal(await cdp.evaluate(`document.querySelector('#ticket-showtime').textContent`), 'Interstellar');
+  assert.equal(await cdp.evaluate(includes('Đơn này không có bắp nước hoặc combo.')), true);
+  assert.equal(await cdp.evaluate(includes('Hạn giữ chỗ')), true);
+  await reload(detailReady);
+  await cdp.evaluate(`document.querySelector('main a[href^="/profile/bookings?"]').click()`); await cdp.wait(listReady);
+  assert.equal(await cdp.evaluate('location.pathname + location.search + location.hash'), filteredUrl);
+  await reload(listReady);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('main article').length`), 1);
+  passed.push('Chi tiết không combo; reload chi tiết và về danh sách giữ status/ref/hash; reload bộ lọc');
+
+  for (const width of [390, 768, 1440]) {
+    await boot({ width }); await cdp.wait(listReady); await assertShell(); await screenshot(`tickets-list-${width}.png`);
+    await cdp.evaluate(`document.querySelector('main article a[href^="/profile/bookings/"]').click()`); await cdp.wait(detailReady); await assertShell();
+    assert.equal(await cdp.evaluate(includes('D7')), true);
+    assert.equal(await cdp.evaluate(includes('Combo đôi')), true);
+    assert.equal(await cdp.evaluate(includes('60.000')), true);
+    assert.equal(await cdp.evaluate(`document.querySelectorAll('main a[href^="/checkout/"]').length`), 0);
+    await screenshot(`tickets-detail-${width}.png`);
+    passed.push(`Danh sách/chi tiết ghế, combo, tiền và bố cục không tràn ngang ${width}px`);
+  }
+
+  await boot({ route: `${list}?status=invalid&ref=keep` }); await cdp.wait(listReady);
+  await cdp.wait(`location.search === '?ref=keep'`);
+  await chooseFilter('Đã xác nhận'); await cdp.evaluate('history.back()');
+  await cdp.wait(`location.search === '?ref=keep'`);
+  await boot({ route: `${list}?status=PENDING&status=EXPIRED` }); await cdp.wait(listReady);
+  await cdp.wait(`location.search === '?status=PENDING'`);
+  passed.push('URL status sai được replace; trùng lấy giá trị đầu, giữ query khác');
+
+  await boot({ history: [] }); await cdp.wait(includes('Bạn chưa có đơn đặt vé nào'));
+  assert.equal(await cdp.evaluate(`document.querySelector('main a[href="/movies"]').textContent`), 'Khám phá phim');
+  await boot({ history: [ticketHistory[0]], route: `${list}?status=EXPIRED` }); await cdp.wait(includes('Chưa có vé ở trạng thái này'));
+  await cdp.click('Xem tất cả vé'); await cdp.wait(listReady);
+  passed.push('Phân biệt danh sách rỗng với bộ lọc không có kết quả');
+
+  await boot({ history: [{ bookingCode: code, status: 'UNKNOWN' }] }); await cdp.wait(listReady);
+  assert.equal(await cdp.evaluate(includes('Chưa cập nhật')), true);
+  assert.equal(await cdp.evaluate(includes('Chưa xác định')), true);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('main a[href^="/checkout/"]').length`), 0);
+  await boot({ route: detail, detailOverrides: { status: 'UNKNOWN', showtime: null, seats: null, products: null, totalAmount: null, createdAt: null } });
+  await cdp.wait(detailReady); assert.equal(await cdp.evaluate(includes('Chưa có thông tin ghế')), true);
+  assert.equal(await cdp.evaluate(includes('Chưa có thông tin bắp nước')), true);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('main a[href^="/checkout/"]').length`), 0);
+  passed.push('Dữ liệu thiếu có fallback, không bịa giá/ghế/combo; trạng thái lạ không cho thanh toán');
+
+  await boot({ history: {} }); await cdp.wait(includes('Không thể tải thông tin vé'));
+  scenario.history = ticketHistory; await cdp.click('Thử lại'); await cdp.wait(listReady);
+  for (const detailStatus of [403, 404]) {
+    await boot({ route: detail, detailStatus });
+    await cdp.wait(includes(detailStatus === 403 ? 'Bạn không có quyền xem' : 'Không tìm thấy đơn'));
+    assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main a[href="${list}"]'))`), true);
+  }
+  passed.push('Payload danh sách sai không giả làm rỗng; retry và lỗi chi tiết 403/404 có lối về');
+
+  await boot({ allowCheckout: true }); await cdp.wait(listReady);
+  await cdp.evaluate(`document.querySelector('main a[href^="/checkout/"]').click()`);
+  await cdp.wait(`location.pathname === '/checkout/${ticketHistory[1].bookingCode}' && document.querySelector('main').textContent.includes('Interstellar')`);
+  assert.ok(requests.slice(start).every(item => item.method === 'GET'));
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('main a[href*="/qr"]').length`), 0);
+  passed.push('Tiếp tục đơn mở checkout hiện có; mọi request trong luồng trang vé đều GET, không lấy QR');
 }
 
 try {
@@ -211,8 +316,9 @@ try {
   await release(); await cdp.wait(listReady);
   passed.push('403 của Admin không tước quyền xem vé; xác minh lại /users/me trước khi cho vào');
 
+  await checkTicketData();
   assert.deepEqual(exceptions, []);
-  const report = { mode: 'Edge production / API xác thực mô phỏng, chưa kiểm tra backend thật', passed,
+  const report = { mode: 'Edge production / API xác thực và vé mô phỏng, chưa kiểm tra backend thật', passed,
     requests, runtimeExceptions: exceptions.length, artifacts };
   await writeFile(path.join(artifacts, 'results.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ ...report, requests: requests.length }, null, 2));

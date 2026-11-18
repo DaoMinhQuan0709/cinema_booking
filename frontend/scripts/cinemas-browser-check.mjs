@@ -91,11 +91,13 @@ async function intercept(event) {
   assert.ok(['GET', 'OPTIONS'].includes(request.method), 'Kiểm tra danh bạ không được ghi dữ liệu');
   const mockSeatRead = !live && /^\/showtimes\/50[12](?:\/seats)?$/.test(route);
   const mockUserRead = !live && route === '/users/me';
+  const mockTicketsRead = !live && route === '/users/me/bookings';
   const mockMovieRead = !live && route === '/movies/10';
-  assert.ok(['/cinemas', '/showtimes', '/movies'].includes(route) || /^\/cinemas\/[1-9]\d*$/.test(route) || mockSeatRead || mockUserRead || mockMovieRead, `API ngoài phạm vi: ${route}`);
+  assert.ok(['/cinemas', '/showtimes', '/movies'].includes(route) || /^\/cinemas\/[1-9]\d*$/.test(route) || mockSeatRead || mockUserRead || mockMovieRead || mockTicketsRead, `API ngoài phạm vi: ${route}`);
   if (live) return cdp.send('Fetch.continueRequest', { requestId, url: apiBase + route + url.search });
   if (request.method === 'OPTIONS') return reply(requestId, 200, null);
   if (mockUserRead) return reply(requestId, 200, { id: 100, fullName: 'Khách thử nghiệm', email: 'navigation@example.invalid', role: 'USER' });
+  if (mockTicketsRead) return reply(requestId, 200, []);
   if (mockMovieRead) return reply(requestId, 200, { ...mockMovie, durationMinutes: 120, releaseDate: today });
   if (route === '/showtimes/502') return reply(requestId, 200, secondDaySlots[0]);
   if (route === '/showtimes/501') return reply(requestId, 200, mockSlots[0]);
