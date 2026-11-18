@@ -50,15 +50,13 @@ export const Header = () => {
   const navLinks = [
     { name: 'Trang chủ', path: '/' },
     { name: 'Phim', path: '/movies' },
-    { name: 'Lịch chiếu', path: '/showtimes' },
     { name: 'Rạp chiếu phim', path: '/cinemas' },
+    { name: 'Vé của tôi', path: '/profile/bookings' },
   ];
 
   const getNavLinkClass = ({ isActive }) =>
-    `relative py-2 text-sm font-medium tracking-wide transition-all duration-200 hover:text-white ${
-      isActive ? 'text-white font-semibold' : 'text-neutral-400'
-    } after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-primary after:transition-all after:duration-300 ${
-      isActive ? 'after:scale-x-100 after:opacity-100' : 'after:scale-x-0 after:opacity-0 hover:after:scale-x-100 hover:after:opacity-70'
+    `relative py-2 text-sm font-medium tracking-wide transition-all duration-200 hover:text-white ${isActive ? 'text-white font-semibold' : 'text-neutral-400'
+    } after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2px] after:bg-primary after:transition-all after:duration-300 ${isActive ? 'after:scale-x-100 after:opacity-100' : 'after:scale-x-0 after:opacity-0 hover:after:scale-x-100 hover:after:opacity-70'
     }`;
 
   const isAdmin = user?.role === USER_ROLE.ADMIN;
@@ -109,6 +107,8 @@ export const Header = () => {
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen((prev) => !prev)}
+                  aria-label="Menu tài khoản"
+                  aria-expanded={isUserMenuOpen}
                   className="flex items-center gap-3 p-1.5 pr-3 rounded-full bg-surface hover:bg-surface/80 border border-surfaceBorder transition-all cursor-pointer focus:outline-none"
                 >
                   <div className="w-8 h-8 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
@@ -123,9 +123,8 @@ export const Header = () => {
                     </p>
                   </div>
                   <ChevronDown
-                    className={`w-4 h-4 text-muted transition-transform duration-200 ${
-                      isUserMenuOpen ? 'rotate-180' : ''
-                    }`}
+                    className={`w-4 h-4 text-muted transition-transform duration-200 ${isUserMenuOpen ? 'rotate-180' : ''
+                      }`}
                   />
                 </button>
 
@@ -189,6 +188,7 @@ export const Header = () => {
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}
               className="p-2 rounded-lg bg-surface border border-surfaceBorder text-muted hover:text-white transition-colors"
               aria-label="Toggle menu"
+              aria-expanded={isMobileMenuOpen}
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -206,10 +206,9 @@ export const Header = () => {
                 to={link.path}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={({ isActive }) =>
-                  `px-3 py-2 rounded-lg text-base font-medium transition-colors ${
-                    isActive
-                      ? 'bg-primary/15 text-primary font-semibold'
-                      : 'text-neutral-300 hover:bg-surface'
+                  `px-3 py-2 rounded-lg text-base font-medium transition-colors ${isActive
+                    ? 'bg-primary/15 text-primary font-semibold'
+                    : 'text-neutral-300 hover:bg-surface'
                   }`
                 }
               >
@@ -243,15 +242,6 @@ export const Header = () => {
                 </div>
 
                 <div className="flex flex-col space-y-1">
-                  <Link
-                    to="/profile/bookings"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-neutral-300 hover:bg-surface"
-                  >
-                    <Ticket className="w-4 h-4 text-muted" />
-                    Vé của tôi
-                  </Link>
-
                   {isAdmin && (
                     <Link
                       to="/admin"

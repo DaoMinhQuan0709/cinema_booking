@@ -9,10 +9,10 @@ import { useAuthStore } from './features/auth/authStore';
 import { MovieShowcase } from './features/movies/MovieShowcase';
 import { queryClient } from './config/queryClient';
 import AdminRoute, { AdminIndexRedirect } from './routes/AdminRoute';
+import LegacyShowtimesRedirect from './routes/LegacyShowtimesRedirect';
 
 const MovieDetail = lazy(() => import('./features/movies/MovieDetail'));
 const MovieCatalog = lazy(() => import('./features/movies/MovieCatalog'));
-const ShowtimesPage = lazy(() => import('./features/showtimes/ShowtimesPage'));
 const CinemasPage = lazy(() => import('./features/cinemas/CinemasPage'));
 const CinemaDetailPage = lazy(() => import('./features/cinemas/CinemaDetailPage'));
 const SeatSelectionPage = lazy(() => import('./features/booking/SeatSelectionPage'));
@@ -124,7 +124,7 @@ export const App = () => {
             <Route path="checkout/:bookingCode" element={<CheckoutPage />} />
             <Route path="payment/vnpay-callback" element={<VNPayReturnPage />} />
             <Route path="booking" element={<SeatSelectionPage />} />
-            <Route path="showtimes" element={<ShowtimesPage />} />
+            <Route path="showtimes" element={<LegacyShowtimesRedirect />} />
             <Route path="cinemas" element={<CinemasPage />} />
             <Route path="cinemas/:id" element={<CinemaDetailPage />} />
             <Route path="profile/bookings" element={<PlaceholderPage title="Lịch Sử Vé Đã Đặt Của Bạn" />} />

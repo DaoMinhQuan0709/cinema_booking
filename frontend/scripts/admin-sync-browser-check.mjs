@@ -72,6 +72,7 @@ async function intercept({ requestId, request }) {
     return reply(requestId, scenario.movieCode, { content: filtered.slice(pageNo * pageSize, (pageNo + 1) * pageSize), pageNo, pageSize, totalElements: filtered.length, totalPages: Math.ceil(filtered.length / pageSize), last: true }, 'Catalog phim');
   }
   if (route === '/cinemas') return reply(requestId, 200, cinemas());
+  if (route === '/cinemas/2') return reply(requestId, 200, cinemas()[0]);
   if (route === '/showtimes') return reply(requestId, 200, showtimes().filter(item => !url.searchParams.get('date') || item.startTime.startsWith(url.searchParams.get('date'))));
   if (route === '/admin/reports/revenue') return reply(requestId, 200, { totalRevenue: revision ? 200000 : 100000, totalSuccessfulBookings: revision ? 2 : 1, totalTicketsSold: revision ? 2 : 1,
     breakdown: [{ id: 7, label: movies()[0].title, revenue: revision ? 200000 : 100000, bookingCount: revision ? 2 : 1, ticketCount: revision ? 2 : 1 }] });
@@ -216,13 +217,13 @@ try {
 
   reset(); await boot(); await ready();
   await spa('/movies'); await cdp.wait(`document.querySelector('main').textContent.includes('Phim trước khi nhập')`);
-  await spa(`/showtimes?date=${tomorrow}`); await cdp.wait(`Boolean(document.querySelector('a[href="/booking/10"]'))`);
+  await spa(`/cinemas/2?date=${tomorrow}&movieId=7`); await cdp.wait(`Boolean(document.querySelector('a[href="/booking/10"]'))`);
   await spa('/admin/movies'); await cdp.wait(`document.querySelector('main tbody')?.textContent.includes('Phim trước khi nhập')`);
   await spa(`/admin/showtimes?date=${tomorrow}`); await cdp.wait(`document.querySelectorAll('main tbody tr').length === 1`);
   await spa('/admin/reports'); await cdp.wait(`document.querySelector('#admin-kpi-revenue')?.textContent === '100.000đ'`);
   await spa('/admin/sync'); await ready(); await submit(); await result();
   await spa('/movies'); await cdp.wait(`document.querySelector('main').textContent.includes('Phim Galaxy mẫu đã nhập')`);
-  await spa(`/showtimes?date=${tomorrow}`); await cdp.wait(`Boolean(document.querySelector('a[href="/booking/11"]'))`);
+  await spa(`/cinemas/2?date=${tomorrow}&movieId=7`); await cdp.wait(`Boolean(document.querySelector('a[href="/booking/11"]'))`);
   await spa('/admin/movies'); await cdp.wait(`document.querySelector('main tbody')?.textContent.includes('Phim Galaxy mẫu đã nhập')`);
   await spa(`/admin/showtimes?date=${tomorrow}`); await cdp.wait(`document.querySelectorAll('main tbody tr').length === 2`);
   await spa('/admin/reports'); await cdp.wait(`document.querySelector('#admin-kpi-revenue')?.textContent === '200.000đ'`);

@@ -61,9 +61,6 @@ export const getCinemaPhoneHref = phone => {
   return /^\+?\d{3,20}$/.test(number) ? `tel:${number}` : null;
 };
 
-export const getCinemaScheduleHref = id => isInternalShowtimeId(id)
-  ? `/showtimes?cinemaId=${encodeURIComponent(String(id))}` : null;
-
 export const getCinemaDetailHref = id => isInternalShowtimeId(id)
   ? `/cinemas/${encodeURIComponent(String(id))}` : null;
 

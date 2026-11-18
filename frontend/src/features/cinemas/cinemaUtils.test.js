@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   filterCinemas, getCinemaCities, getCinemaCity, getCinemaDetailHref, getCinemaGallerySources, getCinemaImageSources, getCinemaPhoneHref, getCinemaPickerState,
-  getCinemaScheduleHref, normalizeCinemaSearch, readCinemaFilters, UNKNOWN_CITY, writeCinemaFilters,
+  normalizeCinemaSearch, readCinemaFilters, UNKNOWN_CITY, writeCinemaFilters,
 } from './cinemaUtils.js';
 
 const cinemas = [
@@ -83,14 +83,6 @@ test('gallery chỉ dùng imageUrls, giữ thứ tự và loại trùng/URL sai'
     assert.deepEqual(getCinemaGallerySources({ imageUrls, imageLandscape: 'https://example.com/wide.jpg', imagePortrait: 'https://example.com/tall.jpg' }), []);
   }
   assert.deepEqual(getCinemaGallerySources({ imageUrls: [null, {}, 'data:image/png;base64,abc', '/relative.jpg'] }), []);
-});
-
-test('liên kết lịch dùng bigint nội bộ, từ chối mã Galaxy, số 0, dấu âm và tràn ID', () => {
-  assert.equal(getCinemaScheduleHref(12), '/showtimes?cinemaId=12');
-  assert.equal(getCinemaScheduleHref('9223372036854775807'), '/showtimes?cinemaId=9223372036854775807');
-  for (const id of [0, -1, '', null, '1011-12345', 'galaxy-uuid', '9223372036854775808', '1&movieId=2']) {
-    assert.equal(getCinemaScheduleHref(id), null);
-  }
 });
 
 test('tìm/lọc danh sách 200 rạp giữ đúng kết quả mà không cắt trang ngầm', () => {

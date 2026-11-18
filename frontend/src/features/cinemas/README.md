@@ -18,7 +18,9 @@
 - Lọc trong danh sách đã tải, không gọi API mỗi ký tự. URL dùng `q`/`city`; nhập từ khóa replace lịch sử, đổi tỉnh/thành tạo điểm Back; giữ tham số không liên quan.
 - Trang không gọi Galaxy, API sơ đồ ghế hoặc API ghi. Ảnh HTTP(S) lấy trực tiếp từ CDN nguồn và giữ tỷ lệ; thẻ/ảnh bên cạnh lazy-load, ảnh chính của gallery tải ngay. Thiếu metadata có thông báo dự phòng.
 
-Trang lịch chiếu kết hợp danh sách rạp trong catalog và trong các suất: rạp hợp lệ chưa có suất trong ngày vẫn được giữ trong select/URL. Khi metadata chưa có hoặc lỗi, ID đã chọn không tự bị bỏ để hiển thị lịch rạp khác. Rạp sai tỉnh/thành hoặc không tồn tại được chuẩn hóa khi đủ dữ liệu thành công.
+Header desktop/mobile và footer có mục “Vé của tôi” tới `/profile/bookings`. Trang vé hiện vẫn là placeholder; danh sách/chi tiết vé chưa được triển khai. Dropdown tài khoản desktop giữ lối tắt vé; menu mobile chỉ có một mục vé trong điều hướng chính và đóng sau khi chọn. “Rạp chiếu phim” active ở cả danh sách và chi tiết.
+
+Màn hình lịch chung đã được gỡ. URL cũ `/showtimes?cinemaId=<id>` được `LegacyShowtimesRedirect` chuyển bằng `replace` tới `/cinemas/<id>`, chỉ giữ `date` hợp lệ theo lịch và `movieId` bigint nội bộ hợp lệ. Trang đích tiếp tục kiểm tra dải 7 ngày/phim còn suất. Thiếu/sai định dạng `cinemaId` chuyển về `/cinemas`, giữ `city` (trim, tối đa 200 ký tự) nếu có; ID đúng định dạng nhưng không tồn tại hiển thị trạng thái không tìm thấy của trang rạp. Tham số trùng dùng giá trị đầu tiên. API `/api/v1/showtimes`, lịch trong trang phim và `/admin/showtimes` tiếp tục hoạt động; `scheduleUtils.js` và test của nó vẫn được giữ.
 
 ## Thêm bản đồ Google Maps thủ công
 
@@ -52,6 +54,7 @@ npm.cmd run test:cinemas-live
 `test:cinemas-browser`: Edge headless với bản production và REST/ảnh mô phỏng, gồm các nhóm sau:
 
 - Danh sách/chi tiết: bộ lọc, cache, mở trực tiếp/reload, Back/Forward, ID sai/404/503, lỗi và phản hồi chậm của từng API danh sách/chi tiết. Đổi rạp khi GET chi tiết hoặc GET suất cũ còn chờ không lẫn thông tin, phim, giá hoặc vị trí.
+- Điều hướng mới: khách/đã đăng nhập ở 390/768/1440px, header/footer và dropdown desktop tới trang vé tạm; mobile không lặp mục vé, chọn xong đóng menu; active rạp/ vé, Back/Forward và reload. Nhánh URL cũ được kiểm tra riêng: chuyển hướng replace giữ ngày/phim, thiếu/sai ID về danh sách giữ city, ngày/phim sai bị bỏ, ID không tồn tại tới trang 404 rạp. Kiểm tra thêm lịch trong trang phim; trang quản trị suất và invalidation lịch tại rạp được kiểm tra bởi `test:admin-showtimes-browser` và `test:admin-sync-browser`.
 - Gallery và bộ chọn rạp: ảnh thiếu/lỗi, một/hai/nhiều ảnh, bàn phím/vuốt, cache danh sách, thành phố rỗng/lỗi/tải, đổi rạp giữ ngày và bỏ phim cũ.
 - Ngày/phim/suất: URL ngày/phim sai, rạp/ngày hết suất, lỗi/tải/sai payload của API suất, lỗi API phim vẫn dùng poster từ suất. Fixture hai phim kiểm tra thứ tự theo giờ, phim sắp chiếu, giá/phòng, Tab/Enter chọn ngày/phim và liên kết `/booking/:showtimeId` bằng ID nội bộ. Một kịch bản đi từ danh sách → chi tiết → ngày → phim → suất đến sơ đồ ghế ở 390px; hai GET chi tiết suất/ghế được mô phỏng, không tạo booking.
 - Giao diện 390/768/1440px không tràn ngang, một Footer; khối giá/vị trí và trạng thái chưa có mã iframe Google Maps có ảnh chụp desktop/mobile. URL iframe trong `cinemaGoogleMapEmbeds.js` được unit test kiểm tra định dạng. Mặc định Edge mô phỏng không tải Google Maps thật; thêm `--check-map` để tải iframe thật của rạp ID 9, ghi HTTP status và chụp ảnh. Chế độ này vẫn mô phỏng API rạp, nên không xác nhận ID trong DB.

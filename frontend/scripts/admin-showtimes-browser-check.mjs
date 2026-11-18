@@ -62,6 +62,7 @@ async function intercept({ requestId, request }) {
       totalElements: movies.length, totalPages: Math.ceil(movies.length / pageSize), last: (pageNo + 1) * pageSize >= movies.length }, 'Danh sách phim');
   }
   if (route === '/cinemas') return reply(requestId, scenario.cinemaStatus, cinemas, 'Danh sách rạp');
+  if (route === '/cinemas/1') return reply(requestId, scenario.cinemaStatus, cinemas[0]);
   if (route === '/showtimes') {
     const params = url.searchParams;
     const data = slots.filter(item => item.active && item.startTime > getVietnamClock().dateTime
@@ -282,11 +283,11 @@ try {
   scenario.writeStatus = 201; await submit(); await cdp.wait(`!document.querySelector('dialog[open]')`);
   passed.push('400 field errors avoid duplicate toast; 500 retains manual values and one toast, then explicit resubmit succeeds');
 
-  reset(); await boot(); await waitTable(); await spa(`/showtimes?date=${day1}`);
+  reset(); await boot(); await waitTable(); await spa(`/cinemas/1?date=${day1}&movieId=1`);
   await cdp.wait(`Boolean(document.querySelector('main a[href="/booking/1"]'))`);
   await spa(`/admin/showtimes?date=${day1}&cinemaId=1&movieId=1`); await waitTable(1);
   await openCreate(); await fill({ startTime: `${day1}T21:30` }); await submit(); await cdp.wait(`!document.querySelector('dialog[open]')`); await waitTable(2);
-  const created = slots.at(-1); await spa(`/showtimes?date=${day1}`);
+  const created = slots.at(-1); await spa(`/cinemas/1?date=${day1}&movieId=1`);
   await cdp.wait(`Boolean(document.querySelector('main a[href="/booking/${created.id}"]'))`);
   assert.equal(await cdp.evaluate(`document.querySelector('main a[href="/booking/${created.id}"]').textContent.includes('21:30')`), true);
   passed.push('creating invalidates an already warm customer schedule; the real public page shows the new slot and internal booking link');

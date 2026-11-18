@@ -136,7 +136,7 @@ try {
   assert.equal(advance.length, 1); assert.equal(advance[0].startTime, config.day + 'T00:00:00');
   passed.push('Phim COMING_SOON thật: UI chặn trước ngày phát hành dù qua nửa đêm; đúng 00:00 ngày phát hành ghi được vào PostgreSQL');
 
-  await spa(`/showtimes?date=${config.day}&cinemaId=${config.cinemaId}&movieId=${config.movieId}`);
+  await spa(`/cinemas/${config.cinemaId}?date=${config.day}&movieId=${config.movieId}`);
   await cdp.wait(`!document.querySelector('#admin-main') && Boolean(document.querySelector('a[href="/booking/${schedule[0].id}"]'))`);
   passed.push('UI xếp lịch giờ Việt Nam từ browser Los Angeles; PostgreSQL trả 409 giữ form, lịch khách có suất thật');
 

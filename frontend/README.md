@@ -104,23 +104,13 @@ khóa cả cặp; không ghép qua lối đi. Giữ các ID hiện có để b�
 URL sai/thiếu ID được báo ngay, không gọi API; backend trả 400 cho tham số sai
 kiểu.
 
-Trang `/showtimes` hiển thị tất cả phim có suất mở bán trong ngày, chia thành
-từng phim → rạp → giờ chiếu. Thanh ngày gồm hôm nay và 6 ngày tiếp theo, tính
-theo giờ Việt Nam kể cả khi trình duyệt ở múi giờ khác. Bộ lọc thành phố/rạp/phim
-lưu trong URL (`date`, `city`, `cinemaId`, `movieId`) để Back/Forward và quay lại
-từ trang chọn ghế giữ được ngữ cảnh. Poster/tên phim mở chi tiết; giờ chiếu mở
-`/booking/:showtimeId` với ID nội bộ.
-
-Mỗi ngày chỉ gọi `GET /showtimes?date=YYYY-MM-DD`; không tải riêng từng phim
-hoặc sơ đồ ghế. Dữ liệu được cache/làm mới mỗi phút khi trang đang hoạt động,
-loại các suất đã bắt đầu; độ mới nguồn vẫn phụ thuộc chu kỳ đồng bộ backend.
-Phim sắp chiếu có suất bán trước cũng xuất hiện. Bộ lọc không hợp lệ chỉ tự
-reset sau phản hồi thành công; lỗi API rạp chỉ tạm vô hiệu hóa bộ lọc thành phố,
-không ngăn xem lịch. Có skeleton, trạng thái không có suất, retry và giữ dữ liệu
-cũ nếu làm mới thất bại. Route được lazy-load như các trang phim/chọn ghế.
-
-Route cụm rạp và lịch sử vé vẫn là trang chờ triển khai. Mã kết nối booking,
-payment, admin và chatbot được giữ để phục vụ các bước frontend tiếp theo.
+Xem lịch tại `/cinemas/:id`: chọn ngày/phim rồi giờ chiếu để tới
+`/booking/:showtimeId` bằng ID nội bộ. Danh sách `/cinemas` giữ tìm/lọc rạp.
+URL cũ `/showtimes?cinemaId=<id>` chuyển bằng replace tới chi tiết rạp,
+giữ ngày/ID phim hợp lệ; thiếu hoặc sai định dạng ID thì về danh sách và giữ `city`.
+Header/footer có “Vé của tôi” tới `/profile/bookings`, hiện vẫn là trang tạm.
+API lịch, lịch trong trang phim và `/admin/showtimes` tiếp tục hoạt động.
+Xem [tài liệu trang rạp](src/features/cinemas/README.md) để biết chi tiết và kiểm thử.
 
 Xem [hướng dẫn backend/Galaxy](../backend/cinema-booking-backend/GALAXY_SYNC.md)
 để khởi động backend và hiểu ranh giới giữa catalog Galaxy và kho ghế nội bộ.

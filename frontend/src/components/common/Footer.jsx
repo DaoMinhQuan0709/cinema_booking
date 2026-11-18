@@ -47,8 +47,8 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/showtimes" className="hover:text-primary transition-colors">
-                  Lịch chiếu toàn quốc
+                <Link to="/profile/bookings" className="hover:text-primary transition-colors">
+                  Vé của tôi
                 </Link>
               </li>
               <li>
