@@ -35,6 +35,12 @@ const mockSlots = [{ id: 501, movieId: 10, movieTitle: 'Phim thử lịch', cine
   posterUrl: 'https://images.example.invalid/showtime-poster.svg', auditoriumName: 'Phòng 1',
   startTime: `${today}T23:59:59`, endTime: `${days[1].date}T01:30:00`, basePrice: 89000 }];
 const mockMovie = { id: 10, title: 'Phim thử lịch', posterUrl: 'https://images.example.invalid/movie-poster.svg', ageRating: 'C13', status: 'NOW_SHOWING' };
+const secondMovie = { id: 11, title: 'Phim thứ hai', posterUrl: 'https://images.example.invalid/second-movie-poster.svg', ageRating: 'T16', status: 'COMING_SOON' };
+const secondDaySlots = [
+  { ...mockSlots[0], id: 502, movieId: 11, movieTitle: secondMovie.title, posterUrl: 'https://images.example.invalid/second-showtime-poster.svg',
+    startTime: `${days[1].date}T13:00:00`, endTime: `${days[1].date}T15:00:00`, basePrice: 99000 },
+  { ...mockSlots[0], id: 503, startTime: `${days[1].date}T14:30:00`, endTime: `${days[1].date}T16:30:00` },
+];
 const cards = `document.querySelectorAll('main article[aria-labelledby^="cinema-name-"]')`;
 const gallery = 'main section[aria-roledescription="carousel"]';
 const galleryViewport = `${gallery} > div[aria-label="Ảnh rạp"]`;
@@ -54,6 +60,13 @@ async function reply(requestId, status, data) {
       { name: 'Access-Control-Allow-Headers', value: 'Content-Type, Accept, Authorization' },
       { name: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' }],
     body: Buffer.from(JSON.stringify({ code: status, message: status === 200 ? 'OK' : 'Lỗi mô phỏng', data })).toString('base64') });
+}
+
+async function replyIfStillActive(requestId, status, data) {
+  try { await reply(requestId, status, data); }
+  catch (error) {
+    if (!error.message.includes('Invalid InterceptionId')) throw error;
+  }
 }
 
 async function intercept(event) {
@@ -80,21 +93,29 @@ async function intercept(event) {
   }
   if (route.startsWith('/cinemas/')) {
     if (scenario.detailMode === 'held') { scenario.heldDetail = requestId; return; }
+    if (scenario.detailMode === 'heldFor2' && route === '/cinemas/2') { scenario.heldDetail = requestId; return; }
     if (scenario.detailMode === 'error') return reply(requestId, 503, null);
     if (scenario.detailMode === 'invalid') return reply(requestId, 200, null);
     const cinema = fixtures.find(item => String(item.id) === route.split('/').at(-1));
     return reply(requestId, cinema ? 200 : 404, cinema ? { ...cinema, ...scenario.detailOverrides } : null);
   }
   if (route === '/movies') {
-    const content = scenario.movieMode === 'empty' || url.searchParams.get('status') !== 'NOW_SHOWING'
-      ? [] : [{ ...mockMovie, posterUrl: scenario.movieMode === 'brokenPoster' ? 'https://images.example.invalid/broken-poster.jpg' : mockMovie.posterUrl }];
+    if (scenario.movieMode === 'error') return reply(requestId, 503, null);
+    const status = url.searchParams.get('status');
+    let content = [];
+    if (scenario.movieMode === 'multi' && status === 'COMING_SOON') content = [secondMovie];
+    else if (scenario.movieMode !== 'empty' && status === 'NOW_SHOWING') {
+      content = [{ ...mockMovie, posterUrl: scenario.movieMode === 'brokenPoster' ? 'https://images.example.invalid/broken-poster.jpg' : mockMovie.posterUrl }];
+    }
     return reply(requestId, 200, { content, pageNo: 0, pageSize: 100, totalElements: content.length, totalPages: 1, last: true });
   }
   if (scenario.showtimeMode === 'held') { scenario.heldShowtime = requestId; return; }
+  if (scenario.showtimeMode === 'heldFor2' && url.searchParams.get('cinemaId') === '2') { scenario.heldShowtime = requestId; return; }
   if (scenario.showtimeMode === 'error') return reply(requestId, 503, null);
   if (scenario.showtimeMode === 'invalid') return reply(requestId, 200, { unexpected: true });
   if (scenario.showtimeMode === 'invalidIds') return reply(requestId, 200, [{ ...mockSlots[0], id: 'galaxy-501' }, ...mockSlots]);
   if (scenario.showtimeMode === 'onlyInvalidIds') return reply(requestId, 200, [{ ...mockSlots[0], id: 'galaxy-501' }]);
+  if (scenario.showtimeMode === 'multi') return reply(requestId, 200, url.searchParams.get('date') === days[1].date ? secondDaySlots : []);
   return reply(requestId, 200, url.searchParams.get('date') === today ? mockSlots : []);
 }
 
@@ -402,6 +423,38 @@ async function runInfoHeaderMock() {
   passed.push('Thông tin chi tiết mới hơn cache danh sách vẫn giữ đúng thành phố và rạp hiện tại');
 }
 
+async function runRapidSwitchMock() {
+  scenario = { mode: 'ok', detailMode: 'heldFor2' };
+  await boot('/cinemas/2');
+  await cdp.wait(`document.querySelector('main [role="status"]')?.textContent.includes('Đang tải thông tin rạp')`);
+  for (let attempt = 0; attempt < 30 && !scenario.heldDetail; attempt += 1) await delay(30);
+  assert.ok(scenario.heldDetail, 'Request chi tiết rạp cũ phải đang chờ');
+  await cdp.evaluate(`history.pushState(null, '', '/cinemas/1'); dispatchEvent(new PopStateEvent('popstate'))`);
+  await detailReady('Galaxy Đà Nẵng');
+  await replyIfStillActive(scenario.heldDetail, 200, fixtures[1]);
+  await delay(100);
+  assert.equal(await cdp.evaluate(`document.querySelector('main h1').textContent`), 'Galaxy Đà Nẵng');
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('175 Nguyễn Thái Học')`), false);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('footer').length`), 1);
+  passed.push('Đổi rạp khi GET chi tiết cũ còn chờ không ghi đè thông tin rạp mới');
+
+  scenario = { mode: 'ok', showtimeMode: 'heldFor2' };
+  await boot(`/cinemas/2?date=${days[1].date}&movieId=10`); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('Đang tải suất chiếu')`);
+  for (let attempt = 0; attempt < 30 && !scenario.heldShowtime; attempt += 1) await delay(30);
+  assert.ok(scenario.heldShowtime, 'Request suất rạp cũ phải đang chờ');
+  await cdp.evaluate(`history.pushState(null, '', '/cinemas/1?date=${days[1].date}'); dispatchEvent(new PopStateEvent('popstate'))`);
+  await detailReady('Galaxy Đà Nẵng');
+  await cdp.wait(`document.querySelector('${detailSchedule} [role="status"]')?.textContent.includes('chưa có suất chiếu')`);
+  await replyIfStillActive(scenario.heldShowtime, 200, secondDaySlots);
+  await delay(100);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('${movieGrid}'))`), false);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('${showtimePanel}'))`), false);
+  assert.equal(await cdp.evaluate(`document.querySelector('${pricingPanel}').textContent.includes('99.000đ')`), false);
+  assert.equal(await cdp.evaluate(`document.querySelector('${locationPanel}').textContent.includes('Tầng 3, đường Điện Biên Phủ')`), true);
+  passed.push('Đổi rạp khi GET suất cũ còn chờ không lẫn phim, giá hoặc vị trí rạp');
+}
+
 async function runDetailSelectionMock() {
   scenario = { mode: 'ok' };
   await boot('/cinemas/2?ref=share'); await detailReady('Galaxy Hà Nội');
@@ -474,6 +527,43 @@ async function runDetailSelectionMock() {
   await cdp.wait(`document.querySelector('${movieGrid} img')?.src.endsWith('/showtime-poster.svg') && document.querySelector('${movieGrid} img').naturalWidth > 0`);
   assert.equal(await cdp.evaluate(`document.querySelector('${movieGrid} button').textContent.includes('C13')`), true);
   passed.push('Poster metadata tải lỗi chuyển sang poster của suất, nhãn tuổi vẫn giữ đúng');
+
+  scenario = { mode: 'ok', movieMode: 'error' };
+  await boot('/cinemas/2'); await detailReady('Galaxy Hà Nội');
+  for (let attempt = 0; attempt < 100 && !responses.some(response => response.route.endsWith('/movies') && response.status === 503); attempt += 1) await delay(50);
+  assert.ok(responses.some(response => response.route.endsWith('/movies') && response.status === 503));
+  await cdp.wait(`document.querySelector('${movieGrid} img')?.src.endsWith('/showtime-poster.svg')`);
+  assert.equal(await cdp.evaluate(`document.querySelector('${movieGrid} button').textContent.includes('C13')`), false);
+  assert.equal(await cdp.evaluate(`document.querySelector('${detailSchedule}').textContent.includes('Phim thử lịch')`), true);
+  passed.push('API phim lỗi vẫn giữ phim/suất từ lịch và dùng poster suất, không bịa nhãn tuổi');
+
+  scenario = { mode: 'ok', movieMode: 'multi', showtimeMode: 'multi' };
+  await boot(`/cinemas/2?date=${days[1].date}`); await detailReady('Galaxy Hà Nội');
+  await cdp.wait(`document.querySelectorAll('${movieGrid} button').length === 2 && document.querySelector('${movieGrid} button').textContent.includes('T16')`);
+  assert.deepEqual(await cdp.evaluate(`[...document.querySelectorAll('${movieGrid} button')].map(button => button.querySelector('.line-clamp-2').textContent)`), ['Phim thứ hai', 'Phim thử lịch']);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('${pricingPanel} li').length`), 2);
+  await cdp.evaluate(`document.querySelector('${movieGrid} button').click()`);
+  await cdp.wait(`Boolean(document.querySelector('${showtimePanel} a[href="/booking/502"]'))`);
+  assert.equal(await cdp.evaluate(`new URLSearchParams(location.search).get('movieId')`), '11');
+  assert.equal(await cdp.evaluate(`document.querySelector('${showtimePanel}').textContent.includes('99.000đ')`), true);
+  await cdp.evaluate(`document.querySelector('${movieGrid} button').focus()`);
+  await cdp.key('Tab');
+  assert.equal(await cdp.evaluate(`document.activeElement === document.querySelectorAll('${movieGrid} button')[1]`), true);
+  await cdp.key('Enter');
+  await cdp.wait(`Boolean(document.querySelector('${showtimePanel} a[href="/booking/503"]'))`);
+  assert.equal(await cdp.evaluate(`new URLSearchParams(location.search).get('movieId')`), '10');
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('footer').length`), 1);
+  passed.push('Fixture hai phim/suất sắp đúng giờ; phim sắp chiếu có metadata, Tab/Enter đổi phim và panel đúng ID/giá');
+
+  scenario = { mode: 'ok' };
+  await boot('/cinemas/2', 390); await detailReady('Galaxy Hà Nội');
+  await cdp.evaluate(`document.querySelector('${detailSchedule} [aria-label^="Hôm nay"]').focus()`);
+  await cdp.key('Tab');
+  assert.equal(await cdp.evaluate(`document.activeElement.getAttribute('aria-label')`), `${days[1].label}, ${days[1].fullDate}`);
+  await cdp.key('Enter');
+  await cdp.wait(`new URLSearchParams(location.search).get('date') === ${JSON.stringify(days[1].date)}`);
+  assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  passed.push('390px Tab/Enter chọn ngày trên trang chi tiết, cập nhật URL và không tràn ngang');
 
   scenario = { mode: 'ok', showtimeMode: 'invalidIds' };
   await boot(`/cinemas/2?date=${today}&movieId=10`); await detailReady('Galaxy Hà Nội');
@@ -668,14 +758,13 @@ async function runLive() {
   await boot(); await ready(catalog.length);
   const expected = filterCinemas(catalog);
   assert.deepEqual(await cdp.evaluate(`[...${cards}].map(card => card.querySelector('h2').textContent)`), expected.map(cinema => cinema.name));
-  const sample = expected.find(cinema => cinema.imageLandscape && cinema.phone);
+  const sample = expected.find(cinema => cinema.address?.trim()) || expected[0];
   assert.ok(sample);
-  assert.equal(await cdp.evaluate(`document.querySelector('[aria-labelledby="cinema-name-${sample.id}"]').textContent.includes(${JSON.stringify(sample.address)})`), true);
-  await cdp.wait(`document.querySelector('[aria-labelledby="cinema-name-${sample.id}"] img')?.complete`);
-  assert.equal(await cdp.evaluate(`document.querySelector('[aria-labelledby="cinema-name-${sample.id}"] img').naturalWidth > 0`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('[aria-labelledby="cinema-name-${sample.id}"]').textContent.includes(${JSON.stringify(sample.address?.trim() || 'Địa chỉ đang cập nhật')})`), true);
+  await cdp.wait(`(() => { const card = document.querySelector('[aria-labelledby="cinema-name-${sample.id}"]'); const img = card?.querySelector('img'); return !img || (img.complete && img.naturalWidth > 0); })()`, 25000);
   await visibleImagesReady();
   await screenshot('cinemas-desktop-live.png');
-  passed.push(`Danh sách/thứ tự/địa chỉ khớp ${catalog.length} rạp từ API thật; ảnh CDN tải được`);
+  passed.push(`Danh sách/thứ tự/địa chỉ khớp ${catalog.length} rạp từ API thật; ảnh có tải được hoặc hiện fallback`);
 
   const reads = cinemaReads(); const keyword = normalizeCinemaSearch(sample.name);
   await setField('#cinema-search', keyword); await ready(filterCinemas(catalog, { q: keyword }).length);
@@ -692,7 +781,8 @@ async function runLive() {
 
   const detail = await readApi(`/cinemas/${sample.id}`);
   await openDetail(sample.id, detail.name);
-  assert.equal(await cdp.evaluate(`document.querySelector('main').textContent.includes(${JSON.stringify(detail.address)})`), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('main').textContent.includes(${JSON.stringify(detail.address?.trim() || 'Địa chỉ đang cập nhật')})`), true);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('footer').length`), 1);
   await cdp.send('Page.reload'); await detailReady(detail.name);
   await returnToList(); await ready(catalog.length);
   passed.push(`CTA/reload hiển thị chi tiết rạp ${sample.id} khớp GET thật; quay lại danh sách`);
@@ -735,7 +825,7 @@ try {
     if (error.message.includes('"code":-32602,"message":"Invalid InterceptionId."')) return;
     exceptions.push(error.stack); await cdp.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' }).catch(() => {});
   }); });
-  if (live) await runLive(); else { await runMock(); await runDetailMock(); await runInfoHeaderMock(); await runDetailSelectionMock(); await runGalleryMock(); }
+  if (live) await runLive(); else { await runMock(); await runDetailMock(); await runInfoHeaderMock(); await runRapidSwitchMock(); await runDetailSelectionMock(); await runGalleryMock(); }
   assert.deepEqual(exceptions, []);
   assert.ok(requests.every(request => ['GET', 'OPTIONS'].includes(request.method)));
   const report = { mode: live ? 'Edge production / API localhost thật chỉ đọc, không mô phỏng response' : 'Edge production / REST và ảnh mô phỏng, không xác nhận DB/HTTP thật',

@@ -18,7 +18,7 @@ Mục tiêu: giữ `/cinemas` làm danh sách tìm/lọc rạp, thêm trang chi 
 - [x] 6. Tạo `CinemaMovieGrid.jsx`: poster/tên và nhãn tuổi lấy bổ sung từ API phim có cache; dùng thao tác chọn phim riêng → không chuyển sang `/movies/:id` khi chọn, không bịa điểm đánh giá, phim đã chọn có trạng thái rõ ràng.
 - [x] 7. Tạo `CinemaShowtimePanel.jsx` dưới lưới, hiện giờ/phòng/giá của phim đã chọn → bấm tới `/booking/:showtimeId` bằng ID nội bộ; loại suất đã bắt đầu, làm mới lịch định kỳ, xử lý tải/rỗng/lỗi độc lập với thông tin rạp.
 - [x] 8. Tạo `CinemaPricingInfo.jsx` và `CinemaLocation.jsx` theo khối cuối ảnh 3 → giá bám dữ liệu suất; địa chỉ/hotline/map thuộc đúng rạp, iframe tải khi gần khung nhìn, có nút chỉ đường. Thiếu giá/địa chỉ/ảnh có thông báo; không sao chép chính sách giá chưa được backend áp dụng.
-- [ ] 9. Cập nhật `features/cinemas/README.md`, unit test logic URL/ngày/nhóm suất và `scripts/cinemas-browser-check.mjs` → bổ sung fixture chi tiết rạp/phim, đổi rạp nhanh, lỗi từng API, ảnh thiếu, một Footer, Tab/Enter và màn hình 390/768/1440px; chế độ live chỉ đọc catalog, không gọi tạo ghế/booking/sync.
+- [x] 9. Cập nhật `features/cinemas/README.md`, unit test logic URL/ngày/nhóm suất và `scripts/cinemas-browser-check.mjs` → bổ sung fixture chi tiết rạp/phim, đổi rạp nhanh, lỗi từng API, ảnh thiếu, một Footer, Tab/Enter và màn hình 390/768/1440px; chế độ live chỉ đọc catalog, không gọi tạo ghế/booking/sync.
 
 ## Kiểm chứng cuối
 
@@ -76,10 +76,17 @@ Mục tiêu: giữ `/cinemas` làm danh sách tìm/lọc rạp, thêm trang chi 
 **Phần 8 — hoàn tất ngày 17/11/2026.**
 
 - `CinemaPricingInfo.jsx` hiển thị khoảng `basePrice` theo từng phim từ suất còn mở bán của đúng rạp/ngày; bỏ ID suất hoặc giá sai, có trạng thái tải/lỗi/thiếu giá. Ghi rõ đây là giá cơ bản, giá cuối tính khi chọn ghế và xác nhận đơn; không tạo bảng giá hoặc chính sách ngoài dữ liệu backend.
-- `CinemaLocation.jsx` lấy địa chỉ, hotline, tọa độ từ chi tiết rạp hiện tại. Chỉ đường ưu tiên tọa độ hợp lệ, nếu thiếu thì dùng tên/địa chỉ/thành phố; thiếu cả hai thì không tạo liên kết. Iframe dùng `loading="lazy"`, mã nhúng Google Maps được cấu hình thủ công theo ID rạp. Gallery đã xử lý ảnh thiếu ở phần 3. Chưa xác nhận bản đồ thật vì chưa có mã iframe của rạp.
+- `CinemaLocation.jsx` lấy địa chỉ, hotline, tọa độ từ chi tiết rạp hiện tại. Chỉ đường ưu tiên tọa độ hợp lệ, nếu thiếu thì dùng tên/địa chỉ/thành phố; thiếu cả hai thì không tạo liên kết. Iframe dùng `loading="lazy"`, mã nhúng Google Maps được cấu hình thủ công theo ID rạp. Gallery đã xử lý ảnh thiếu ở phần 3. Bản đồ thật chưa được kiểm tra trong phần này.
 - Bổ sung 3 unit test helper giá/bản đồ, kiểm tra Edge cho giá/ngày/rạp, vị trí/chỉ đường, thiếu dữ liệu và ảnh chụp khối cuối trang desktop/mobile. Lint, **129/129 test**, build và **49 nhóm Edge mô phỏng** đạt, không có lỗi JavaScript; kết quả tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-EZjjyL`. Chưa kiểm tra API/DB thật.
 
 **Điều chỉnh mục 8 — Google Maps iframe thủ công ngày 17/11/2026.**
 
-- Theo lựa chọn mới của người dùng, bỏ nhánh OpenStreetMap và Maps Embed API có key. `cinemaGoogleMapEmbeds.js` nhận HTML iframe sao chép từ Google Maps theo ID rạp; chỉ lấy URL `src` HTTPS thuộc `www.google.com/maps/embed?pb=...`. Chưa có mã iframe nên chưa thể điền rạp thật. Rạp thiếu mã vẫn hiện địa chỉ/hotline/chỉ đường; hướng dẫn điền trong README.
-- Lint, build, **131/131 unit test** và **49 nhóm Edge mô phỏng** đạt, không lỗi JavaScript; kết quả tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-LYDL2K`. Chưa kiểm tra iframe Google Maps thật vì cấu hình chưa có mã rạp.
+- Theo lựa chọn mới của người dùng, bỏ nhánh OpenStreetMap và Maps Embed API có key. `cinemaGoogleMapEmbeds.js` nhận HTML iframe sao chép từ Google Maps theo ID rạp; chỉ lấy URL `src` HTTPS thuộc `www.google.com/maps/embed?pb=...`. Rạp thiếu mã vẫn hiện địa chỉ/hotline/chỉ đường; hướng dẫn điền trong README. Sau đó đã có 25 mã nhúng được thêm vào cấu hình.
+- Lint, build, **131/131 unit test** và **49 nhóm Edge mô phỏng** đạt, không lỗi JavaScript; kết quả tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-LYDL2K`. Chưa kiểm tra iframe Google Maps thật trong lần chạy này.
+
+**Phần 9 — hoàn tất ngày 18/11/2026.**
+
+- README tổng hợp cách dùng trang, hướng dẫn cấu hình iframe Google Maps thủ công và phạm vi kiểm tra. Unit test bổ sung trường hợp `movieId` trùng trên URL, nhiều phòng cùng giờ và xác thực toàn bộ 25 mã nhúng hiện có đều có ID/URL hợp lệ. Chưa đối chiếu marker của từng mã với rạp trong DB thật.
+- Script Edge có fixture hai phim/suất, phim đang và sắp chiếu; kiểm tra thứ tự giờ, giá/phòng, Tab/Enter chọn phim và ngày. Bổ sung API phim lỗi và hai trường hợp đổi rạp khi GET chi tiết hoặc suất của rạp cũ chưa kết thúc; không lẫn phim, giá, vị trí. Các nhánh catalog/chi tiết/suất lỗi, ảnh thiếu, một Footer và 390/768/1440px vẫn đạt. Chế độ live chỉ cho GET/OPTIONS các API catalog/lịch/phim; không gọi tạo ghế/booking/sync.
+- Live script dùng rạp mẫu có địa chỉ nếu có, chấp nhận fallback khi thiếu địa chỉ/ảnh và kiểm tra một Footer ở trang chi tiết. Tại thời điểm kiểm tra không có backend lắng nghe cổng 8080 nên chưa chạy chế độ live; API/DB và bản đồ Google thật thuộc kiểm chứng mục 10.
+- Tại `frontend`, lint, **133/133 unit test**, build và **54 nhóm Edge mô phỏng** đạt, không lỗi JavaScript; kết quả tại `C:\Users\LOQ\AppData\Local\Temp\cinema-cinemas-mock-tAFQiB`.

@@ -51,6 +51,7 @@ test('chuẩn hóa URL: bỏ ngày/phim sai, không tự thêm date, URL đã ch
   assert.equal(normalizeDetailParams(params('date=2026-11-18&date=2026-11-19'), days).toString(), 'date=2026-11-18');
   const canonical = 'date=2026-11-18&movieId=5&ref=a';
   assert.equal(normalizeDetailParams(params(canonical), days).toString(), canonical);
+  assert.equal(normalizeDetailParams(params('date=2026-11-18&movieId=10&movieId=11&ref=share'), days).toString(), 'date=2026-11-18&movieId=10&ref=share');
 });
 
 test('giờ Việt Nam đúng quanh nửa đêm và không ra giờ 24', () => {
@@ -97,6 +98,17 @@ test('gom suất theo phim, sắp theo suất sớm nhất rồi giờ, bỏ d�
   assert.equal(movies[3].posterUrl, null);
   assert.deepEqual(input, before);
   assert.deepEqual(groupMoviesFromShowtimes([]), []);
+});
+
+test('nhiều phòng cùng giờ vẫn giữ từng suất; phim cùng giờ xếp theo tên', () => {
+  const time = '2026-11-18T13:00:00';
+  const movies = groupMoviesFromShowtimes([
+    { id: 4, movieId: 11, movieTitle: 'Phim B', auditoriumName: 'Phòng 2', startTime: time },
+    { id: 3, movieId: 10, movieTitle: 'Phim A', auditoriumName: 'Phòng 3', startTime: time },
+    { id: 2, movieId: 11, movieTitle: 'Phim B', auditoriumName: 'Phòng 1', startTime: time },
+  ]);
+  assert.deepEqual(movies.map(movie => movie.movieId), ['10', '11']);
+  assert.deepEqual(movies[1].showtimes.map(slot => [slot.id, slot.auditoriumName]), [[2, 'Phòng 1'], [4, 'Phòng 2']]);
 });
 
 test('xóa movieId không còn suất; giữ nguyên tham chiếu khi hợp lệ hoặc không có movieId', () => {

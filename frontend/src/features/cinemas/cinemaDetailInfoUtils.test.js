@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getCinemaMapLinks, getCinemaPriceRows, getManualGoogleEmbedUrl } from './cinemaDetailInfoUtils.js';
+import { cinemaGoogleMapEmbeds } from './cinemaGoogleMapEmbeds.js';
 
 test('giá cơ bản nhóm theo phim, bỏ giá và ID suất không hợp lệ', () => {
   const rows = getCinemaPriceRows([
@@ -25,6 +26,13 @@ test('mã iframe Google Maps sao chép thủ công chỉ lấy src hợp lệ', 
     'https://www.google.com/maps/embed/v1/place?key=test&q=Hanoi',
     'https://www.google.com/maps/embed?pb=',
   ]) assert.equal(getManualGoogleEmbedUrl(input), null, String(input));
+});
+
+test('mọi mã nhúng Google Maps đang cấu hình có ID và URL hợp lệ', () => {
+  for (const [id, html] of Object.entries(cinemaGoogleMapEmbeds)) {
+    assert.match(id, /^[1-9]\d*$/);
+    assert.ok(getManualGoogleEmbedUrl(html), `Mã nhúng của rạp ${id} không hợp lệ`);
+  }
 });
 
 test('bản đồ thủ công theo rạp; chỉ đường ưu tiên tọa độ hợp lệ', () => {
