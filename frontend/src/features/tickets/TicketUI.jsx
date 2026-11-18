@@ -28,8 +28,57 @@ export function TicketRefresh({ query }) {
   </button>;
 }
 
-export function TicketLoading() {
-  return <p role="status" className="rounded-2xl border border-surfaceBorder bg-surface px-6 py-16 text-center text-sm text-muted">Đang tải thông tin vé…</p>;
+export function TicketLoading({ variant = 'list' }) {
+  if (variant === 'detail') {
+    return <div role="status" aria-label="Đang tải thông tin chi tiết vé" className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,0.45fr)]">
+      <div className="space-y-6">
+        <div className="animate-pulse rounded-2xl border border-surfaceBorder bg-surface p-6 space-y-4">
+          <div className="h-3 w-28 rounded bg-surfaceBorder/60" />
+          <div className="h-7 w-2/3 rounded bg-surfaceBorder" />
+          <div className="grid gap-4 pt-2 sm:grid-cols-2">
+            <div className="h-10 rounded bg-surfaceBorder/40" />
+            <div className="h-10 rounded bg-surfaceBorder/40" />
+          </div>
+        </div>
+        <div className="animate-pulse rounded-2xl border border-surfaceBorder bg-surface p-6 space-y-4">
+          <div className="h-5 w-32 rounded bg-surfaceBorder" />
+          <div className="h-12 rounded bg-surfaceBorder/40" />
+          <div className="h-12 rounded bg-surfaceBorder/40" />
+        </div>
+      </div>
+      <aside className="space-y-6">
+        <div className="animate-pulse rounded-2xl border border-surfaceBorder bg-surface p-6 space-y-4">
+          <div className="h-5 w-32 rounded bg-surfaceBorder" />
+          <div className="h-6 w-24 rounded-full bg-surfaceBorder/60" />
+          <div className="space-y-3 pt-4">
+            <div className="h-4 w-full rounded bg-surfaceBorder/40" />
+            <div className="h-4 w-3/4 rounded bg-surfaceBorder/40" />
+            <div className="h-8 w-1/2 rounded bg-surfaceBorder" />
+          </div>
+        </div>
+      </aside>
+      <span className="sr-only">Đang tải thông tin vé…</span>
+    </div>;
+  }
+
+  return <div role="status" aria-label="Đang tải danh sách vé" className="space-y-4">
+    {[1, 2, 3].map(item => <div key={item} className="grid animate-pulse overflow-hidden rounded-2xl border border-surfaceBorder bg-surface lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(15rem,0.9fr)]">
+      <div className="border-l-2 border-primary/40 p-5 sm:p-6 space-y-3">
+        <div className="h-3 w-32 rounded bg-surfaceBorder/60" />
+        <div className="h-6 w-3/4 rounded bg-surfaceBorder" />
+        <div className="h-4 w-1/2 rounded bg-surfaceBorder/50" />
+      </div>
+      <div className="grid content-center gap-4 border-t border-surfaceBorder p-5 sm:p-6 lg:border-t-0">
+        <div className="h-4 w-3/4 rounded bg-surfaceBorder/40" />
+        <div className="h-4 w-1/2 rounded bg-surfaceBorder/40" />
+      </div>
+      <div className="flex flex-col justify-between gap-4 border-t border-dashed border-surfaceBorder p-5 sm:p-6 lg:border-l lg:border-t-0">
+        <div className="h-6 w-24 rounded-full bg-surfaceBorder/60" />
+        <div className="h-7 w-28 rounded bg-surfaceBorder" />
+      </div>
+    </div>)}
+    <span className="sr-only">Đang tải thông tin vé…</span>
+  </div>;
 }
 
 export function TicketError({ query }) {

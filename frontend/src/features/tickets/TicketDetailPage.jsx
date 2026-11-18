@@ -91,7 +91,7 @@ export default function TicketDetailPage() {
         <TicketRefresh query={query} />
       </header>
       <div className="space-y-6">
-        {query.isPending && <TicketLoading />}
+        {query.isPending && <TicketLoading variant="detail" />}
         {query.isError && <TicketError query={query} />}
         {query.data && <TicketContents ticket={query.data} />}
       </div>

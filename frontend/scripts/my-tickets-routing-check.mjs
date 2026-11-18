@@ -1,4 +1,4 @@
-// Mục 1–3: bản production với API xác thực/vé mô phỏng; không đọc/ghi backend thật.
+// Mục 1–4: bản production với API xác thực/vé mô phỏng; không đọc/ghi backend thật.
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -252,6 +252,23 @@ async function checkTicketData() {
   }
   passed.push('Payload danh sách sai không giả làm rỗng; retry và lỗi chi tiết 403/404 có lối về');
 
+  // Mục 4: Skeleton khi loading và lỗi làm mới giữ dữ liệu cũ kèm cảnh báo
+  await boot({ holdTickets: true });
+  await cdp.wait('Boolean(document.querySelector(\'main [role="status"][aria-label*="Đang tải"]\'))');
+  assert.equal(await cdp.evaluate('Boolean(document.querySelector("main .animate-pulse"))'), true);
+  await releaseHeldTicket();
+  scenario.holdTickets = false;
+  await cdp.wait(listReady);
+  scenario.historyStatus = 500;
+  await cdp.click('Làm mới');
+  await cdp.wait(includes('Chưa làm mới được dữ liệu'));
+  assert.equal(await cdp.evaluate('document.querySelectorAll("main article").length'), ticketHistory.length);
+  scenario.historyStatus = 200;
+  await cdp.click('Thử lại');
+  await cdp.wait(`!document.querySelector('main').textContent.includes('Chưa làm mới được dữ liệu')`);
+  assert.equal(await cdp.evaluate('document.querySelectorAll("main article").length'), ticketHistory.length);
+  passed.push('Skeleton hiển thị khi loading; lỗi làm mới giữ dữ liệu cũ kèm cảnh báo, Thử lại xóa cảnh báo');
+
   await boot({ allowCheckout: true }); await cdp.wait(listReady);
   await cdp.evaluate(`document.querySelector('main a[href^="/checkout/"]').click()`);
   await cdp.wait(`location.pathname === '/checkout/${ticketHistory[1].bookingCode}' && document.querySelector('main').textContent.includes('Interstellar')`);
@@ -415,13 +432,13 @@ try {
   await checkTicketData();
   await checkSessionIsolation();
   assert.deepEqual(exceptions, []);
-  const report = { mode: 'Edge production / API xác thực và vé mô phỏng, chưa kiểm tra backend thật — Mục 1–3', passed,
+  const report = { mode: 'Edge production / API xác thực và vé mô phỏng, chưa kiểm tra backend thật — Mục 1–4', passed,
     requests, runtimeExceptions: exceptions.length, artifacts };
   await writeFile(path.join(artifacts, 'results.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ ...report, requests: requests.length }, null, 2));
 } catch (error) {
   await writeFile(path.join(artifacts, 'failure.json'), JSON.stringify({ passed, requests, exceptions,
     body: await cdp?.evaluate('document.body.innerText').catch(() => '') }, null, 2));
-  console.error(`Kiểm tra mục 1–3 thất bại: ${artifacts}`);
+  console.error(`Kiểm tra mục 1–4 thất bại: ${artifacts}`);
   throw error;
 } finally { await browser?.close(); }

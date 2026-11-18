@@ -130,6 +130,7 @@ function CheckoutForm({ booking, query, userId, code }) {
       try { if (sessionStorage.getItem(storageKey) === code) sessionStorage.removeItem(storageKey); } catch { /* Storage is optional. */ }
       await client.invalidateQueries({ queryKey: seatMapKeys.seats(booking.showtime.showtimeId) });
       client.removeQueries({ queryKey: key, exact: true });
+      void client.invalidateQueries({ queryKey: ['my-tickets'] });
       toast.success('Đã hủy giữ ghế.', { id: 'checkout-cancelled' });
       navigate(`/booking/${booking.showtime.showtimeId}`, { replace: true });
     } catch (error) {

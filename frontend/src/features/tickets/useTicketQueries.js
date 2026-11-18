@@ -1,10 +1,10 @@
 /**
- * Cách ly dữ liệu vé theo phiên (Mục 3):
- * - queryKey bắt đầu bằng ['my-tickets', sessionId] → dữ liệu của từng phiên tách biệt hoàn toàn.
- * - gcTime: 0 → cache bị GC ngay sau khi observer cuối cùng unsubscribe (component unmount).
- * - AbortSignal → request đang bay bị hủy khi query bị cancel (logout/đổi tài khoản).
- * - clearTicketCache() trong authStore → cancel + remove query ngay khi đổi/xóa phiên,
- *   không chờ GC tự nhiên, không để dữ liệu cũ làm placeholder cho phiên mới.
+ * Quản lý truy vấn dữ liệu vé:
+ * - Cách ly dữ liệu theo phiên (Mục 3): queryKey theo sessionId, gcTime: 0, AbortSignal, clearTicketCache.
+ * - Cập nhật trạng thái và chu kỳ làm mới (Mục 4):
+ *   + staleTime: 30 giây, tự làm mới khi focus tab (refetchOnWindowFocus: true).
+ *   + Polling: danh sách có đơn PENDING hoặc chi tiết đơn PENDING tự động làm mới mỗi 30 giây khi tab đang mở.
+ *   + Dừng polling khi không còn đơn PENDING hoặc khi tab ẩn/chuyển nền (refetchIntervalInBackground: false).
  */
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../auth/authStore';
@@ -22,7 +22,13 @@ export function useTicketHistory() {
   return useQuery({
     queryKey: ['my-tickets', sessionId, 'list'],
     queryFn: ({ signal }) => ticketService.getHistory(signal),
-    enabled, gcTime: 0, retry: false,
+    enabled,
+    gcTime: 0,
+    retry: false,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: query => Array.isArray(query.state.data) && query.state.data.some(t => t.status === 'PENDING') ? 30_000 : false,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -31,6 +37,12 @@ export function useTicketDetail(code) {
   return useQuery({
     queryKey: ['my-tickets', sessionId, 'detail', code],
     queryFn: ({ signal }) => ticketService.getDetail(code, signal),
-    enabled: enabled && isBookingCode(code), gcTime: 0, retry: false,
+    enabled: enabled && isBookingCode(code),
+    gcTime: 0,
+    retry: false,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: query => query.state.data?.status === 'PENDING' ? 30_000 : false,
+    refetchIntervalInBackground: false,
   });
 }

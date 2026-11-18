@@ -31,3 +31,10 @@ export function clearTicketCache(sessionId) {
   void queryClient.cancelQueries({ queryKey });
   queryClient.removeQueries({ queryKey });
 }
+
+/**
+ * Đánh dấu dữ liệu vé cần được làm mới (stale/refetch) sau khi tạo đơn, hủy đơn, hoặc thanh toán.
+ */
+export function invalidateTicketCache() {
+  void queryClient.invalidateQueries({ queryKey: ['my-tickets'] });
+}

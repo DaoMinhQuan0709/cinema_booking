@@ -62,6 +62,7 @@ function VerifiedResult({ userId, params }) {
     try { if (sessionStorage.getItem(key) === booking.bookingCode) sessionStorage.removeItem(key); } catch { /* Storage is optional. */ }
     void client.invalidateQueries({ queryKey: seatMapKeys.seats(booking.showtime.showtimeId) });
     void client.invalidateQueries({ queryKey: ['bookings', userId, booking.bookingCode] });
+    void client.invalidateQueries({ queryKey: ['my-tickets'] });
   }, [confirmed, userId, booking?.bookingCode, booking?.showtime?.showtimeId, client]);
 
   if (query.isPending) return <ResultNotice title="Đang kiểm tra kết quả thanh toán"><LoaderCircle className="mx-auto h-6 w-6 animate-spin" aria-label="Đang tải" /></ResultNotice>;

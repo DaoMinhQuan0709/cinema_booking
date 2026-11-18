@@ -24,7 +24,7 @@ Mục tiêu: thay trang tạm bằng danh sách đơn đặt vé của tài kho�
 
 - [x] **3. Cách ly dữ liệu theo phiên.** Query key bắt đầu bằng `['my-tickets', sessionId]`, phân biệt danh sách/chi tiết/QR; truyền AbortSignal, đặt `gcTime: 0`, không lưu dữ liệu vé vào localStorage. Khi đổi tài khoản/đăng xuất, hủy truy vấn và bỏ dữ liệu phiên trước; không dùng dữ liệu cũ làm placeholder cho phiên mới. → Kiểm tra đổi tài khoản khi request còn chờ, phản hồi muộn, đăng xuất và đăng nhập lại cùng tài khoản.
 
-- [ ] **4. Cập nhật trạng thái và xử lý lỗi.** Stale time 30 giây, tải lại khi focus; danh sách có đơn chờ và chi tiết đơn chờ làm mới mỗi 30 giây khi tab đang mở. Sau tạo đơn, hủy giữ chỗ hoặc xác nhận thanh toán, invalidate dữ liệu vé của phiên hiện tại. Có skeleton, danh sách rỗng với “Khám phá phim”, bộ lọc không có kết quả, lỗi/thử lại; lỗi làm mới giữ dữ liệu cũ kèm cảnh báo. Chi tiết 403/404 có lối về danh sách. Trạng thái lạ hiện “Chưa xác định”, không mở QR hoặc thao tác thanh toán. → Kiểm tra lỗi từng API, phục hồi, cập nhật sau checkout và không tự gọi API ghi từ trang vé.
+- [x] **4. Cập nhật trạng thái và xử lý lỗi.** Stale time 30 giây, tải lại khi focus; danh sách có đơn chờ và chi tiết đơn chờ làm mới mỗi 30 giây khi tab đang mở. Sau tạo đơn, hủy giữ chỗ hoặc xác nhận thanh toán, invalidate dữ liệu vé của phiên hiện tại. Có skeleton, danh sách rỗng với “Khám phá phim”, bộ lọc không có kết quả, lỗi/thử lại; lỗi làm mới giữ dữ liệu cũ kèm cảnh báo. Chi tiết 403/404 có lối về danh sách. Trạng thái lạ hiện “Chưa xác định”, không mở QR hoặc thao tác thanh toán. → Kiểm tra lỗi từng API, phục hồi, cập nhật sau checkout và không tự gọi API ghi từ trang vé.
 
 - [ ] **5. Bảo vệ API QR và nối giao diện.** Giữ `GET /api/v1/bookings/{bookingCode}/qr`, bỏ quyền công khai; backend kiểm tra chủ đơn hoặc ADMIN và trạng thái `CONFIRMED` trước khi sinh PNG. Trả 401 khi chưa đăng nhập, 403 khi không có quyền, 404 khi không tồn tại, 409 khi chưa xác nhận; thêm `Cache-Control: no-store`. Frontend tải bằng Axios/Bearer với `responseType: 'blob'`; điều chỉnh interceptor để giữ nguyên blob thành công nhưng vẫn bóc `ApiResponse` của JSON. Hiển thị/tải PNG qua object URL, thu hồi khi đổi đơn/phiên hoặc unmount; lỗi QR có thử lại riêng, không dùng trực tiếp `qrCodeUrl` của lịch sử. → Kiểm tra quyền, trạng thái, ảnh PNG và tải file; giữ nguyên nội dung QR và cơ chế email hiện có.
 
@@ -137,5 +137,44 @@ Báo cáo cục bộ:
 - `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-d0P8xb/results.json`
 - `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-Q0gaMN/results.json`
 
-Giới hạn: các kiểm thử ở trên dùng REST mô phỏng, chưa gọi backend/database thật. Mục 4–6 tiếp tục thực hiện ở các bước sau.
+Giới hạn: các kiểm thử ở trên dùng REST mô phỏng, chưa gọi backend/database thật.
+
+### Mục 4 — hoàn thành và kiểm chứng bằng API mô phỏng (18/11/2026)
+
+Đã triển khai:
+
+- `frontend/src/config/queryClient.js`: bổ sung `invalidateTicketCache()` để invalidate cache `['my-tickets']` tập trung sau các thao tác thay đổi trạng thái đơn hàng.
+- `frontend/src/features/tickets/useTicketQueries.js`:
+  - Cấu hình `staleTime: 30_000` (30 giây), `refetchOnWindowFocus: true`.
+  - Cấu hình tự động làm mới (polling): danh sách có ít nhất một đơn `PENDING` hoặc trang chi tiết đơn `PENDING` tự động poll mỗi 30 giây khi tab đang mở (`refetchIntervalInBackground: false`). Khi không có đơn pending thì dừng polling.
+- `frontend/src/features/tickets/TicketUI.jsx` & `TicketDetailPage.jsx`:
+  - Nâng cấp `TicketLoading` thành component Skeleton card và detail skeleton hoàn chỉnh với hiệu ứng `animate-pulse`, `role="status"` và trợ năng screen reader (`sr-only`).
+  - Đảm bảo hiển thị lỗi làm mới: khi background/manual refresh gặp lỗi nhưng đã có dữ liệu cũ, giao diện vẫn giữ nguyên danh sách vé cũ kèm banner cảnh báo `role="alert"` và nút "Thử lại".
+- Đồng bộ cache vé (`invalidateQueries({ queryKey: ['my-tickets'] })`):
+  - `useBookingHold.js`: invalidate sau khi giữ ghế (`holdSeats`) thành công và sau khi hủy giữ ghế (`cancelHold`) thành công.
+  - `CheckoutPage.jsx`: invalidate sau khi hủy đơn (`cancel`) thành công.
+  - `VNPayReturnPage.jsx`: invalidate khi giao dịch thanh toán được xác nhận (`confirmed === true`).
+- `frontend/scripts/my-tickets-routing-check.mjs`: mở rộng kiểm tra tự động bao gồm:
+  - Hiển thị Skeleton card có `animate-pulse` khi đang tải danh sách vé.
+  - Lỗi làm mới giữ dữ liệu cũ kèm cảnh báo và nút "Thử lại", khi thử lại thành công thì xóa cảnh báo.
+  - Chi tiết 403/404 có đường dẫn về danh sách vé.
+  - Trạng thái lạ hiện "Chưa xác định", không mở QR và không có CTA thanh toán.
+
+Kiểm tra đã chạy:
+
+| Lệnh | Kết quả |
+| --- | --- |
+| `npm run lint` | Đạt (0 warnings) |
+| `npm test` | 145/145 đạt |
+| `npm run build` | Đạt (1.49s) |
+| `npm run test:my-tickets-routing` | 34 nhóm đạt (bao gồm toàn bộ ca Mục 4), 0 lỗi JavaScript |
+| `npm run test:cinemas-browser` | 64 nhóm đạt, không lỗi JavaScript |
+| `npm run test:checkout-browser` | 18 nhóm đạt, không lỗi JavaScript |
+
+Báo cáo cục bộ:
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-tickets-routing-lnEFJT/results.json`
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-teLYT6/results.json`
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-iSREAi/results.json`
+
+Giới hạn: các kiểm thử ở trên dùng REST mô phỏng, chưa gọi backend/database thật. Mục 5–6 tiếp tục thực hiện ở các bước sau.
 

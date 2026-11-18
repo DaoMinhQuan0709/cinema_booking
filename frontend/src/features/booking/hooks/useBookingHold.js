@@ -134,6 +134,7 @@ export function useBookingHold(showtimeId) {
       owned.current = { userId: auth.user.id, ids: new Set(ids) };
       setReceipt({ userId: auth.user.id, booking: response });
       patchSeats(ids, 'LOCKED');
+      void queryClient.invalidateQueries({ queryKey: ['my-tickets'] });
       toast.success('Giữ ghế thành công! Bạn có 10 phút để hoàn tất đặt vé.', { id: 'hold-success' });
       return response;
     } catch (error) {
@@ -164,6 +165,7 @@ export function useBookingHold(showtimeId) {
       }
       patchSeats(booking.seats.map(seat => seat.showtimeSeatId), 'AVAILABLE');
       await queryClient.invalidateQueries({ queryKey });
+      void queryClient.invalidateQueries({ queryKey: ['my-tickets'] });
       toast.success('Đã hủy giữ ghế. Bạn có thể chọn lại.', { id: 'hold-cancelled' });
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Chưa hủy được giữ ghế. Vui lòng thử lại.', { id: 'hold-error' });
