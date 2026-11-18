@@ -44,6 +44,8 @@ npm.cmd run lint
 npm.cmd test
 npm.cmd run build
 npm.cmd run test:cinemas-browser
+npm.cmd run test:cinemas-browser -- --check-map
+npm.cmd run test:cinemas-map-audit
 npm.cmd run test:cinemas-live
 ```
 
@@ -51,9 +53,11 @@ npm.cmd run test:cinemas-live
 
 - Danh sách/chi tiết: bộ lọc, cache, mở trực tiếp/reload, Back/Forward, ID sai/404/503, lỗi và phản hồi chậm của từng API danh sách/chi tiết. Đổi rạp khi GET chi tiết hoặc GET suất cũ còn chờ không lẫn thông tin, phim, giá hoặc vị trí.
 - Gallery và bộ chọn rạp: ảnh thiếu/lỗi, một/hai/nhiều ảnh, bàn phím/vuốt, cache danh sách, thành phố rỗng/lỗi/tải, đổi rạp giữ ngày và bỏ phim cũ.
-- Ngày/phim/suất: URL ngày/phim sai, rạp/ngày hết suất, lỗi/tải/sai payload của API suất, lỗi API phim vẫn dùng poster từ suất. Fixture hai phim kiểm tra thứ tự theo giờ, phim sắp chiếu, giá/phòng, Tab/Enter chọn ngày/phim và liên kết `/booking/:showtimeId` bằng ID nội bộ.
-- Giao diện 390/768/1440px không tràn ngang, một Footer; khối giá/vị trí và trạng thái chưa có mã iframe Google Maps có ảnh chụp desktop/mobile. URL iframe thực tế trong `cinemaGoogleMapEmbeds.js` được unit test kiểm tra định dạng; Edge mô phỏng không tải Google Maps thật.
+- Ngày/phim/suất: URL ngày/phim sai, rạp/ngày hết suất, lỗi/tải/sai payload của API suất, lỗi API phim vẫn dùng poster từ suất. Fixture hai phim kiểm tra thứ tự theo giờ, phim sắp chiếu, giá/phòng, Tab/Enter chọn ngày/phim và liên kết `/booking/:showtimeId` bằng ID nội bộ. Một kịch bản đi từ danh sách → chi tiết → ngày → phim → suất đến sơ đồ ghế ở 390px; hai GET chi tiết suất/ghế được mô phỏng, không tạo booking.
+- Giao diện 390/768/1440px không tràn ngang, một Footer; khối giá/vị trí và trạng thái chưa có mã iframe Google Maps có ảnh chụp desktop/mobile. URL iframe trong `cinemaGoogleMapEmbeds.js` được unit test kiểm tra định dạng. Mặc định Edge mô phỏng không tải Google Maps thật; thêm `--check-map` để tải iframe thật của rạp ID 9, ghi HTTP status và chụp ảnh. Chế độ này vẫn mô phỏng API rạp, nên không xác nhận ID trong DB.
 
-`test:cinemas-live`: Edge production với API localhost và ảnh CDN thật; chỉ cho GET/OPTIONS `/cinemas`, `/cinemas/:id`, `/showtimes` và `/movies`. Cần backend đang chạy và dữ liệu rạp đã có. Script chỉ đọc catalog/lịch/phim; không khởi động lại backend, gọi sync, tạo ghế/booking hoặc sửa DB. Mặc định API `http://localhost:8080/api/v1`; có thể đặt `CINEMAS_TEST_API_BASE` sang địa chỉ loopback/cổng khác. Chế độ live chưa được xác nhận trong mục 9 nếu backend không chạy; kiểm tra dữ liệu/API thật thuộc mục 10.
+`test:cinemas-map-audit`: GET danh sách rạp từ API localhost, đối chiếu toàn bộ ID có mã nhúng với catalog, kiểm tra URL/tên địa điểm trong mã và liệt kê rạp chưa có mã. Khoảng cách tọa độ in ra là từ **tâm khung bản đồ** tới tọa độ API, không phải sai số của marker; cần xem ảnh bản đồ để xác nhận vị trí thực tế.
+
+`test:cinemas-live`: Edge production với API localhost và ảnh CDN thật; chỉ cho GET/OPTIONS `/cinemas`, `/cinemas/:id`, `/showtimes` và `/movies`. Cần backend đang chạy và dữ liệu rạp đã có. Script kiểm tra iframe Google Maps của rạp mẫu từ API thật, chi tiết rạp ở 390/768/1440px và ngày/phim/suất theo dữ liệu thật, nhưng không mở trang ghế bằng API thật. Script chỉ đọc catalog/lịch/phim; không khởi động lại backend, gọi sync, tạo ghế/booking hoặc sửa DB. Mặc định API `http://localhost:8080/api/v1`; có thể đặt `CINEMAS_TEST_API_BASE` sang địa chỉ loopback/cổng khác.
 
 Hai lệnh dùng cổng preview/debug riêng (4206/9239 và 4207/9240), profile Edge tạm, tự đóng tài nguyên do script tạo và lưu `results.json`/ảnh trong đường dẫn temp được in ra. Có thể đặt `ADMIN_EDGE_PATH` nếu Edge không ở vị trí mặc định. Build lại trước khi kiểm tra thay đổi giao diện. Số rạp/ID trong kết quả live là snapshot, không hardcode lên ứng dụng.
