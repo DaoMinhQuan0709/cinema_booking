@@ -75,6 +75,9 @@ axiosInstance.interceptors.response.use(
     if (response.config._sessionId !== tokenStorage.getSessionId()) {
       return Promise.reject(new axios.CanceledError('Phản hồi thuộc phiên đăng nhập cũ.'));
     }
+    if (response.config.responseType === 'blob') {
+      return response;
+    }
     const apiResponse = response.data;
     return {
       ...response,

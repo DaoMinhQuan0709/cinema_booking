@@ -46,3 +46,16 @@ export function useTicketDetail(code) {
     refetchIntervalInBackground: false,
   });
 }
+
+export function useTicketQr(code, isConfirmed) {
+  const { sessionId, enabled } = useTicketSession();
+  return useQuery({
+    queryKey: ['my-tickets', sessionId, 'qr', code],
+    queryFn: ({ signal }) => ticketService.getQr(code, signal),
+    enabled: enabled && isBookingCode(code) && Boolean(isConfirmed),
+    gcTime: 0,
+    retry: false,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+}

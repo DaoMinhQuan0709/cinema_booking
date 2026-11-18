@@ -1,12 +1,89 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Ticket } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Download, RefreshCw, Ticket } from 'lucide-react';
 import { formatTicketDateTime, formatTicketMoney, isBookingCode, ticketListHref, ticketSeatLabel, ticketSeatType, ticketText } from './ticketUtils';
-import { useTicketDetail } from './useTicketQueries';
+import { useTicketDetail, useTicketQr } from './useTicketQueries';
 import { TicketContinue, TicketError, TicketLoading, TicketRefresh, TicketStatus } from './TicketUI';
 
 const FOCUS_CLASS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
 const PANEL_CLASS = 'min-w-0 rounded-2xl border border-surfaceBorder bg-surface p-5 sm:p-7';
+
+function TicketQrSection({ ticket }) {
+  const isConfirmed = ticket.status === 'CONFIRMED';
+  const qrQuery = useTicketQr(ticket.bookingCode, isConfirmed);
+
+  const qrUrl = useMemo(() => {
+    if (!qrQuery.data) return null;
+    return URL.createObjectURL(qrQuery.data);
+  }, [qrQuery.data]);
+
+  useEffect(() => {
+    return () => {
+      if (qrUrl) URL.revokeObjectURL(qrUrl);
+    };
+  }, [qrUrl]);
+
+  return (
+    <section aria-labelledby="ticket-qr" className={`${PANEL_CLASS} text-center`}>
+      <Ticket aria-hidden="true" className="mx-auto mb-4 h-8 w-8 text-muted" strokeWidth={1.5} />
+      <h2 id="ticket-qr" className="text-lg font-bold text-white">Mã vé</h2>
+      {!isConfirmed ? (
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          {ticket.status === 'PENDING'
+            ? 'Đơn đang chờ thanh toán. Mã vé chỉ dành cho đơn đã xác nhận.'
+            : ticket.status === 'CANCELLED' || ticket.status === 'EXPIRED'
+              ? 'Đơn này không có mã vé có hiệu lực.'
+              : 'Chưa xác định được trạng thái đơn để hiển thị mã vé.'}
+        </p>
+      ) : qrQuery.isPending ? (
+        <div role="status" aria-label="Đang tải mã QR" className="mt-4 flex flex-col items-center gap-3">
+          <div className="h-44 w-44 animate-pulse rounded-xl bg-surfaceBorder/60" />
+          <p className="text-xs text-muted">Đang tải mã QR...</p>
+        </div>
+      ) : qrQuery.isError ? (
+        <div role="alert" className="mt-4 space-y-3">
+          <p className="text-sm text-red-300">
+            {qrQuery.error?.response?.status === 403
+              ? 'Bạn không có quyền xem mã QR này.'
+              : qrQuery.error?.response?.status === 409
+                ? 'Đơn chưa được xác nhận. Mã QR chưa khả dụng.'
+                : 'Không tải được mã QR. Vui lòng thử lại.'}
+          </p>
+          <button
+            type="button"
+            disabled={qrQuery.isFetching}
+            onClick={() => void qrQuery.refetch()}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-surfaceBorder px-3 py-1.5 text-xs font-semibold text-white hover:bg-surface disabled:opacity-50 ${FOCUS_CLASS}`}
+          >
+            <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${qrQuery.isFetching ? 'motion-safe:animate-spin' : ''}`} />
+            Thử lại
+          </button>
+        </div>
+      ) : qrUrl ? (
+        <div className="mt-4 space-y-4">
+          <div className="inline-block rounded-xl bg-white p-3 shadow-lg">
+            <img
+              src={qrUrl}
+              alt={`Mã QR đơn đặt vé ${ticket.bookingCode}`}
+              className="h-44 w-44 object-contain"
+            />
+          </div>
+          <p className="text-xs text-muted">Xuất trình mã này tại quầy vé hoặc cửa phòng chiếu</p>
+          <div>
+            <a
+              href={qrUrl}
+              download={`ticket-${ticket.bookingCode}.png`}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primaryHover ${FOCUS_CLASS}`}
+            >
+              <Download aria-hidden="true" className="h-4 w-4" />
+              Tải mã QR
+            </a>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
 
 function TicketContents({ ticket }) {
   const showtime = ticket.showtime || {};
@@ -52,14 +129,7 @@ function TicketContents({ ticket }) {
         </dl>
         {ticket.status === 'PENDING' && <div className="mt-6"><TicketContinue ticket={ticket} /></div>}
       </section>
-      <section aria-labelledby="ticket-qr" className={`${PANEL_CLASS} text-center`}>
-        <Ticket aria-hidden="true" className="mx-auto mb-4 h-8 w-8 text-muted" strokeWidth={1.5} />
-        <h2 id="ticket-qr" className="text-lg font-bold text-white">Mã vé</h2>
-        <p className="mt-3 text-sm leading-relaxed text-muted">{ticket.status === 'CONFIRMED'
-          ? 'Mã QR hiện chưa khả dụng. Bạn có thể xem thông tin đơn tại đây.'
-          : ticket.status === 'PENDING' ? 'Đơn đang chờ thanh toán. Mã vé chỉ dành cho đơn đã xác nhận.'
-            : ticket.status === 'CANCELLED' || ticket.status === 'EXPIRED' ? 'Đơn này không có mã vé có hiệu lực.' : 'Chưa xác định được trạng thái đơn để hiển thị mã vé.'}</p>
-      </section>
+      <TicketQrSection ticket={ticket} />
     </aside>
   </div>;
 }

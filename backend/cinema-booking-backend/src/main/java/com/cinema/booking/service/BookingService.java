@@ -40,4 +40,14 @@ public interface BookingService {
      * @return BookingResponse chi tiet don dat ve sau khi huy
      */
     BookingResponse cancelBooking(String bookingCode, String userEmail);
+
+    /**
+     * Lay anh ma QR (bytes PNG) cua don dat ve.
+     * Kiem tra quyen so huu (chu don hoac ADMIN) va trang thai don dat ve phai la CONFIRMED.
+     *
+     * @param bookingCode Ma don dat ve
+     * @param userEmail   Email nguoi dung (kiem tra quyen)
+     * @return Byte array cua anh PNG ma QR
+     */
+    byte[] getBookingQrCode(String bookingCode, String userEmail);
 }

@@ -26,7 +26,7 @@ Mục tiêu: thay trang tạm bằng danh sách đơn đặt vé của tài kho�
 
 - [x] **4. Cập nhật trạng thái và xử lý lỗi.** Stale time 30 giây, tải lại khi focus; danh sách có đơn chờ và chi tiết đơn chờ làm mới mỗi 30 giây khi tab đang mở. Sau tạo đơn, hủy giữ chỗ hoặc xác nhận thanh toán, invalidate dữ liệu vé của phiên hiện tại. Có skeleton, danh sách rỗng với “Khám phá phim”, bộ lọc không có kết quả, lỗi/thử lại; lỗi làm mới giữ dữ liệu cũ kèm cảnh báo. Chi tiết 403/404 có lối về danh sách. Trạng thái lạ hiện “Chưa xác định”, không mở QR hoặc thao tác thanh toán. → Kiểm tra lỗi từng API, phục hồi, cập nhật sau checkout và không tự gọi API ghi từ trang vé.
 
-- [ ] **5. Bảo vệ API QR và nối giao diện.** Giữ `GET /api/v1/bookings/{bookingCode}/qr`, bỏ quyền công khai; backend kiểm tra chủ đơn hoặc ADMIN và trạng thái `CONFIRMED` trước khi sinh PNG. Trả 401 khi chưa đăng nhập, 403 khi không có quyền, 404 khi không tồn tại, 409 khi chưa xác nhận; thêm `Cache-Control: no-store`. Frontend tải bằng Axios/Bearer với `responseType: 'blob'`; điều chỉnh interceptor để giữ nguyên blob thành công nhưng vẫn bóc `ApiResponse` của JSON. Hiển thị/tải PNG qua object URL, thu hồi khi đổi đơn/phiên hoặc unmount; lỗi QR có thử lại riêng, không dùng trực tiếp `qrCodeUrl` của lịch sử. → Kiểm tra quyền, trạng thái, ảnh PNG và tải file; giữ nguyên nội dung QR và cơ chế email hiện có.
+- [x] **5. Bảo vệ API QR và nối giao diện.** Giữ `GET /api/v1/bookings/{bookingCode}/qr`, bỏ quyền công khai; backend kiểm tra chủ đơn hoặc ADMIN và trạng thái `CONFIRMED` trước khi sinh PNG. Trả 401 khi chưa đăng nhập, 403 khi không có quyền, 404 khi không tồn tại, 409 khi chưa xác nhận; thêm `Cache-Control: no-store`. Frontend tải bằng Axios/Bearer với `responseType: 'blob'`; điều chỉnh interceptor để giữ nguyên blob thành công nhưng vẫn bóc `ApiResponse` của JSON. Hiển thị/tải PNG qua object URL, thu hồi khi đổi đơn/phiên hoặc unmount; lỗi QR có thử lại riêng, không dùng trực tiếp `qrCodeUrl` của lịch sử. → Kiểm tra quyền, trạng thái, ảnh PNG và tải file; giữ nguyên nội dung QR và cơ chế email hiện có.
 
 - [ ] **6. Kiểm chứng và cập nhật tài liệu.** Thêm unit test lọc/đếm trạng thái, URL, ngày/tiền, điều kiện thao tác và cách ly phiên; backend test quyền/trạng thái QR, mã không tồn tại, PNG và header không cache. Thêm script Edge mô phỏng cho khách/đăng nhập, đổi phiên lúc request chờ, danh sách rỗng/lỗi, chi tiết ghế/combo, QR/tải ảnh, tiếp tục checkout, cập nhật sau thanh toán và Back/Forward/reload. Kiểm tra bàn phím/focus/nhãn trạng thái, một Header/Footer và không tràn ngang ở 390/768/1440px. Chạy lint, unit test, build, script trang vé và kiểm tra rạp/checkout bị ảnh hưởng; chạy test backend liên quan. → Ghi rõ kết quả mô phỏng, API thật và phần chưa kiểm chứng.
 
@@ -177,4 +177,52 @@ Báo cáo cục bộ:
 - `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-iSREAi/results.json`
 
 Giới hạn: các kiểm thử ở trên dùng REST mô phỏng, chưa gọi backend/database thật. Mục 5–6 tiếp tục thực hiện ở các bước sau.
+
+### Mục 5 — hoàn thành và kiểm chứng bằng API mô phỏng (18/11/2026)
+
+Đã triển khai:
+
+- **Backend (Spring Boot)**:
+  - `SecurityConfig.java`: Xóa `/api/v1/bookings/*/qr` khỏi danh sách `permitAll()`, yêu cầu xác thực JWT qua Spring Security.
+  - `BookingService.java` & `BookingServiceImpl.java`: Thêm method `byte[] getBookingQrCode(String bookingCode, String userEmail)` kiểm tra:
+    1. Đơn hàng tồn tại (404 ResourceNotFoundException).
+    2. Người dùng là chủ đơn hoặc có vai trò `ADMIN` (403 ForbiddenException).
+    3. Đơn hàng có trạng thái `CONFIRMED` (409 ConflictException khi đơn chưa xác nhận).
+    4. Sinh dữ liệu ảnh PNG QR qua `QrCodeService` (ZXing).
+  - `BookingController.java`: Cập nhật endpoint `GET /api/v1/bookings/{bookingCode}/qr`, nhận `@AuthenticationPrincipal UserDetails userDetails`, gọi service và thêm header `Cache-Control: no-store` cùng `Content-Type: image/png`.
+- **Frontend (React)**:
+  - `frontend/src/config/axiosInstance.js`: Thêm nhánh xử lý `response.config.responseType === 'blob'` trong response interceptor để trả về trực tiếp `response` chứa Blob thay vì cố gắng unwrap JSON `ApiResponse`.
+  - `frontend/src/features/tickets/ticketService.js`: Bổ sung hàm `getQr(code, signal)` gọi endpoint `/bookings/{code}/qr` với `responseType: 'blob'` và `skipErrorToast: true`.
+  - `frontend/src/features/tickets/useTicketQueries.js`: Thêm query hook `useTicketQr(code, isConfirmed)` với `queryKey: ['my-tickets', sessionId, 'qr', code]`, `gcTime: 0`, `staleTime: 0`, chỉ kích hoạt khi đơn `CONFIRMED`.
+  - `frontend/src/features/tickets/TicketDetailPage.jsx`:
+    - Tạo component `TicketQrSection`:
+      - Khi đơn chưa xác nhận (`PENDING`, `CANCELLED`, `EXPIRED`): hiển thị văn bản hướng dẫn thích hợp.
+      - Khi đơn `CONFIRMED`: hiển thị skeleton khi tải, xử lý lỗi 403 ("Bạn không có quyền xem mã QR này"), 409 ("Đơn chưa được xác nhận. Mã QR chưa khả dụng"), và lỗi mạng kèm nút "Thử lại".
+      - Khi thành công: tạo Object URL an toàn từ Blob, hiển thị ảnh mã QR và nút "Tải mã QR" (`a[download]`).
+      - Tự động thu hồi Object URL bằng `URL.revokeObjectURL` khi đổi mã đơn/phiên hoặc khi unmount để chống rò rỉ bộ nhớ.
+- `frontend/scripts/my-tickets-routing-check.mjs`: Bổ sung bộ kiểm thử 5 ca cho mã QR:
+  1. Đơn `CONFIRMED`: tải và hiển thị mã QR blob, có nút tải file PNG.
+  2. Đơn `PENDING`: tuyệt đối không gọi API QR, hiển thị văn bản chờ thanh toán.
+  3. Lỗi 403: hiển thị thông báo lỗi quyền và nút "Thử lại" tải lại thành công.
+  4. Lỗi 409: hiển thị thông báo đơn chưa được xác nhận.
+  5. Rời trang chi tiết: xác nhận `URL.revokeObjectURL` được gọi tự động.
+
+Kiểm tra đã chạy:
+
+| Lệnh | Kết quả |
+| --- | --- |
+| `npm run lint` | Đạt (0 warnings, tuân thủ react-hooks) |
+| `npm test` | 145/145 đạt |
+| `npm run build` | Đạt (1.34s) |
+| `npm run test:my-tickets-routing` | 39 nhóm đạt (bao gồm 5 ca mã QR của Mục 5), 0 lỗi JavaScript |
+| `npm run test:cinemas-browser` | 64 nhóm đạt, không lỗi JavaScript |
+| `npm run test:checkout-browser` | 18 nhóm đạt, không lỗi JavaScript |
+
+Báo cáo cục bộ:
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-tickets-routing-grmate/results.json`
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-VKCftu/results.json`
+- `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-xnrVtW/`
+
+Giới hạn: các kiểm thử ở trên dùng REST mô phỏng, chưa gọi backend/database thật. Mục 6 sẽ tiến hành kiểm chứng toàn diện và hoàn tất tài liệu.
+
 

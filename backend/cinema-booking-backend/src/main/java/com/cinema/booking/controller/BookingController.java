@@ -4,10 +4,10 @@ import com.cinema.booking.dto.request.BookingCreateRequest;
 import com.cinema.booking.dto.response.ApiResponse;
 import com.cinema.booking.dto.response.BookingResponse;
 import com.cinema.booking.service.BookingService;
-import com.cinema.booking.service.QrCodeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,7 +26,6 @@ import org.springframework.web.bind.annotation.*;
 public class BookingController {
 
     private final BookingService bookingService;
-    private final QrCodeService qrCodeService;
     private final com.cinema.booking.service.BookingProductsService bookingProductsService;
 
     @PutMapping("/{bookingCode}/products")
@@ -89,12 +88,17 @@ public class BookingController {
 
     /**
      * GET /api/v1/bookings/{bookingCode}/qr - Lay anh ma QR cua don dat ve (dinh dang PNG) (Cong viec 5.3).
+     * Yeu cau xac thuc: chi chu don hoac ADMIN moi duoc xem, va don phai o trang thai CONFIRMED.
+     * Khong cache tren trinh duyet (Cache-Control: no-store).
      */
     @GetMapping(value = "/{bookingCode}/qr", produces = MediaType.IMAGE_PNG_VALUE)
-    public ResponseEntity<byte[]> getBookingQrCode(@PathVariable String bookingCode) {
-        log.info("GET /api/v1/bookings/{}/qr", bookingCode);
-        byte[] qrBytes = qrCodeService.generateQrCodeImageBytes(bookingCode);
+    public ResponseEntity<byte[]> getBookingQrCode(
+            @PathVariable String bookingCode,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        log.info("GET /api/v1/bookings/{}/qr - user={}", bookingCode, userDetails.getUsername());
+        byte[] qrBytes = bookingService.getBookingQrCode(bookingCode, userDetails.getUsername());
         return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .contentType(MediaType.IMAGE_PNG)
                 .body(qrBytes);
     }

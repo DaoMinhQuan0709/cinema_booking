@@ -8,11 +8,13 @@ import com.cinema.booking.enums.BookingStatus;
 import com.cinema.booking.enums.ShowtimeSeatStatus;
 import com.cinema.booking.enums.UserRole;
 import com.cinema.booking.exception.BadRequestException;
+import com.cinema.booking.exception.ConflictException;
 import com.cinema.booking.exception.ForbiddenException;
 import com.cinema.booking.exception.ResourceNotFoundException;
 import com.cinema.booking.exception.SeatConflictException;
 import com.cinema.booking.repository.*;
 import com.cinema.booking.service.BookingService;
+import com.cinema.booking.service.QrCodeService;
 import com.cinema.booking.service.SeatLockService;
 import com.cinema.booking.service.WebSocketService;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +56,7 @@ public class BookingServiceImpl implements BookingService {
     private final UserRepository userRepository;
     private final SeatLockService seatLockService;
     private final WebSocketService webSocketService;
+    private final QrCodeService qrCodeService;
     private final com.cinema.booking.service.CheckoutSupport checkout;
     private final com.cinema.booking.service.SeatChanges seatChanges;
     private final com.cinema.booking.service.CatalogGuard guard;
@@ -287,6 +290,29 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus(BookingStatus.CANCELLED);
         seatChanges.release(booking);
         return mapToBookingResponse(booking, booking.getBookingSeats().stream().map(BookingSeat::getShowtimeSeat).toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] getBookingQrCode(String bookingCode, String userEmail) {
+        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay don dat ve voi ma: " + bookingCode));
+
+        User currentUser = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
+
+        boolean isOwner = booking.getUser().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new ForbiddenException("Ban khong co quyen xem ma QR cua don dat ve nay");
+        }
+
+        if (booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new ConflictException("Đơn đặt vé chưa được xác nhận, mã QR chưa khả dụng");
+        }
+
+        return qrCodeService.generateQrCodeImageBytes(booking.getBookingCode());
     }
 
     // ========== Private Helper Methods ==========

@@ -2,14 +2,16 @@ package com.cinema.booking;
 
 import com.cinema.booking.controller.BookingController;
 import com.cinema.booking.dto.response.BookingResponse;
+import com.cinema.booking.exception.ConflictException;
+import com.cinema.booking.exception.ForbiddenException;
 import com.cinema.booking.exception.GlobalExceptionHandler;
 import com.cinema.booking.exception.SeatConflictException;
 import com.cinema.booking.service.BookingService;
-import com.cinema.booking.service.QrCodeService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.RedisConnectionFailureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +22,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -36,7 +39,7 @@ class BookingControllerTests {
     void setUp() {
         bookings = mock(BookingService.class);
         products = mock(com.cinema.booking.service.BookingProductsService.class);
-        mvc = MockMvcBuilders.standaloneSetup(new BookingController(bookings, mock(QrCodeService.class), products))
+        mvc = MockMvcBuilders.standaloneSetup(new BookingController(bookings, products))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .build();
@@ -101,5 +104,37 @@ class BookingControllerTests {
                 .content("{\"expectedRevision\":\"a\",\"products\":[{\"productId\":1,\"quantity\":-1}]}"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(products);
+    }
+
+    @Test
+    void qrEndpointReturnsPngWithNoCacheHeaderWhenConfirmed() throws Exception {
+        byte[] mockPng = new byte[]{1, 2, 3, 4};
+        when(bookings.getBookingQrCode("BKTEST123", "test@example.invalid")).thenReturn(mockPng);
+
+        mvc.perform(get("/api/v1/bookings/BKTEST123/qr"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
+                .andExpect(content().contentType(MediaType.IMAGE_PNG))
+                .andExpect(content().bytes(mockPng));
+    }
+
+    @Test
+    void qrEndpointReturnsForbiddenWhenUserNotAuthorized() throws Exception {
+        when(bookings.getBookingQrCode("BKTEST123", "test@example.invalid"))
+                .thenThrow(new ForbiddenException("Ban khong co quyen xem ma QR cua don dat ve nay"));
+
+        mvc.perform(get("/api/v1/bookings/BKTEST123/qr"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value(403));
+    }
+
+    @Test
+    void qrEndpointReturnsConflictWhenBookingNotConfirmed() throws Exception {
+        when(bookings.getBookingQrCode("BKTEST123", "test@example.invalid"))
+                .thenThrow(new ConflictException("Đơn đặt vé chưa được xác nhận, mã QR chưa khả dụng"));
+
+        mvc.perform(get("/api/v1/bookings/BKTEST123/qr"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value(409));
     }
 }

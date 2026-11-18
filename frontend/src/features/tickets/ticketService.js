@@ -14,4 +14,16 @@ export const ticketService = {
     if (!isRecord(data) || data.bookingCode !== code) throw new Error('Dữ liệu chi tiết vé không hợp lệ.');
     return data;
   },
+  async getQr(code, signal) {
+    const response = await axiosInstance.get(`/bookings/${encodeURIComponent(code)}/qr`, {
+      signal,
+      responseType: 'blob',
+      skipErrorToast: true,
+    });
+    const blob = response?.data;
+    if (!blob || (typeof Blob !== 'undefined' && !(blob instanceof Blob))) {
+      throw new Error('Dữ liệu mã QR không hợp lệ.');
+    }
+    return blob;
+  },
 };

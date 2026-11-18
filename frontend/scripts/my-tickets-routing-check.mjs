@@ -1,4 +1,4 @@
-// Mục 1–4: bản production với API xác thực/vé mô phỏng; không đọc/ghi backend thật.
+// Mục 1–5: bản production với API xác thực/vé mô phỏng; không đọc/ghi backend thật.
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -67,6 +67,29 @@ async function intercept({ request, requestId }) {
     }
     if (route === '/users/me/bookings') return reply(requestId, scenario.historyStatus || 200, scenario.history);
     return reply(requestId, scenario.detailStatus || 200, { ...ticketDetail(route.split('/').at(-1)), ...scenario.detailOverrides });
+  }
+  if (/^\/bookings\/BK[a-zA-Z0-9]{18}\/qr$/.test(route)) {
+    assert.equal(request.method, 'GET', 'Mã QR chỉ được đọc qua GET');
+    assert.ok(scenario.verified.has(request.headers.Authorization), 'Phải xác minh phiên trước khi đọc mã QR');
+    const qrStatus = scenario.qrStatus || 200;
+    if (qrStatus === 200) {
+      const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+      await cdp.send('Fetch.fulfillRequest', {
+        requestId,
+        responseCode: 200,
+        responseHeaders: [
+          { name: 'Content-Type', value: 'image/png' },
+          { name: 'Cache-Control', value: 'no-store' },
+          { name: 'Access-Control-Allow-Origin', value: origin },
+          { name: 'Access-Control-Allow-Credentials', value: 'true' },
+          { name: 'Access-Control-Allow-Headers', value: 'Authorization, Content-Type, Accept' },
+          { name: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' },
+        ],
+        body: pngBase64,
+      });
+      return;
+    }
+    return reply(requestId, qrStatus, null);
   }
   if (route === '/products' && scenario.allowCheckout) return reply(requestId, 200, []);
   if (route === '/auth/login') return reply(requestId, 200, {
@@ -347,6 +370,75 @@ async function checkSessionIsolation() {
   passed.push('Đăng xuất và đăng nhập lại cùng tài khoản: cache bị xóa, tải dữ liệu mới từ API');
 }
 
+/**
+ * Mục 5: kiểm tra bảo vệ API QR và hiển thị giao diện mã vé.
+ * Các ca:
+ * 1. Đơn CONFIRMED: tải và hiển thị mã QR blob, có nút tải file PNG.
+ * 2. Đơn PENDING: không gọi API QR, hiển thị văn bản hướng dẫn.
+ * 3. Lỗi 403 Forbidden: thông báo không có quyền, nút Thử lại tải lại thành công.
+ * 4. Lỗi 409 Conflict: thông báo đơn chưa xác nhận, mã QR chưa khả dụng.
+ * 5. Điều hướng rời trang chi tiết: tự động thu hồi (revokeObjectURL) blob URL mã QR.
+ */
+async function checkTicketQr() {
+  const start = requests.length;
+
+  // Ca QR-1: Đơn CONFIRMED tải và hiển thị mã QR, có nút tải PNG
+  await boot({ route: detail });
+  await cdp.wait(detailReady);
+  await cdp.wait('Boolean(document.querySelector("section[aria-labelledby=\\"ticket-qr\\"] img"))');
+  const qrImgSrc = await cdp.evaluate('document.querySelector("section[aria-labelledby=\\"ticket-qr\\"] img")?.src');
+  assert.ok(qrImgSrc?.startsWith('blob:'), 'Mã QR phải là blob URL');
+  assert.equal(await cdp.evaluate('Boolean(document.querySelector("section[aria-labelledby=\\"ticket-qr\\"] a[download]"))'), true);
+  assert.equal(requests.slice(start).some(item => item.route.endsWith('/qr')), true, 'Đơn CONFIRMED phải gọi API QR');
+  passed.push('Đơn CONFIRMED: tải và hiển thị mã QR blob an toàn, có nút tải file PNG');
+
+  // Ca QR-2: Đơn PENDING không gọi API QR, hiển thị văn bản hướng dẫn
+  const pendingCode = ticketHistory[1].bookingCode;
+  const qrStartPending = requests.length;
+  await boot({ route: `${list}/${pendingCode}` });
+  await cdp.wait(detailReady);
+  assert.equal(await cdp.evaluate('Boolean(document.querySelector("section[aria-labelledby=\\"ticket-qr\\"] img"))'), false);
+  assert.equal(await cdp.evaluate(includes('Đơn đang chờ thanh toán. Mã vé chỉ dành cho đơn đã xác nhận.')), true);
+  assert.equal(requests.slice(qrStartPending).some(item => item.route.endsWith('/qr')), false, 'Đơn PENDING tuyệt đối không gọi API QR');
+  passed.push('Đơn PENDING: không gọi API QR, hiển thị thông báo chờ thanh toán');
+
+  // Ca QR-3: Lỗi 403 Forbidden khi tải QR và Thử lại thành công
+  await boot({ route: detail, qrStatus: 403 });
+  await cdp.wait(detailReady);
+  await cdp.wait(includes('Bạn không có quyền xem mã QR này.'));
+  assert.equal(await cdp.evaluate('Boolean(document.querySelector("section[aria-labelledby=\\"ticket-qr\\"] img"))'), false);
+  scenario.qrStatus = 200;
+  await cdp.evaluate(`(() => {
+    const btn = [...document.querySelectorAll('section[aria-labelledby="ticket-qr"] button')].find(b => b.textContent.includes('Thử lại'));
+    btn?.click();
+  })()`);
+  await cdp.wait('Boolean(document.querySelector("section[aria-labelledby=\\"ticket-qr\\"] img"))');
+  passed.push('Lỗi 403: thông báo không có quyền xem mã QR, nút Thử lại tải lại thành công');
+
+  // Ca QR-4: Lỗi 409 Conflict khi tải QR
+  await boot({ route: detail, qrStatus: 409 });
+  await cdp.wait(detailReady);
+  await cdp.wait(includes('Đơn chưa được xác nhận. Mã QR chưa khả dụng.'));
+  passed.push('Lỗi 409: thông báo đơn chưa được xác nhận, mã QR chưa khả dụng');
+
+  // Ca QR-5: Thu hồi (revoke) blob URL khi rời trang để chống rò rỉ bộ nhớ
+  await boot({ route: detail });
+  await cdp.wait('Boolean(document.querySelector("section[aria-labelledby=\\"ticket-qr\\"] img"))');
+  await cdp.evaluate(`(() => {
+    window.__revoked = [];
+    const origRevoke = URL.revokeObjectURL;
+    URL.revokeObjectURL = function(url) {
+      window.__revoked.push(url);
+      origRevoke.call(URL, url);
+    };
+  })()`);
+  await cdp.evaluate(`document.querySelector('main a[href^="/profile/bookings"]').click()`);
+  await cdp.wait(listReady);
+  const revokedCount = await cdp.evaluate('window.__revoked?.length || 0');
+  assert.ok(revokedCount > 0, 'Object URL phải được revoke khi rời trang chi tiết');
+  passed.push('Rời trang chi tiết vé: tự động thu hồi (revokeObjectURL) blob URL mã QR');
+}
+
 try {
   browser = await startEdgeBrowser({ root, port: 4210, debugPort: 9243, artifacts, executable: process.env.ADMIN_EDGE_PATH });
   cdp = browser.cdp;
@@ -431,14 +523,15 @@ try {
 
   await checkTicketData();
   await checkSessionIsolation();
+  await checkTicketQr();
   assert.deepEqual(exceptions, []);
-  const report = { mode: 'Edge production / API xác thực và vé mô phỏng, chưa kiểm tra backend thật — Mục 1–4', passed,
+  const report = { mode: 'Edge production / API xác thực và vé mô phỏng, chưa kiểm tra backend thật — Mục 1–5', passed,
     requests, runtimeExceptions: exceptions.length, artifacts };
   await writeFile(path.join(artifacts, 'results.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ ...report, requests: requests.length }, null, 2));
 } catch (error) {
   await writeFile(path.join(artifacts, 'failure.json'), JSON.stringify({ passed, requests, exceptions,
     body: await cdp?.evaluate('document.body.innerText').catch(() => '') }, null, 2));
-  console.error(`Kiểm tra mục 1–4 thất bại: ${artifacts}`);
+  console.error(`Kiểm tra mục 1–5 thất bại: ${artifacts}`);
   throw error;
 } finally { await browser?.close(); }
