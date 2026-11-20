@@ -10,6 +10,7 @@ import { productService } from '../../services/productService';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { checkoutKey, productKey, draftFromBooking, selectedProducts, priceChanged, safePaymentUrl, remainingSeconds, formatCountdown, formatCheckoutShowtime, checkoutStatusText } from './checkoutUtils';
 import { seatMapKeys } from './hooks/useShowtimeSeats';
+import { invalidateTicketCache } from '../../config/queryClient';
 
 const primary = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primaryHover disabled:cursor-not-allowed disabled:bg-surfaceBorder disabled:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
 const secondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-surfaceBorder px-4 py-2 text-sm text-neutral-200 hover:border-neutral-500 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary';
@@ -121,6 +122,7 @@ function CheckoutForm({ booking, query, userId, code }) {
   }
 
   async function cancel() {
+    const sessionId = useAuthStore.getState().sessionId;
     if (busy.current) return;
     busy.current = true; setOperation('cancel');
     try {
@@ -130,7 +132,7 @@ function CheckoutForm({ booking, query, userId, code }) {
       try { if (sessionStorage.getItem(storageKey) === code) sessionStorage.removeItem(storageKey); } catch { /* Storage is optional. */ }
       await client.invalidateQueries({ queryKey: seatMapKeys.seats(booking.showtime.showtimeId) });
       client.removeQueries({ queryKey: key, exact: true });
-      void client.invalidateQueries({ queryKey: ['my-tickets'] });
+      if (sessionId === useAuthStore.getState().sessionId) void invalidateTicketCache(sessionId);
       toast.success('Đã hủy giữ ghế.', { id: 'checkout-cancelled' });
       navigate(`/booking/${booking.showtime.showtimeId}`, { replace: true });
     } catch (error) {

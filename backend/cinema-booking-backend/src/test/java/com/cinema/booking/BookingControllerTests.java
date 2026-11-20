@@ -5,6 +5,7 @@ import com.cinema.booking.dto.response.BookingResponse;
 import com.cinema.booking.exception.ConflictException;
 import com.cinema.booking.exception.ForbiddenException;
 import com.cinema.booking.exception.GlobalExceptionHandler;
+import com.cinema.booking.exception.ResourceNotFoundException;
 import com.cinema.booking.exception.SeatConflictException;
 import com.cinema.booking.service.BookingService;
 import org.junit.jupiter.api.AfterEach;
@@ -108,7 +109,7 @@ class BookingControllerTests {
 
     @Test
     void qrEndpointReturnsPngWithNoCacheHeaderWhenConfirmed() throws Exception {
-        byte[] mockPng = new byte[]{1, 2, 3, 4};
+        byte[] mockPng = new com.cinema.booking.service.QrCodeService().generateQrCodeImageBytes("BKTEST123");
         when(bookings.getBookingQrCode("BKTEST123", "test@example.invalid")).thenReturn(mockPng);
 
         mvc.perform(get("/api/v1/bookings/BKTEST123/qr"))
@@ -136,5 +137,13 @@ class BookingControllerTests {
         mvc.perform(get("/api/v1/bookings/BKTEST123/qr"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value(409));
+    }
+
+    @Test
+    void qrEndpointReturnsNotFoundWhenBookingDoesNotExist() throws Exception {
+        when(bookings.getBookingQrCode("missing", "test@example.invalid"))
+                .thenThrow(new ResourceNotFoundException("Không tìm thấy đơn"));
+        mvc.perform(get("/api/v1/bookings/missing/qr"))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value(404));
     }
 }

@@ -42,7 +42,7 @@ class SecurityAuthorizationTests {
 
     @Test
     void anonymousRequestsReturnJson401ForProfileAndAdmin() throws Exception {
-        for (String path : new String[]{"/api/v1/users/me", "/api/v1/admin/reports"}) {
+        for (String path : new String[]{"/api/v1/users/me", "/api/v1/admin/reports", "/api/v1/users/me/bookings", "/api/v1/bookings/BK20261120130000ABCD/qr"}) {
             mvc.perform(get(path)).andExpect(status().isUnauthorized())
                     .andExpect(content().contentTypeCompatibleWith("application/json"))
                     .andExpect(jsonPath("$.code").value(401));
@@ -80,6 +80,18 @@ class SecurityAuthorizationTests {
         verifyNoInteractions(users);
     }
 
+    @Test
+    void qrRequiresAValidBearerButDoesNotRequireTheAdminRole() throws Exception {
+        String path = "/api/v1/bookings/BK20261120130000ABCD/qr";
+        when(tokens.validateToken("invalid-token")).thenReturn(false);
+        mvc.perform(get(path).header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isUnauthorized());
+        bearer("customer-token", "CUSTOMER");
+        mvc.perform(get(path).header("Authorization", "Bearer customer-token")).andExpect(status().isOk());
+        bearer("admin-token", "ADMIN");
+        mvc.perform(get(path).header("Authorization", "Bearer admin-token")).andExpect(status().isOk());
+    }
+
     private void bearer(String token, String role) {
         when(tokens.validateToken(token)).thenReturn(true);
         when(tokens.getEmailFromToken(token)).thenReturn("test@example.invalid");
@@ -101,7 +113,7 @@ class SecurityAuthorizationTests {
 
     @RestController
     static class ProbeController {
-        @GetMapping({"/api/v1/users/me", "/api/v1/admin/reports", "/api/v1/movies"})
+        @GetMapping({"/api/v1/users/me", "/api/v1/admin/reports", "/api/v1/movies", "/api/v1/bookings/BK20261120130000ABCD/qr"})
         Map<String, Object> read() { return Map.of("code", 200, "data", "protected"); }
     }
 }

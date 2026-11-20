@@ -8,6 +8,7 @@ import { formatCurrency } from '../../utils/formatCurrency';
 import { formatCheckoutShowtime } from './checkoutUtils';
 import { parseVNPayReturn, paymentResultView, resultIsFinal } from './vnpayReturnUtils';
 import { seatMapKeys } from './hooks/useShowtimeSeats';
+import { invalidateTicketCache } from '../../config/queryClient';
 
 const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-surfaceBorder px-5 py-3 text-sm font-semibold text-white transition-colors hover:border-neutral-500 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
 const primary = `${button} border-primary bg-primary hover:border-primaryHover hover:bg-primaryHover`;
@@ -62,7 +63,8 @@ function VerifiedResult({ userId, params }) {
     try { if (sessionStorage.getItem(key) === booking.bookingCode) sessionStorage.removeItem(key); } catch { /* Storage is optional. */ }
     void client.invalidateQueries({ queryKey: seatMapKeys.seats(booking.showtime.showtimeId) });
     void client.invalidateQueries({ queryKey: ['bookings', userId, booking.bookingCode] });
-    void client.invalidateQueries({ queryKey: ['my-tickets'] });
+    const sessionId = useAuthStore.getState().sessionId;
+    void invalidateTicketCache(sessionId);
   }, [confirmed, userId, booking?.bookingCode, booking?.showtime?.showtimeId, client]);
 
   if (query.isPending) return <ResultNotice title="Đang kiểm tra kết quả thanh toán"><LoaderCircle className="mx-auto h-6 w-6 animate-spin" aria-label="Đang tải" /></ResultNotice>;

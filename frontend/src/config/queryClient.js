@@ -35,6 +35,7 @@ export function clearTicketCache(sessionId) {
 /**
  * Đánh dấu dữ liệu vé cần được làm mới (stale/refetch) sau khi tạo đơn, hủy đơn, hoặc thanh toán.
  */
-export function invalidateTicketCache() {
-  void queryClient.invalidateQueries({ queryKey: ['my-tickets'] });
+export function invalidateTicketCache(sessionId) {
+  if (!sessionId) return Promise.resolve();
+  return queryClient.invalidateQueries({ queryKey: ['my-tickets', sessionId] });
 }

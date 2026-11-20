@@ -6,6 +6,7 @@ import { useAuthStore } from '../../auth/authStore';
 import { applySeatStatusUpdate } from '../../../utils/seatRealtime';
 import { buildHoldRequest, getHoldErrorMessage, getHoldExpiry } from '../bookingHold';
 import { seatMapKeys } from './useShowtimeSeats';
+import { invalidateTicketCache } from '../../../config/queryClient';
 
 function savedCode(userId, showtimeId, value) {
   if (userId == null) return null;
@@ -134,7 +135,7 @@ export function useBookingHold(showtimeId) {
       owned.current = { userId: auth.user.id, ids: new Set(ids) };
       setReceipt({ userId: auth.user.id, booking: response });
       patchSeats(ids, 'LOCKED');
-      void queryClient.invalidateQueries({ queryKey: ['my-tickets'] });
+      void invalidateTicketCache(auth.sessionId);
       toast.success('Giữ ghế thành công! Bạn có 10 phút để hoàn tất đặt vé.', { id: 'hold-success' });
       return response;
     } catch (error) {
@@ -155,6 +156,7 @@ export function useBookingHold(showtimeId) {
     if (busy.current || !booking) return;
     busy.current = true;
     setOperation('cancelling');
+    const sessionId = useAuthStore.getState().sessionId;
     try {
       await cancelMutation.mutateAsync(booking.bookingCode);
       await queryClient.cancelQueries({ queryKey });
@@ -165,7 +167,9 @@ export function useBookingHold(showtimeId) {
       }
       patchSeats(booking.seats.map(seat => seat.showtimeSeatId), 'AVAILABLE');
       await queryClient.invalidateQueries({ queryKey });
-      void queryClient.invalidateQueries({ queryKey: ['my-tickets'] });
+      if (sessionId && useAuthStore.getState().sessionId === sessionId) {
+        void invalidateTicketCache(sessionId);
+      }
       toast.success('Đã hủy giữ ghế. Bạn có thể chọn lại.', { id: 'hold-cancelled' });
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Chưa hủy được giữ ghế. Vui lòng thử lại.', { id: 'hold-error' });

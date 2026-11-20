@@ -28,7 +28,7 @@ Mục tiêu: thay trang tạm bằng danh sách đơn đặt vé của tài kho�
 
 - [x] **5. Bảo vệ API QR và nối giao diện.** Giữ `GET /api/v1/bookings/{bookingCode}/qr`, bỏ quyền công khai; backend kiểm tra chủ đơn hoặc ADMIN và trạng thái `CONFIRMED` trước khi sinh PNG. Trả 401 khi chưa đăng nhập, 403 khi không có quyền, 404 khi không tồn tại, 409 khi chưa xác nhận; thêm `Cache-Control: no-store`. Frontend tải bằng Axios/Bearer với `responseType: 'blob'`; điều chỉnh interceptor để giữ nguyên blob thành công nhưng vẫn bóc `ApiResponse` của JSON. Hiển thị/tải PNG qua object URL, thu hồi khi đổi đơn/phiên hoặc unmount; lỗi QR có thử lại riêng, không dùng trực tiếp `qrCodeUrl` của lịch sử. → Kiểm tra quyền, trạng thái, ảnh PNG và tải file; giữ nguyên nội dung QR và cơ chế email hiện có.
 
-- [ ] **6. Kiểm chứng và cập nhật tài liệu.** Thêm unit test lọc/đếm trạng thái, URL, ngày/tiền, điều kiện thao tác và cách ly phiên; backend test quyền/trạng thái QR, mã không tồn tại, PNG và header không cache. Thêm script Edge mô phỏng cho khách/đăng nhập, đổi phiên lúc request chờ, danh sách rỗng/lỗi, chi tiết ghế/combo, QR/tải ảnh, tiếp tục checkout, cập nhật sau thanh toán và Back/Forward/reload. Kiểm tra bàn phím/focus/nhãn trạng thái, một Header/Footer và không tràn ngang ở 390/768/1440px. Chạy lint, unit test, build, script trang vé và kiểm tra rạp/checkout bị ảnh hưởng; chạy test backend liên quan. → Ghi rõ kết quả mô phỏng, API thật và phần chưa kiểm chứng.
+- [x] **6. Kiểm chứng và cập nhật tài liệu.** Thêm unit test lọc/đếm trạng thái, URL, ngày/tiền, điều kiện thao tác và cách ly phiên; backend test quyền/trạng thái QR, mã không tồn tại, PNG và header không cache. Thêm script Edge mô phỏng cho khách/đăng nhập, đổi phiên lúc request chờ, danh sách rỗng/lỗi, chi tiết ghế/combo, QR/tải ảnh, tiếp tục checkout, cập nhật sau thanh toán và Back/Forward/reload. Kiểm tra bàn phím/focus/nhãn trạng thái, một Header/Footer và không tràn ngang ở 390/768/1440px. Chạy lint, unit test, build, script trang vé và kiểm tra rạp/checkout bị ảnh hưởng; chạy test backend liên quan. → Ghi rõ kết quả mô phỏng, API thật và phần chưa kiểm chứng.
 
 ## Hoàn tất khi
 
@@ -224,5 +224,61 @@ Báo cáo cục bộ:
 - `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-xnrVtW/`
 
 Giới hạn: các kiểm thử ở trên dùng REST mô phỏng, chưa gọi backend/database thật. Mục 6 sẽ tiến hành kiểm chứng toàn diện và hoàn tất tài liệu.
+
+### Mục 6 — hoàn thành kiểm chứng và tài liệu (20/11/2026)
+
+Tài liệu vận hành module: [frontend/src/features/tickets/README.md](frontend/src/features/tickets/README.md). Các kết quả dưới đây là lần kiểm tra cuối cho mục 6; phần tiến độ trước đó lưu kết quả lịch sử.
+
+Đã bổ sung kiểm tra:
+
+- `ticketUtils.test.js` tiếp tục bao phủ URL, lọc/đếm, ngày giờ Việt Nam, VND, nhãn ghế và điều kiện tiếp tục đơn.
+- `ticketQueries.test.js`: dùng hook/service/Axios interceptor thật, chỉ thay HTTP adapter. Kiểm tra khách và phiên chưa xác minh không đọc dữ liệu; đúng endpoint/Bearer; JSON DTO và PNG Blob; đổi phiên hủy request; phản hồi cũ bị bỏ kể cả adapter trả muộn; unmount hủy QR và xóa query.
+- `config/queryClient.test.js`: hủy/xóa list/detail/QR theo phiên, không khôi phục cache khi response muộn, giữ cache công khai/phiên khác; invalidation chỉ tác động phiên được chỉ định.
+- `ticketQr.test.js`: giữ nguyên Blob PNG và từ chối response JSON/HTML, rỗng hoặc sai chữ ký ảnh.
+- `BookingQrServiceTests`: thực thi kiểm tra quyền/trạng thái trong service thật với repository mock. Chủ đơn và ADMIN được đọc QR của đơn `CONFIRMED`; khách hàng khác bị 403 ở mọi trạng thái; chủ đơn/Admin bị 409 khi `PENDING`/`CANCELLED`/`EXPIRED`; đơn không tồn tại bị 404, không sinh QR cho chuỗi tùy ý. Sinh PNG 300×300 bằng ZXing rồi giải mã lại để xác nhận nội dung đúng mã đơn.
+- `BookingControllerTests`: kiểm tra PNG thật, `Content-Type: image/png`, `Cache-Control: no-store` và ánh xạ 403/404/409. `SecurityAuthorizationTests`: filter chain thật chặn QR chưa xác thực/token sai bằng 401; USER/CUSTOMER không cần quyền ADMIN để qua bước xác thực endpoint. `PaymentReturnTests` kiểm tra hồi quy kết quả thanh toán.
+- `my-tickets-routing-check.mjs`: mở rộng lên 47 nhóm. Ngoài các ca mục 1–5, kiểm tra file PNG thực sự tải xuống đúng byte và tên; ảnh được trình duyệt giải mã; tổng URL tạo/thu hồi cân bằng; đổi phiên/logout gỡ ảnh/link tải ngay; response list/detail/QR muộn không khôi phục dữ liệu; PNG sai/lỗi QR 404/503; danh sách/chi tiết poll khi có `PENDING`, tab ẩn dừng và không còn đơn chờ thì dừng; stale refetch khi focus; từ kết quả thanh toán được backend mô phỏng xác nhận trở về/reload trang vé thấy `CONFIRMED` và QR. Kiểm tra Tab/focus/Enter, `aria-pressed`, alt ảnh, nền trắng, một Header/Footer và không tràn ngang tại 390/768/1440px.
+
+Các lỗi sửa trong quá trình nghiệm thu:
+
+- Chuyển `URL.createObjectURL` khỏi `useMemo` trong render sang effect của component ảnh QR. Cleanup gỡ `src`/`href` và thu hồi URL khi đổi Blob/unmount; tránh tạo tài nguyên từ lần render bị bỏ.
+- Thêm kiểm tra MIME/chữ ký PNG trước khi hiển thị và cung cấp nút tải, tránh tải JSON/HTML thành file `.png`.
+- `invalidateTicketCache(sessionId)` và các điểm gọi sau tạo/hủy giữ chỗ, hủy checkout, xác nhận thanh toán chỉ invalidate vé của phiên liên quan. Bỏ invalidation chung `['my-tickets']` tại các điểm này; không tác động cache phiên khác.
+- Kiểm tra phản hồi đến muộn thử trả dữ liệu thật từ fixture; Chromium có thể đã hủy interception nên không còn cho fulfill. Unit test bổ sung transport cố tình trả muộn để xác nhận Axios vẫn bỏ response cũ.
+
+Kết quả cuối:
+
+| Kiểm tra | Kết quả | Phạm vi |
+| --- | --- | --- |
+| `npm run lint` | Đạt, 0 cảnh báo | Cấu hình đầy đủ |
+| `npm test` | 153/153 đạt | Toàn bộ unit frontend |
+| `npm run build` | Đạt | Build production |
+| `npm run test:my-tickets-routing` | 47 nhóm đạt, 0 lỗi JavaScript | Edge + REST mô phỏng, tải PNG xuống filesystem thật |
+| `npm run test:cinemas-browser` | 64 nhóm đạt, 0 lỗi JavaScript | Hồi quy rạp/điều hướng, REST mô phỏng |
+| `npm run test:checkout-browser` | 18 nhóm đạt, 0 lỗi JavaScript | Hồi quy checkout/VNPay return, REST/gateway mô phỏng |
+| Maven: `BookingQrServiceTests,BookingControllerTests,SecurityAuthorizationTests,PaymentReturnTests` | 34 test đạt, không lỗi/skip | Service/controller/security/ZXing; repository và JWT lookup mock |
+| `git diff --check` | Đạt | Không lỗi khoảng trắng |
+
+Lệnh backend chạy từ `backend/cinema-booking-backend`:
+
+```powershell
+.\mvnw.cmd '-Dmaven.repo.local=C:/Users/LOQ/.m2/repository' '-Dtest=BookingQrServiceTests,BookingControllerTests,SecurityAuthorizationTests,PaymentReturnTests' test
+```
+
+Máy kiểm tra cần chỉ rõ Maven cache vì cấu hình mặc định trỏ tới `C:/.m2/repository` ngoài workspace. Báo cáo Maven tại `backend/cinema-booking-backend/target/surefire-reports/`.
+
+Báo cáo và ảnh chụp:
+
+- Vé: `C:/Users/LOQ/AppData/Local/Temp/cinema-tickets-routing-3sLoIp/results.json`; cùng thư mục có ảnh 390/768/1440px và file tải `ticket-BK20261109130000ABCD.png`.
+- Rạp: `C:/Users/LOQ/AppData/Local/Temp/cinema-cinemas-mock-ehFZtJ/results.json`.
+- Checkout: `C:/Users/LOQ/AppData/Local/Temp/cinema-checkout-browser-LYdFYm/`.
+
+Giới hạn được xác nhận:
+
+- **API/DB thật:** chưa chạy hành trình trình duyệt tới backend đang phục vụ dữ liệu thật, đăng nhập JWT thật, VNPay/IPN thật hoặc gửi email vé. Không suy diễn kết quả các phần này từ test mô phỏng. Các test Maven đã chạy mã backend thật ở mức service/controller/security, không kết nối PostgreSQL/Redis.
+- **Polling:** trong các ca Edge chuyên biệt, timer 30 giây được rút xuống 300ms và đồng hồ ca stale/focus dịch thêm 31 giây. Cấu hình ứng dụng vẫn 30 giây. Việc ẩn/hiện tab được mô phỏng bằng sự kiện visibility.
+- **QR:** fixture Edge là PNG nhỏ để kiểm tra Blob/render/download và vòng đời URL; ảnh QR thật 300×300 và nội dung giải mã được kiểm tra bằng ZXing ở backend. Chưa quét bằng thiết bị tại rạp.
+
+Mục 1–6 đã hoàn thành trong phạm vi kiểm chứng trên. Các mục ngoài phạm vi ban đầu (hủy vé/hoàn tiền/quét tại rạp/poster/thay đổi quy trình thanh toán) vẫn chưa được triển khai.
 
 

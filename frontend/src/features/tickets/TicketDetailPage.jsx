@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Download, RefreshCw, Ticket } from 'lucide-react';
 import { formatTicketDateTime, formatTicketMoney, isBookingCode, ticketListHref, ticketSeatLabel, ticketSeatType, ticketText } from './ticketUtils';
@@ -8,20 +8,38 @@ import { TicketContinue, TicketError, TicketLoading, TicketRefresh, TicketStatus
 const FOCUS_CLASS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
 const PANEL_CLASS = 'min-w-0 rounded-2xl border border-surfaceBorder bg-surface p-5 sm:p-7';
 
+function TicketQrImage({ blob, code }) {
+  const image = useRef(null);
+  const download = useRef(null);
+
+  useEffect(() => {
+    // Object URLs are resources: allocate only after commit, including in StrictMode.
+    const url = URL.createObjectURL(blob);
+    const imageElement = image.current;
+    const downloadElement = download.current;
+    imageElement.src = url;
+    downloadElement.href = url;
+    return () => {
+      imageElement.removeAttribute('src');
+      downloadElement.removeAttribute('href');
+      URL.revokeObjectURL(url);
+    };
+  }, [blob]);
+
+  return <div className="mt-4 space-y-4">
+    <div className="inline-block rounded-xl bg-white p-3 shadow-lg">
+      <img ref={image} alt={`Mã QR đơn đặt vé ${code}`} className="h-44 w-44 object-contain" />
+    </div>
+    <p className="text-xs text-muted">Xuất trình mã này tại quầy vé hoặc cửa phòng chiếu</p>
+    <div><a ref={download} download={`ticket-${code}.png`} className={`inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primaryHover ${FOCUS_CLASS}`}>
+      <Download aria-hidden="true" className="h-4 w-4" />Tải mã QR
+    </a></div>
+  </div>;
+}
+
 function TicketQrSection({ ticket }) {
   const isConfirmed = ticket.status === 'CONFIRMED';
   const qrQuery = useTicketQr(ticket.bookingCode, isConfirmed);
-
-  const qrUrl = useMemo(() => {
-    if (!qrQuery.data) return null;
-    return URL.createObjectURL(qrQuery.data);
-  }, [qrQuery.data]);
-
-  useEffect(() => {
-    return () => {
-      if (qrUrl) URL.revokeObjectURL(qrUrl);
-    };
-  }, [qrUrl]);
 
   return (
     <section aria-labelledby="ticket-qr" className={`${PANEL_CLASS} text-center`}>
@@ -59,27 +77,8 @@ function TicketQrSection({ ticket }) {
             Thử lại
           </button>
         </div>
-      ) : qrUrl ? (
-        <div className="mt-4 space-y-4">
-          <div className="inline-block rounded-xl bg-white p-3 shadow-lg">
-            <img
-              src={qrUrl}
-              alt={`Mã QR đơn đặt vé ${ticket.bookingCode}`}
-              className="h-44 w-44 object-contain"
-            />
-          </div>
-          <p className="text-xs text-muted">Xuất trình mã này tại quầy vé hoặc cửa phòng chiếu</p>
-          <div>
-            <a
-              href={qrUrl}
-              download={`ticket-${ticket.bookingCode}.png`}
-              className={`inline-flex min-h-10 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white hover:bg-primaryHover ${FOCUS_CLASS}`}
-            >
-              <Download aria-hidden="true" className="h-4 w-4" />
-              Tải mã QR
-            </a>
-          </div>
-        </div>
+      ) : qrQuery.data ? (
+        <TicketQrImage blob={qrQuery.data} code={ticket.bookingCode} />
       ) : null}
     </section>
   );

@@ -1,6 +1,6 @@
-// Mục 1–5: bản production với API xác thực/vé mô phỏng; không đọc/ghi backend thật.
+// Mục 1–6: bản production với API mô phỏng; không đọc/ghi backend thật.
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +23,8 @@ const heading = text => `document.querySelector('main h1')?.textContent === ${JS
 const listReady = `${heading('Vé của tôi.')} && Boolean(document.querySelector('main article'))`;
 const detailReady = `${heading('Đơn đặt vé')} && Boolean(document.querySelector('#ticket-showtime'))`;
 const guestReady = heading('Đăng nhập để xem vé');
+const qrReady = `Boolean(document.querySelector('[aria-labelledby="ticket-qr"] img')?.naturalWidth)`;
+const fixturePng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 function sessionSource(user, sessionId) {
   return `localStorage.clear(); ${user ? `
@@ -48,7 +50,7 @@ async function reply(requestId, status, data) {
 async function intercept({ request, requestId }) {
   if (request.method === 'OPTIONS') return reply(requestId, 200, null);
   const route = new URL(request.url).pathname.replace('/api/v1', '');
-  requests.push({ route, method: request.method });
+  requests.push({ route, method: request.method, bearer: request.headers.Authorization });
   if (route === '/users/me') {
     scenario.me++;
     if (scenario.holdMe) {
@@ -62,7 +64,7 @@ async function intercept({ request, requestId }) {
     assert.equal(request.method, 'GET', 'Trang vé chỉ đọc dữ liệu');
     assert.ok(scenario.verified.has(request.headers.Authorization), 'Phải xác minh phiên trước khi đọc vé');
     if (scenario.holdTickets) {
-      scenario.heldTickets.push({ requestId, route });
+      scenario.heldTickets.push({ requestId, route, data: route === '/users/me/bookings' ? scenario.history : { ...ticketDetail(route.split('/').at(-1)), ...scenario.detailOverrides } });
       return;
     }
     if (route === '/users/me/bookings') return reply(requestId, scenario.historyStatus || 200, scenario.history);
@@ -71,9 +73,9 @@ async function intercept({ request, requestId }) {
   if (/^\/bookings\/BK[a-zA-Z0-9]{18}\/qr$/.test(route)) {
     assert.equal(request.method, 'GET', 'Mã QR chỉ được đọc qua GET');
     assert.ok(scenario.verified.has(request.headers.Authorization), 'Phải xác minh phiên trước khi đọc mã QR');
+    if (scenario.holdQr) { scenario.heldQr.push(requestId); return; }
     const qrStatus = scenario.qrStatus || 200;
     if (qrStatus === 200) {
-      const pngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
       await cdp.send('Fetch.fulfillRequest', {
         requestId,
         responseCode: 200,
@@ -85,13 +87,20 @@ async function intercept({ request, requestId }) {
           { name: 'Access-Control-Allow-Headers', value: 'Authorization, Content-Type, Accept' },
           { name: 'Access-Control-Allow-Methods', value: 'GET, OPTIONS' },
         ],
-        body: pngBase64,
+        body: scenario.invalidPng ? Buffer.from('not a png').toString('base64') : fixturePng,
       });
       return;
     }
     return reply(requestId, qrStatus, null);
   }
   if (route === '/products' && scenario.allowCheckout) return reply(requestId, 200, []);
+  if (route === '/payments/vnpay-return' && scenario.paymentFlow) {
+    assert.equal(request.method, 'POST');
+    scenario.paymentReads++;
+    const paid = scenario.paymentConfirmed;
+    return reply(requestId, 200, { booking: { ...ticketDetail(ticketHistory[1].bookingCode), status: paid ? 'CONFIRMED' : 'PENDING' },
+      paymentStatus: paid ? 'SUCCESS' : 'PENDING', attemptStatus: paid ? 'SUCCESS' : 'PENDING', gatewayResponseCode: '00', gatewayTransactionStatus: '00' });
+  }
   if (route === '/auth/login') return reply(requestId, 200, {
     accessToken: 'login-token', refreshToken: 'login-refresh', user: scenario.user,
   });
@@ -102,11 +111,17 @@ async function intercept({ request, requestId }) {
 async function boot({ user = customer, route = list, width = 1440, ...options } = {}) {
   await cdp.send('Page.navigate', { url: 'about:blank' });
   await cdp.wait('location.href === "about:blank"');
-  scenario = { user, status: 200, holdMe: false, holdTickets: false, me: 0, held: [], heldTickets: [], history: ticketHistory, verified: new Set(), ...options };
+  scenario = { user, status: 200, holdMe: false, holdTickets: false, me: 0, held: [], heldTickets: [], heldQr: [], paymentReads: 0, history: ticketHistory, verified: new Set(), ...options };
   const marker = ++sequence;
   const script = await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
     source: `if (location.origin === ${JSON.stringify(origin)}) {
       ${sessionSource(user, `boot-${marker}`)} window.__ticketsBoot = ${marker};
+      window.__urlsCreated = []; window.__urlsRevoked = [];
+      const createUrl = URL.createObjectURL.bind(URL), revokeUrl = URL.revokeObjectURL.bind(URL);
+      URL.createObjectURL = blob => { const url = createUrl(blob); window.__urlsCreated.push(url); return url; };
+      URL.revokeObjectURL = url => { window.__urlsRevoked.push(url); revokeUrl(url); };
+      ${options.fastPolling ? `const interval = window.setInterval.bind(window);
+        window.setInterval = (callback, ms, ...args) => interval(callback, ms === 30000 ? 300 : ms, ...args);` : ''}
     }`,
   });
   await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
@@ -141,14 +156,17 @@ async function waitHeldTickets(count = 1) {
 async function releaseHeldTicket(overrideData) {
   const held = scenario.heldTickets.shift();
   assert.ok(held);
-  const data = overrideData !== undefined ? overrideData : scenario.history;
+  const data = overrideData !== undefined ? overrideData : held.data;
   await reply(held.requestId, 200, data);
 }
 
-async function failHeldTicket() {
+async function releaseLateTicket() {
   const held = scenario.heldTickets.shift();
-  // Giả lập request bị abort hoặc thất bại từ server sau khi phiên đổi
-  await cdp.send('Fetch.failRequest', { requestId: held.requestId, errorReason: 'Aborted' }).catch(() => {});
+  try { await reply(held.requestId, 200, held.data); }
+  catch (error) {
+    // An aborted Fetch interception cannot be fulfilled in Chromium.
+    if (!error.message.includes('Invalid InterceptionId')) throw error;
+  }
 }
 
 async function reload(ready) {
@@ -297,7 +315,7 @@ async function checkTicketData() {
   await cdp.wait(`location.pathname === '/checkout/${ticketHistory[1].bookingCode}' && document.querySelector('main').textContent.includes('Interstellar')`);
   assert.ok(requests.slice(start).every(item => item.method === 'GET'));
   assert.equal(await cdp.evaluate(`document.querySelectorAll('main a[href*="/qr"]').length`), 0);
-  passed.push('Tiếp tục đơn mở checkout hiện có; mọi request trong luồng trang vé đều GET, không lấy QR');
+  passed.push('Tiếp tục đơn mở checkout hiện có; trang vé chỉ GET, không tự tạo giao dịch');
 }
 
 /**
@@ -321,7 +339,7 @@ async function checkSessionIsolation() {
   await switchSession(otherCustomer);
   await waitHeld(); // chờ /users/me của B bị giữ
   // Nhả (abort) response ticket của A — đến muộn sau khi phiên đã đổi
-  if (scenario.heldTickets.length) await failHeldTicket();
+  if (scenario.heldTickets.length) await releaseLateTicket();
   // Xác minh B xong; B sẽ gửi request danh sách mới
   await release();
   await waitHeldTickets(1); // request danh sách của B đang bị giữ
@@ -343,7 +361,7 @@ async function checkSessionIsolation() {
   await switchSession(null);
   await cdp.wait(guestReady); // guard chuyển về màn guest
   // Fail/abort response danh sách cũ của A về sau khi đã logout
-  if (scenario.heldTickets.length) await failHeldTicket();
+  if (scenario.heldTickets.length) await releaseLateTicket();
   // Chờ để đảm bảo không có state update nào từ response muộn
   await delay(300);
   assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main article'))`), false, 'Không hiển thị vé sau logout');
@@ -439,6 +457,143 @@ async function checkTicketQr() {
   passed.push('Rời trang chi tiết vé: tự động thu hồi (revokeObjectURL) blob URL mã QR');
 }
 
+async function assertUrlsReleased() {
+  await cdp.wait('window.__urlsCreated.every(url => window.__urlsRevoked.includes(url))');
+  assert.equal(await cdp.evaluate('window.__urlsCreated.length === window.__urlsRevoked.length'), true);
+}
+
+async function checkFinalAcceptance() {
+  // Actual PNG decode + download via the browser, rather than only checking an <a> attribute.
+  await boot({ route: detail }); await cdp.wait(qrReady);
+  await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: artifacts });
+  await cdp.evaluate(`document.querySelector('[aria-labelledby="ticket-qr"] a[download]').click()`);
+  const filename = `ticket-${code}.png`;
+  const deadline = Date.now() + 10000;
+  while (!(await readdir(artifacts)).includes(filename)) {
+    assert.ok(Date.now() < deadline, 'PNG download must finish'); await delay(60);
+  }
+  assert.deepEqual(await readFile(path.join(artifacts, filename)), Buffer.from(fixturePng, 'base64'));
+  await cdp.evaluate(`document.querySelector('main a[href="${list}"]').click()`); await cdp.wait(listReady);
+  await assertUrlsReleased();
+  passed.push('PNG thực sự giải mã được trên trình duyệt và tải đúng byte/tên file; mọi object URL được thu hồi');
+
+  for (const status of ['CANCELLED', 'EXPIRED', 'UNKNOWN']) {
+    const start = requests.length;
+    await boot({ route: detail, detailOverrides: { status } }); await cdp.wait(detailReady);
+    assert.equal(requests.slice(start).some(request => request.route.endsWith('/qr')), false);
+    assert.equal(await cdp.evaluate(`document.querySelectorAll('main [download], main a[href^="/checkout/"]').length`), 0);
+  }
+  await boot({ route: detail, invalidPng: true }); await cdp.wait(includes('Không tải được mã QR'));
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main [download]'))`), false);
+  scenario.invalidPng = false; await cdp.click('Thử lại', '[aria-labelledby="ticket-qr"]'); await cdp.wait(qrReady);
+  for (const qrStatus of [404, 503]) {
+    await boot({ route: detail, qrStatus }); await cdp.wait(includes('Không tải được mã QR'));
+    assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main [download]'))`), false);
+  }
+  passed.push('CANCELLED/EXPIRED/trạng thái lạ không tải QR; PNG sai, lỗi 404/503 có xử lý và thử lại');
+
+  // A live URL must be revoked immediately on an account switch or logout.
+  for (const nextUser of [otherCustomer, null]) {
+    await boot({ route: detail }); await cdp.wait(qrReady);
+    scenario.holdMe = true;
+    await switchSession(nextUser);
+    await cdp.wait(nextUser ? includes('Đang xác minh phiên') : guestReady);
+    await assertUrlsReleased();
+    assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main img, main [download]'))`), false);
+  }
+  passed.push('Đổi tài khoản/đăng xuất thu hồi tất cả URL QR và gỡ ảnh/link tải trước khi xác minh phiên mới');
+
+  await boot({ route: detail, holdQr: true }); await cdp.wait(detailReady);
+  const qrDeadline = Date.now() + 10000;
+  while (!scenario.heldQr.length) {
+    assert.ok(Date.now() < qrDeadline, 'QR request must be held'); await delay(40);
+  }
+  const heldQr = scenario.heldQr.shift();
+  await switchSession(null); await cdp.wait(guestReady);
+  try {
+    await cdp.send('Fetch.fulfillRequest', { requestId: heldQr, responseCode: 200,
+      responseHeaders: [{ name: 'Content-Type', value: 'image/png' }, { name: 'Access-Control-Allow-Origin', value: origin }], body: fixturePng });
+  } catch (error) { if (!error.message.includes('Invalid InterceptionId')) throw error; }
+  await delay(200);
+  assert.equal(await cdp.evaluate(`window.__urlsCreated.length`), 0);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main img, main [download]'))`), false);
+
+  await boot({ route: detail, holdTickets: true }); await waitHeldTickets();
+  scenario.holdMe = true; scenario.detailOverrides = { showtime: { movieTitle: 'Vé riêng của B' } };
+  await switchSession(otherCustomer); await waitHeld(); await releaseLateTicket();
+  scenario.holdTickets = false; await release(); await cdp.wait(detailReady);
+  assert.equal(await cdp.evaluate(`document.querySelector('#ticket-showtime').textContent`), 'Vé riêng của B');
+  passed.push('Phản hồi QR sau logout và chi tiết sau đổi tài khoản không khôi phục dữ liệu phiên cũ');
+
+  // Accelerate only the 30s polling timer to 300ms in this test, leave product code unchanged.
+  await boot({ fastPolling: true }); await cdp.wait(listReady);
+  const listReads = () => requests.filter(request => request.route === '/users/me/bookings').length;
+  let count = listReads();
+  scenario.history = ticketHistory.map(ticket => ({ ...ticket, movieTitle: `${ticket.movieTitle} cập nhật` }));
+  await cdp.wait(`document.querySelector('main article h2').textContent.endsWith('cập nhật')`);
+  assert.ok(listReads() > count);
+  await cdp.evaluate(`Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); document.dispatchEvent(new Event('visibilitychange'));`);
+  await delay(150); count = listReads(); await delay(700); assert.equal(listReads(), count, 'No polling in background');
+  scenario.history = ticketHistory.map(ticket => ({ ...ticket, status: 'CONFIRMED' }));
+  await cdp.evaluate(`Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); document.dispatchEvent(new Event('visibilitychange'));`);
+  await cdp.wait(`document.querySelectorAll('main a[href^="/checkout/"]').length === 0`);
+  count = listReads(); await delay(700); assert.equal(listReads(), count, 'Stop polling without pending bookings');
+  // With no pending orders, stale data still refreshes on focus after 30s.
+  scenario.history = [{ ...ticketHistory[0], movieTitle: 'Làm mới khi quay lại tab' }];
+  await cdp.evaluate(`(() => { const now = Date.now.bind(Date); Date.now = () => now() + 31000;
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); document.dispatchEvent(new Event('visibilitychange'));
+  })()`);
+  await delay(50);
+  await cdp.evaluate(`Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); window.dispatchEvent(new Event('visibilitychange'));`);
+  await cdp.wait(`document.querySelector('main article h2').textContent === 'Làm mới khi quay lại tab'`);
+  passed.push('Danh sách PENDING poll, tab ẩn dừng, hết PENDING dừng; dữ liệu stale làm mới khi focus (timer kiểm tra rút ngắn)');
+
+  const pendingCode = ticketHistory[1].bookingCode;
+  await boot({ route: `${list}/${pendingCode}`, fastPolling: true }); await cdp.wait(detailReady);
+  scenario.detailOverrides = { status: 'CONFIRMED' };
+  await cdp.wait(qrReady);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main a[href^="/checkout/"]'))`), false);
+  scenario.detailStatus = 503; await cdp.click('Làm mới'); await cdp.wait(includes('Chưa làm mới được dữ liệu'));
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('#ticket-showtime'))`), true);
+  scenario.detailStatus = 200; await cdp.click('Thử lại'); await cdp.wait(`!document.querySelector('main [role="alert"]')`);
+  passed.push('Chi tiết PENDING poll tới CONFIRMED mới tải QR; lỗi làm mới giữ chi tiết và thử lại phục hồi');
+
+  // Journey: tickets -> backend-verified payment result -> tickets, including a reload.
+  await boot({ history: [ticketHistory[1]], paymentFlow: true }); await cdp.wait(listReady);
+  const start = requests.length;
+  const params = new URLSearchParams({ vnp_TxnRef: 'TEST123', vnp_SecureHash: 'a'.repeat(128), vnp_Amount: '18000000', vnp_TmnCode: 'TEST', vnp_ResponseCode: '00', vnp_TransactionStatus: '00' });
+  await cdp.evaluate(`history.pushState(null, '', ${JSON.stringify(`/payment/vnpay-callback?${params}`)}); dispatchEvent(new PopStateEvent('popstate'))`);
+  await cdp.wait(includes('VNPay đã ghi nhận thanh toán'));
+  scenario.paymentConfirmed = true;
+  scenario.history = [{ ...ticketHistory[1], status: 'CONFIRMED' }];
+  scenario.detailOverrides = { status: 'CONFIRMED' };
+  await cdp.click('Kiểm tra trạng thái'); await cdp.wait(heading('Đặt vé thành công'));
+  await cdp.evaluate(`document.querySelector('footer a[href="${list}"]').click()`); await cdp.wait(listReady);
+  assert.equal(await cdp.evaluate(`Boolean(document.querySelector('main a[href^="/checkout/"]'))`), false);
+  assert.equal(await cdp.evaluate(`document.querySelector('main article').textContent.includes('Đã xác nhận')`), true);
+  await reload(listReady);
+  await cdp.evaluate(`document.querySelector('main article a').click()`); await cdp.wait(qrReady);
+  assert.ok(requests.slice(start).every(request => request.method === 'GET' || request.route === '/payments/vnpay-return'));
+  passed.push('Sau backend xác nhận thanh toán, quay về/reload vé thấy CONFIRMED và mở QR; không gọi API tạo thanh toán');
+
+  for (const width of [390, 768, 1440]) {
+    await boot({ width }); await cdp.wait(listReady);
+    await cdp.evaluate(`document.querySelector('main [role="group"] button').focus()`);
+    await cdp.key('Tab');
+    assert.equal(await cdp.evaluate(`document.activeElement.textContent.startsWith('Đã xác nhận')`), true);
+    assert.equal(await cdp.evaluate(`getComputedStyle(document.activeElement).outlineStyle !== 'none'`), true);
+    await cdp.key('Enter'); await cdp.wait(`location.search === '?status=CONFIRMED'`);
+    assert.equal(await cdp.evaluate(`document.activeElement.getAttribute('aria-pressed')`), 'true');
+    await cdp.evaluate(`document.querySelector('main article a').focus()`); await cdp.key('Enter'); await cdp.wait(qrReady); await assertShell();
+    assert.ok((await cdp.evaluate(`document.querySelector('main img').alt`)).includes(code));
+    assert.equal(await cdp.evaluate(`getComputedStyle(document.querySelector('main img').parentElement).backgroundColor`), 'rgb(255, 255, 255)');
+    await screenshot(`tickets-qr-${width}.png`);
+  }
+  passed.push('Tab/focus/Enter lọc và mở chi tiết; nhãn trạng thái, alt QR/nền trắng, một layout tại 390/768/1440px');
+  const storage = await cdp.evaluate(`Object.fromEntries(Object.entries(localStorage))`);
+  assert.ok(Object.keys(storage).every(key => ['premier_cinema_access_token', 'premier_cinema_refresh_token', 'premier_cinema_session_id', 'premier_cinema_user'].includes(key)), 'No private ticket data persisted');
+}
+
 try {
   browser = await startEdgeBrowser({ root, port: 4210, debugPort: 9243, artifacts, executable: process.env.ADMIN_EDGE_PATH });
   cdp = browser.cdp;
@@ -524,14 +679,15 @@ try {
   await checkTicketData();
   await checkSessionIsolation();
   await checkTicketQr();
+  await checkFinalAcceptance();
   assert.deepEqual(exceptions, []);
-  const report = { mode: 'Edge production / API xác thực và vé mô phỏng, chưa kiểm tra backend thật — Mục 1–5', passed,
+  const report = { mode: 'Edge production / API mô phỏng; PNG download thật; timer polling rút ngắn 30s thành 300ms ở các ca ghi rõ — Mục 1–6', passed,
     requests, runtimeExceptions: exceptions.length, artifacts };
   await writeFile(path.join(artifacts, 'results.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ ...report, requests: requests.length }, null, 2));
 } catch (error) {
   await writeFile(path.join(artifacts, 'failure.json'), JSON.stringify({ passed, requests, exceptions,
     body: await cdp?.evaluate('document.body.innerText').catch(() => '') }, null, 2));
-  console.error(`Kiểm tra mục 1–5 thất bại: ${artifacts}`);
+  console.error(`Kiểm tra mục 1–6 thất bại: ${artifacts}`);
   throw error;
 } finally { await browser?.close(); }

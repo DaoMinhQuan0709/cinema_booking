@@ -1,5 +1,6 @@
 import axiosInstance from '../../config/axiosInstance';
 import { bookingService } from '../../services/bookingService';
+import { requireTicketPng } from './ticketQr';
 
 const isRecord = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -20,10 +21,6 @@ export const ticketService = {
       responseType: 'blob',
       skipErrorToast: true,
     });
-    const blob = response?.data;
-    if (!blob || (typeof Blob !== 'undefined' && !(blob instanceof Blob))) {
-      throw new Error('Dữ liệu mã QR không hợp lệ.');
-    }
-    return blob;
+    return requireTicketPng(response?.data);
   },
 };
