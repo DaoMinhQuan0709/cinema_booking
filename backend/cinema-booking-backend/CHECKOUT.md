@@ -1,8 +1,35 @@
 # Chạy và kiểm tra Checkout
 
 Checkout dùng dữ liệu đơn và ghế nội bộ. Từ trang chọn ghế, “Tiếp tục” tạo
-đơn giữ chỗ rồi mở `/checkout/:bookingCode`; mã đơn phải do backend trả về.
-Countdown và sửa combo không gia hạn thời gian giữ ghế.
+đơn giữ chỗ rồi mở `/booking/:bookingCode/products`. Khách chọn bắp, nước,
+combo hoặc tiếp tục chỉ với vé; bấm “Tiếp tục thanh toán” lưu sản phẩm rồi
+mở `/checkout/:bookingCode`. Mã đơn phải do backend trả về, cả hai trang
+dùng cùng đơn và deadline gốc; countdown và sửa sản phẩm không gia hạn giữ ghế.
+
+Thao tác tăng/giảm chỉ sửa bản nháp trong trang sản phẩm. Reload khôi phục
+lựa chọn đã lưu gần nhất; bản nháp chưa lưu không được giữ. Checkout có
+liên kết “Chỉnh sửa sản phẩm” khi đơn còn EDITABLE. PUT kiểm tra lại giá
+và revision trước khi tạo URL; khách phải xác nhận giá thay đổi. URL
+Checkout cũ và “Vé của tôi” vẫn hoạt động trực tiếp.
+
+Danh mục `/api/v1/products` dùng chung cho mọi rạp. Nếu catalog lỗi, giữ
+sản phẩm của đơn và cho thử lại; không gửi danh sách rỗng thay dữ liệu lỗi.
+Sản phẩm ngừng bán phải được khách bỏ rõ ràng. Lỗi 409 yêu cầu tải lại lựa
+chọn đã lưu; lỗi mạng phải GET đối chiếu đơn, không tự gửi lại thanh toán.
+
+## Dữ liệu và ảnh sản phẩm
+
+Nếu database chưa có sản phẩm, dùng công cụ PostgreSQL của dự án để chạy
+[seed-products.sql](src/main/resources/db/manual/seed-products.sql), sau đó
+[update-product-images.sql](src/main/resources/db/manual/update-product-images.sql).
+Seed thêm sản phẩm thiếu theo tên; script ảnh cập nhật đường dẫn theo tên,
+không phụ thuộc ID. Chọn đúng database/schema trước khi chạy. Thay đổi chức
+năng này không tự thực thi hai script hoặc thay schema ứng dụng.
+
+Ảnh nằm trong `src/main/resources/static/images`; tên file phân biệt hoa/thường.
+GET `/images/**` công khai. Frontend ghép đường dẫn `/images/...` theo origin
+backend từ `VITE_API_BASE_URL`, giữ URL HTTP/HTTPS đầy đủ và có ảnh dự phòng.
+Khởi động lại backend để nạp cấu hình bảo mật mới.
 
 ## Cập nhật database và chạy
 
@@ -13,7 +40,7 @@ Countdown và sửa combo không gia hạn thời gian giữ ghế.
    để có unique index giới hạn một attempt đang hoạt động trên mỗi đơn.
 2. Bật PostgreSQL và Redis, khởi động lại backend bằng cấu hình F5 hiện có.
 3. Trong `frontend`, chạy `npm.cmd run dev`. Đăng nhập, chọn phim/suất/ghế,
-   bấm “Tiếp tục”, chọn combo và phương thức rồi thanh toán.
+   bấm “Tiếp tục”, chọn sản phẩm, bấm “Tiếp tục thanh toán”, chọn phương thức rồi thanh toán.
 
 Migration này đã được kiểm tra trong schema riêng khi chạy test; công việc
 triển khai mã nguồn không tự áp dụng migration lên schema dữ liệu thật.

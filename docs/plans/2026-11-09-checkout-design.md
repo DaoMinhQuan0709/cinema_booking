@@ -2,6 +2,12 @@
 
 Ngày: 09/11/2026 (Asia/Ho_Chi_Minh).
 
+**Cập nhật 20/11/2026:** chức năng chọn sản phẩm đã được tách thành bước riêng,
+lưu khi bấm tiếp tục; Checkout xác minh lại giá trước tạo URL. Phần thiết kế
+dưới đây lưu quyết định ban đầu. Hành vi hiện tại xem
+[product-selection-plan.md](../../product-selection-plan.md) và
+[CHECKOUT.md](../../backend/cinema-booking-backend/CHECKOUT.md).
+
 Trạng thái: Người dùng đã xác nhận phạm vi, giả định, phương án 1, bố cục,
 luồng dữ liệu, xử lý lỗi và kiểm thử. Rà soát kỹ thuật đã hoàn tất với phán
 quyết APPROVED của Integrator/Arbiter. Đã triển khai và kiểm chứng ngày

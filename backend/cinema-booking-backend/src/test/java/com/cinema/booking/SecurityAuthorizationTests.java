@@ -18,12 +18,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Map;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /** Real security filter chain with mocked JWT/user lookup; no DB, Redis or external API. */
@@ -81,6 +84,18 @@ class SecurityAuthorizationTests {
     }
 
     @Test
+    void productImagesArePublicReadOnlyResourcesWithCaseSensitiveNames() throws Exception {
+        for (String image : new String[]{"Bap_rang_bo_vua.png", "bap_rang_bo_lon.png", "bap_caramel_vua.png",
+                "nuoc_ngot_vua.png", "nuoc_ngot_lon.png", "nuoc_suoi.png", "combo_solo.png",
+                "combo_couple.png", "combo_caramel.png", "combo_friends.png"}) {
+            mvc.perform(get("/images/" + image)).andExpect(status().isOk())
+                    .andExpect(content().contentTypeCompatibleWith("image/png"));
+        }
+        mvc.perform(post("/images/combo_solo.png")).andExpect(status().isUnauthorized());
+        verifyNoInteractions(users);
+    }
+
+    @Test
     void qrRequiresAValidBearerButDoesNotRequireTheAdminRole() throws Exception {
         String path = "/api/v1/bookings/BK20261120130000ABCD/qr";
         when(tokens.validateToken("invalid-token")).thenReturn(false);
@@ -102,7 +117,11 @@ class SecurityAuthorizationTests {
     @Configuration
     @EnableWebMvc
     @Import(SecurityConfig.class)
-    static class TestConfig {
+    static class TestConfig implements WebMvcConfigurer {
+        @Override
+        public void addResourceHandlers(ResourceHandlerRegistry registry) {
+            registry.addResourceHandler("/images/**").addResourceLocations("classpath:/static/images/");
+        }
         @Bean JwtTokenProvider tokens() { return mock(JwtTokenProvider.class); }
         @Bean CustomUserDetailsService users() { return mock(CustomUserDetailsService.class); }
         @Bean JwtAuthenticationFilter jwtFilter(JwtTokenProvider tokens, CustomUserDetailsService users) {

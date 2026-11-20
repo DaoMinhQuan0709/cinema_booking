@@ -178,8 +178,8 @@ Tiến độ và kiểm chứng (mô phỏng tách API thật): [cinemas-impleme
 > và tính là 2 chỗ trong giới hạn 8; một bên không khả dụng sẽ khóa cả cặp.
 > Route dùng `showtimes.id` nội bộ dạng số. Đã tích hợp WebSocket STOMP và nút
 > “Tiếp tục” gọi API giữ ghế, yêu cầu đăng nhập, xử lý 409, xác nhận mã/thời hạn,
-> hủy giữ chỗ và khôi phục bằng API khi tải lại trang. Đã nối sang Checkout,
-> countdown server, combo và tạo URL thanh toán Sandbox ở mục 4.
+> hủy giữ chỗ và khôi phục bằng API khi tải lại trang. Sau giữ ghế mở bước
+> chọn sản phẩm, sau đó Checkout; cả hai bước dùng countdown server và cùng đơn.
 > Trang kết quả VNPay ở mục 5 đã có; callback MoMo và vé QR là công việc tiếp theo.
 
 *   **Màn hình chiếu cong (Curved Screen):** Đồ họa SVG vòm cong với dòng chữ sáng *"MÀN HÌNH"*.
@@ -201,10 +201,13 @@ Tiến độ và kiểm chứng (mô phỏng tách API thật): [cinemas-impleme
         có nút hủy để chọn lại. HTTP 409 hiện toast một lần và tải lại sơ đồ. Mã đơn
         lưu theo tài khoản/suất trong tab và được xác thực lại qua API khi tải lại trang.
 
-### 4. Trang Chọn Bắp Nước & Thanh Toán (`/checkout/:bookingCode`)
+### 4. Chọn sản phẩm (`/booking/:bookingCode/products`) và Thanh toán (`/checkout/:bookingCode`)
 
-> Đã triển khai route, countdown theo giờ server, chọn combo, xác nhận giá mới,
-> lưu combo khi thanh toán, tạo/tiếp tục URL Sandbox và hủy giữ chỗ.
+> Cập nhật 20/11/2026: chọn bắp/nước/combo ở bước riêng; tăng/giảm chỉ sửa bản
+> nháp, lưu khi bấm “Tiếp tục thanh toán”. Reload lấy lựa chọn đã lưu gần nhất.
+> Checkout hiển thị sản phẩm đã lưu và liên kết chỉnh sửa; kiểm tra lại giá/revision
+> qua PUT trước tạo URL, xác nhận giá mới và giữ nguyên deadline/ghế.
+> Kế hoạch/checklist: [product-selection-plan.md](product-selection-plan.md).
 > Thiết kế và nhật ký rà soát: [2026-11-09-checkout-design.md](docs/plans/2026-11-09-checkout-design.md).
 > Cần cập nhật schema và khởi động lại backend; hướng dẫn trong
 > [CHECKOUT.md](backend/cinema-booking-backend/CHECKOUT.md). Callback VNPay đã có; callback MoMo/vé QR làm sau.
@@ -213,7 +216,8 @@ Tiến độ và kiểm chứng (mô phỏng tách API thật): [cinemas-impleme
     *   Đếm ngược theo `serverTime` và deadline, không phụ thuộc đồng hồ máy khách.
         Khi về 0, kiểm tra lại đơn; chỉ báo hết hạn sau phản hồi server và có nút về trang chủ.
 *   **Danh mục Bắp Nước (Combo Concession):**
-    *   Thẻ combo (ảnh, tên combo, mô tả, đơn giá, nút tăng/giảm số lượng `+` `-`).
+    *   Trang sản phẩm có thẻ ảnh, tên, mô tả, đơn giá, tăng/giảm số lượng từ 0.
+    *   Không bắt buộc mua kèm; không xóa sản phẩm khi catalog lỗi; sản phẩm ngừng bán cho bỏ rõ ràng.
 *   **Phương thức thanh toán:**
     *   Lựa chọn Radio Button giữa **VNPay** và **MoMo**.
 *   **Nút "Thanh Toán Ngay":**

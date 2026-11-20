@@ -1,0 +1,3 @@
+export const primary = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primaryHover disabled:cursor-not-allowed disabled:bg-surfaceBorder disabled:text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary';
+export const secondary = 'inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-surfaceBorder px-4 py-2 text-sm text-neutral-200 hover:border-neutral-500 disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary';
+

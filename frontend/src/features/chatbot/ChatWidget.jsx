@@ -12,7 +12,7 @@ import { useCineBot } from './useCineBot';
  * - Cua so luon duoc giu trong DOM (an bang visibility) de lich su hoi thoai
  *   khong bi mat moi lan dong/mo.
  * - Dong bang nut X, nut tren header hoac phim Escape; focus tra ve nut noi.
- * - Trang /checkout co thanh thanh toan co dinh o day man hinh dien thoai,
+ * - Trang /checkout va chon san pham co thanh hanh dong co dinh o day dien thoai,
  *   nen nut noi duoc nang len de khong de len nut "Thanh toan".
  */
 export const ChatWidget = () => {
@@ -24,7 +24,7 @@ export const ChatWidget = () => {
   const messageInputRef = useRef(null);
   const conversationRef = useRef(null);
 
-  const hasBottomBar = pathname.startsWith('/checkout/');
+  const hasBottomBar = pathname.startsWith('/checkout/') || /^\/booking\/[^/]+\/products\/?$/.test(pathname);
   const bottomClass = hasBottomBar
     ? 'bottom-[calc(5.75rem+env(safe-area-inset-bottom))] lg:bottom-6'
     : 'bottom-[calc(1.25rem+env(safe-area-inset-bottom))] sm:bottom-6';

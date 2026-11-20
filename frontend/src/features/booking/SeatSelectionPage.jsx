@@ -12,6 +12,8 @@ import { SeatGrid } from './SeatGrid';
 import { useShowtimeDetail, useShowtimeSeats } from './hooks/useShowtimeSeats';
 import { useBookingHold } from './hooks/useBookingHold';
 import { formatHoldExpiry } from './bookingHold';
+import { bookingContinueHref } from './checkoutUtils';
+import { BookingProgress } from './BookingUI';
 
 const EMPTY_SEATS = [];
 
@@ -48,7 +50,7 @@ const PageSkeleton = () => (
  * PHAN 1: ma tran ghe uon cong, chon/bo chon ghe (toi da 8 cho).
  * PHAN 2: WebSocket STOMP - ghe doi mau real-time khi nguoi khac giu/ban/nha ghe.
  * PHAN 3: POST /bookings giu ghe 10 phut, xu ly 409 va xac nhan giu cho.
- * Dem nguoc/checkout/thanh toan se duoc tich hop o phan sau.
+ * Sau khi giu ghe, chuyen sang chon san pham roi Checkout voi cung ma don.
  */
 const SeatSelection = ({ showtimeId }) => {
   const navigate = useNavigate();
@@ -120,7 +122,7 @@ const SeatSelection = ({ showtimeId }) => {
     const held = await holdSeats(showtime.id, selectedUnits);
     if (held) {
       setSelectedIds(new Set());
-      navigate(`/checkout/${encodeURIComponent(held.bookingCode)}`);
+      navigate(bookingContinueHref(held));
     }
   }
 
@@ -143,6 +145,7 @@ const SeatSelection = ({ showtimeId }) => {
 
   return (
     <div className="mx-auto w-full max-w-[1280px] flex-1 px-4 pb-16 pt-8 sm:px-8 lg:px-12">
+      <BookingProgress step={0} title="Chọn ghế" />
       <Link
         to={showtime.movieId ? `/movies/${showtime.movieId}` : '/movies'}
         className="mb-6 inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-white"
@@ -240,7 +243,7 @@ const SeatSelection = ({ showtimeId }) => {
                   <p className="text-sm font-semibold text-white">Ghế đang được giữ cho bạn</p>
                   <p className="mt-2 text-xs leading-relaxed text-muted">Mã đặt chỗ: <strong className="break-all font-mono text-white">{booking.bookingCode}</strong></p>
                   <p className="mt-1 text-xs leading-relaxed text-muted">Hạn giữ: <time dateTime={booking.expiresAt} className="font-medium text-white">{formatHoldExpiry(booking.expiresAt)}</time></p>
-                  <Link to={`/checkout/${encodeURIComponent(booking.bookingCode)}`} className="mt-3 flex min-h-11 items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white hover:bg-primaryHover">Tiếp tục thanh toán</Link>
+                  <Link to={bookingContinueHref(booking)} className="mt-3 flex min-h-11 items-center justify-center rounded-lg bg-primary px-3 py-2 text-sm font-bold text-white hover:bg-primaryHover">{booking.checkout?.state === 'EDITABLE' ? 'Tiếp tục chọn sản phẩm' : 'Tiếp tục thanh toán'}</Link>
                   <button type="button" onClick={cancelHold} disabled={isSubmitting} className="mt-3 min-h-10 w-full rounded-lg border border-surfaceBorder px-3 py-2 text-xs font-semibold text-neutral-300 hover:border-neutral-500 hover:text-white disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">{isCancelling ? 'Đang hủy giữ ghế…' : 'Hủy giữ ghế để chọn lại'}</button>
                 </div>
               ) : <p className="mt-3 text-xs leading-relaxed text-muted">Bấm “Tiếp tục” để giữ các ghế đã chọn trong 10 phút. Bạn cần đăng nhập để giữ chỗ.</p>}

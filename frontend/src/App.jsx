@@ -18,6 +18,7 @@ const CinemasPage = lazy(() => import('./features/cinemas/CinemasPage'));
 const CinemaDetailPage = lazy(() => import('./features/cinemas/CinemaDetailPage'));
 const SeatSelectionPage = lazy(() => import('./features/booking/SeatSelectionPage'));
 const CheckoutPage = lazy(() => import('./features/booking/CheckoutPage'));
+const ProductSelectionPage = lazy(() => import('./features/booking/ProductSelectionPage'));
 const VNPayReturnPage = lazy(() => import('./features/booking/VNPayReturnPage'));
 const MyTicketsPage = lazy(() => import('./features/tickets/MyTicketsPage'));
 const TicketDetailPage = lazy(() => import('./features/tickets/TicketDetailPage'));
@@ -116,6 +117,7 @@ export const App = () => {
             <Route path="movies" element={<MovieCatalog />} />
             <Route path="movies/:id" element={<MovieDetail />} />
             <Route path="booking/:showtimeId" element={<SeatSelectionPage />} />
+            <Route path="booking/:bookingCode/products" element={<ProductSelectionPage />} />
             <Route path="checkout/:bookingCode" element={<CheckoutPage />} />
             <Route path="payment/vnpay-callback" element={<VNPayReturnPage />} />
             <Route path="booking" element={<SeatSelectionPage />} />

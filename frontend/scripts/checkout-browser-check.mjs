@@ -1,7 +1,7 @@
 // Windows/Edge regression check. REST and gateway requests are intercepted; no real booking/payment.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,7 @@ const artifacts = await mkdtemp(path.join(tmpdir(), 'cinema-checkout-browser-'))
 const port = 4196, debugPort = 9229;
 const origin = `http://127.0.0.1:${port}`;
 const code = 'BK20261109130000ABCD';
+const productsRoute = `/booking/${code}/products`;
 const user = { id: 7, email: 'checkout@example.invalid', fullName: 'Khách kiểm thử', role: 'CUSTOMER' };
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const exceptions = [], results = [], requests = [];
@@ -52,7 +53,7 @@ class CDP {
 
 function reset(options = {}) {
   scenario = { deadline: Date.now() + 600000, status: 'PENDING', phase: 'EDITABLE', cart: [], price: 30000,
-    revision: '0'.repeat(64), sequence: 0, payMode: 'ready', put: 0, pay: 0, cancel: 0, get: 0, ...options };
+    revision: '0'.repeat(64), sequence: 0, payMode: 'ready', put: 0, pay: 0, cancel: 0, get: 0, create: 0, ...options };
 }
 
 function booking() {
@@ -85,11 +86,17 @@ async function intercept(cdp, event) {
   try { body = request.postData ? JSON.parse(request.postData) : null; } catch { body = null; }
   requests.push({ method, pathname: url.pathname, body, authenticated: Boolean(request.headers.Authorization ?? request.headers.authorization) });
   const ok = data => fulfill(200, { code: 200, data });
-  if (url.pathname.endsWith('/users/me')) return ok(user);
+  if (url.pathname.startsWith('/images/')) {
+    if (url.pathname !== '/images/combo_solo.png') return fulfill(404, {});
+    return cdp.send('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'image/png' }],
+      body: (await readFile(path.join(root, '../backend/cinema-booking-backend/src/main/resources/static/images/combo_solo.png'))).toString('base64') });
+  }
+  if (url.pathname.endsWith('/users/me')) return ok(scenario.currentUser ?? user);
   if (url.pathname === '/api/v1/products' && method === 'GET') {
     if (scenario.catalogError) return fulfill(500, { code: 500, message: 'Catalog unavailable' });
     if (scenario.catalogUnavailable) return ok([]);
-    return ok([{ id: 1, name: 'Combo Một', description: 'Một bắp rang và một nước ngọt', price: scenario.price, isAvailable: true }]);
+    return ok([{ id: 1, name: 'Combo Một', description: 'Một bắp rang và một nước ngọt', price: scenario.price, isAvailable: true,
+      imageUrl: scenario.brokenImage ? '/images/missing.png' : '/images/combo_solo.png' }]);
   }
   if (url.pathname.endsWith('/payments/create-url')) {
     scenario.pay++;
@@ -117,6 +124,8 @@ async function intercept(cdp, event) {
     if (scenario.reprice) { scenario.price = 35000; scenario.reprice = false; }
     scenario.cart = body.products.map(item => ({ ...item, productName: 'Combo Một', unitPrice: scenario.price, subtotal: scenario.price * item.quantity }));
     scenario.revision = (++scenario.sequence).toString(16).padStart(64, '0');
+    if (scenario.lostPut) { scenario.lostPut = false; return cdp.send('Fetch.failRequest', { requestId, errorReason: 'ConnectionReset' }); }
+    if (scenario.delayPut) await delay(scenario.delayPut);
     return ok(booking());
   }
   if (url.pathname.endsWith(`/bookings/${code}/cancel`)) {
@@ -129,7 +138,7 @@ async function intercept(cdp, event) {
     if (scenario.forbidden) return fulfill(403, { code: 403, message: 'Forbidden' });
     return ok(booking());
   }
-  if (url.pathname.endsWith('/bookings') && method === 'POST') { scenario.status = 'PENDING'; return fulfill(201, { code: 201, data: booking() }); }
+  if (url.pathname.endsWith('/bookings') && method === 'POST') { scenario.create++; scenario.status = 'PENDING'; return fulfill(201, { code: 201, data: booking() }); }
   if (url.pathname.endsWith('/showtimes/5950/seats')) return ok({ showtimeId: 5950, auditoriumId: 1, auditoriumName: 'Rạp 3', totalRows: 1, totalCols: 1,
     seats: [{ showtimeSeatId: 101, seatId: 1, rowChar: 'A', seatNumber: 1, seatType: 'STANDARD', status: 'AVAILABLE', price: 80000, version: 0 }] });
   if (url.pathname.endsWith('/showtimes/5950')) return ok({ id: 5950, movieTitle: 'Buổi Chiếu Mùa Thu', cinemaName: 'Galaxy Nguyễn Du', auditoriumName: 'Rạp 3', startTime: '2026-11-10T19:30:00' });
@@ -166,25 +175,173 @@ try {
   await new Promise((resolve, reject) => { socket.addEventListener('open', resolve); socket.addEventListener('error', reject); });
   cdp = new CDP(socket);
   await cdp.send('Runtime.enable'); await cdp.send('Page.enable');
+  await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await cdp.send('Emulation.setTimezoneOverride', { timezoneId: 'America/Los_Angeles' });
   await cdp.send('Fetch.enable', { patterns: [{ urlPattern: 'http://localhost:8080/*' }, { urlPattern: 'https://sandbox.vnpayment.vn/*' }] });
   cdp.on('Runtime.exceptionThrown', event => exceptions.push(event.exceptionDetails.exception?.description ?? event.exceptionDetails.text));
   cdp.on('Fetch.requestPaused', event => { void intercept(cdp, event).catch(error => { exceptions.push(error.stack); }); });
 
+  reset(); await boot(cdp, { route: productsRoute, authenticated: false });
+  await cdp.wait(`document.body.textContent.includes('Đăng nhập để tiếp tục')`);
+  assert.equal(scenario.get, 0); results.push('products: guest gate does not fetch a private booking');
+
+  reset(); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
+  assert.equal(scenario.put, 0);
+  assert.equal(await cdp.evaluate(`document.querySelector('output[aria-label="Số lượng Combo Một"]').textContent`), '1');
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
+  assert.equal(scenario.cart[0].quantity, 1); assert.equal(scenario.put, 1); assert.equal(scenario.pay, 0);
+  results.push('products: quantities remain local until Continue; one PUT and no payment POST');
+
+  reset({ catalogUnavailable: true }); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`document.body.textContent.includes('Hiện chưa có sản phẩm đang bán')`);
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
+  assert.equal(scenario.cart.length, 0); assert.equal(scenario.put, 1);
+  results.push('products: an empty catalog permits a ticket-only booking');
+
+  reset({ reprice: true }); await boot(cdp, { route: productsRoute, width: 390 });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`);
+  assert.equal(await cdp.evaluate('location.pathname'), productsRoute); assert.equal(scenario.pay, 0);
+  assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  await writeFile(path.join(artifacts, 'products-mobile-price.png'), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  await cdp.click('Đồng ý và tiếp tục'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
+  assert.equal(scenario.cart[0].unitPrice, 35000); assert.equal(scenario.put, 1);
+  results.push('products: mobile price change is confirmed before checkout, without another PUT');
+
+  reset({ catalogError: true, cart: [{ productId: 1, productName: 'Combo Một', unitPrice: 30000, quantity: 2, subtotal: 60000 }] });
+  await boot(cdp, { route: productsRoute });
+  await cdp.wait(`document.body.textContent.includes('Chưa tải được danh mục sản phẩm')`);
+  assert.equal(await cdp.evaluate(`document.querySelector('output[aria-label="Số lượng Combo Một"]').textContent`), '2');
+  assert.equal(await cdp.evaluate(`[...document.querySelectorAll('button')].filter(b=>b.textContent.includes('Tiếp tục thanh toán')).every(b=>b.disabled)`), true);
+  scenario.catalogError = false; await cdp.click('Thử lại danh mục');
+  await cdp.wait(`!document.querySelector('button[aria-label="Tăng Combo Một"]').disabled`);
+  results.push('products: catalog failure preserves saved quantities and retry restores editing');
+
+  reset(); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
+  scenario.revision = 'f'.repeat(64);
+  scenario.cart = [{ productId: 1, productName: 'Combo Một', unitPrice: 30000, quantity: 2, subtotal: 60000 }];
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`document.body.textContent.includes('Tải lại lựa chọn đã lưu')`);
+  assert.equal(await cdp.evaluate(`document.querySelector('output[aria-label="Số lượng Combo Một"]').textContent`), '1');
+  await cdp.click('Tải lại lựa chọn');
+  assert.equal(await cdp.evaluate(`document.querySelector('output[aria-label="Số lượng Combo Một"]').textContent`), '2');
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
+  results.push('products: 409 preserves draft until explicit reload, then saves the latest cart');
+
+  reset({ unavailableOnPut: true }); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`document.body.textContent.includes('Sản phẩm đã ngừng bán. Vui lòng bỏ khỏi đơn.')`);
+  assert.equal(await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').disabled`), true);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Giảm Combo Một"]').click()`);
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
+  assert.equal(scenario.cart.length, 0); assert.equal(scenario.pay, 0);
+  results.push('products: withdrawn unsaved products remain visible and can be removed');
+
+  reset({ cart: [{ productId: 1, productName: 'Combo Một', unitPrice: 30000, quantity: 2, subtotal: 60000 }] });
+  const originalDeadline = scenario.deadline;
+  await boot(cdp, { route: productsRoute });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
+  await cdp.wait(`document.querySelector('output[aria-label="Số lượng Combo Một"]').textContent === '3'`);
+  assert.equal(scenario.put, 0);
+  await cdp.send('Page.reload');
+  await cdp.wait(`document.querySelector('output[aria-label="Số lượng Combo Một"]')?.textContent === '2'`);
+  await cdp.wait(`!document.querySelector('button[aria-label="Giảm Combo Một"]').disabled`);
+  await cdp.send('Page.bringToFront');
+  await cdp.evaluate(`document.querySelector('button[aria-label="Giảm Combo Một"]').focus()`);
+  assert.equal(await cdp.evaluate(`document.activeElement?.getAttribute('aria-label')`), 'Giảm Combo Một');
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r', unmodifiedText: '\r' });
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+  await cdp.wait(`document.querySelector('output[aria-label="Số lượng Combo Một"]').textContent === '1'`);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Giảm Combo Một"]').click()`);
+  await cdp.wait(`document.querySelector('output[aria-label="Số lượng Combo Một"]').textContent === '0'`);
+  await cdp.wait(`Boolean(document.querySelector('img[src="http://localhost:8080/images/combo_solo.png"]')?.naturalWidth)`);
+  await writeFile(path.join(artifacts, 'products-desktop.png'), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
+  assert.equal(scenario.cart.length, 0); assert.equal(scenario.deadline, originalDeadline); assert.equal(scenario.create, 0);
+  await cdp.evaluate(`document.querySelector('a[href="${productsRoute}"]').click()`);
+  await cdp.wait(`document.querySelector('output[aria-label="Số lượng Combo Một"]')?.textContent === '0'`);
+  results.push('products: reload discards draft, restores saved cart; keyboard removal persists zero and keeps deadline');
+
+  reset({ brokenImage: true }); await boot(cdp, { route: productsRoute, width: 390 });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.wait(`!document.querySelector('article img') && Boolean(document.querySelector('article svg'))`);
+  assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+  assert.equal(await cdp.evaluate(`document.querySelector('button[aria-label="Mở trợ lý CineBot"]').getBoundingClientRect().bottom <= document.querySelector('main .fixed.inset-x-0.bottom-0').getBoundingClientRect().top`), true);
+  await writeFile(path.join(artifacts, 'products-mobile-fallback.png'), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
+  results.push('products: broken images use fallback; mobile has no overflow or CineBot/action overlap');
+
+  reset({ lostPut: true }); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`document.body.textContent.includes('Tải lại lựa chọn đã lưu')`);
+  assert.equal(scenario.put, 1); assert.equal(scenario.cart[0].quantity, 1); assert.ok(scenario.get >= 2);
+  assert.equal(await cdp.evaluate('location.pathname'), productsRoute);
+  await cdp.click('Tải lại lựa chọn'); await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
+  assert.equal(scenario.cart[0].quantity, 1);
+  results.push('products: lost PUT response is reconciled with GET, without automatic retry or duplicate quantities');
+
+  reset({ delayPut: 500 }); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click(); const b = [...document.querySelectorAll('button')].find(b=>b.textContent.includes('Tiếp tục thanh toán')&&!b.disabled); b.click(); b.click();`);
+  await cdp.wait(`location.pathname === '/checkout/${code}'`); assert.equal(scenario.put, 1);
+  results.push('products: repeated Continue clicks produce one PUT');
+
+  reset({ delayPut: 1000 }); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.click('Tiếp tục thanh toán');
+  for (let attempt = 0; attempt < 30 && scenario.put === 0; attempt++) await delay(20);
+  assert.equal(scenario.put, 1); scenario.forbidden = true; scenario.currentUser = { ...user, id: 8, email: 'another@example.invalid' };
+  await cdp.evaluate(`localStorage.setItem('premier_cinema_user', ${JSON.stringify(JSON.stringify({ ...user, id: 8, email: 'another@example.invalid' }))}); localStorage.setItem('premier_cinema_session_id', 'another-session'); window.dispatchEvent(new StorageEvent('storage', { key: 'premier_cinema_session_id', storageArea: localStorage }));`);
+  await cdp.wait(`document.body.textContent.includes('Không thể truy cập đơn này')`); await delay(1100);
+  assert.equal(await cdp.evaluate('location.pathname'), productsRoute);
+  assert.equal(await cdp.evaluate(`document.body.textContent.includes('Buổi Chiếu Mùa Thu')`), false);
+  assert.equal(scenario.pay, 0);
+  results.push('products: switching accounts during PUT discards the old response and private UI');
+
+  for (const phase of ['READY', 'CREATING', 'UNKNOWN']) {
+    reset({ phase }); await boot(cdp, { route: productsRoute });
+    await cdp.wait(`location.pathname === '/checkout/${code}'`);
+    await cdp.wait(`document.body.textContent.includes('${phase === 'READY' ? 'Phiên thanh toán đã sẵn sàng' : 'Đang kiểm tra phiên thanh toán'}')`);
+    assert.equal(scenario.put, 0); assert.equal(scenario.pay, 0);
+  }
+  for (const status of ['CANCELLED', 'CONFIRMED', 'EXPIRED']) {
+    reset({ status }); await boot(cdp, { route: productsRoute });
+    await cdp.wait(`location.pathname === '/checkout/${code}'`);
+    assert.equal(scenario.put, 0);
+  }
+  reset({ deadline: Date.now() + 1800 }); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`location.pathname === '/checkout/${code}' && document.body.textContent.includes('Hết thời gian giữ vé')`);
+  assert.equal(scenario.put, 0); assert.equal(scenario.pay, 0);
+  results.push('products: active payment, closed and expired bookings cannot edit or create a payment');
+
+  reset({ cancelError: true }); await boot(cdp, { route: productsRoute });
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.click('Hủy giữ ghế để chọn lại'); await cdp.click('Vẫn hủy giữ ghế'); await cdp.wait(`!document.querySelector('dialog[open]')`);
+  assert.equal(await cdp.evaluate('location.pathname'), productsRoute);
+  scenario.cancelError = false; await cdp.click('Hủy giữ ghế để chọn lại'); await cdp.click('Vẫn hủy giữ ghế');
+  await cdp.wait(`location.pathname === '/booking/5950'`); assert.equal(scenario.cancel, 2);
+  results.push('products: cancelling waits for successful API response before returning to seats');
+
+  if (!process.argv.includes('--products-only')) {
   reset(); await boot(cdp, { authenticated: false });
   await cdp.wait(`document.body.textContent.includes('Đăng nhập để tiếp tục')`);
   assert.equal(scenario.get, 0); results.push('guest gate: no private booking request');
 
   reset(); await boot(cdp);
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
   const countdown = await cdp.evaluate(`document.querySelector('output[aria-label="Thời gian giữ ghế còn lại"]').textContent`);
   assert.match(countdown, /^(10:00|09:5\d)$/); // Page clock is deliberately +24 hours.
   await cdp.click('Thanh toán ngay'); await cdp.wait(`location.hostname === 'sandbox.vnpayment.vn'`);
   assert.equal(scenario.put, 1); assert.equal(scenario.pay, 1); results.push('desktop: server countdown despite clock skew, empty combo, PUT then redirect');
 
-  reset({ reprice: true }); await boot(cdp, { width: 390 });
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
-  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
+  reset({ reprice: true, cart: [{ productId: 1, productName: 'Combo Một', unitPrice: 30000, quantity: 1, subtotal: 30000 }] }); await boot(cdp, { width: 390 });
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
   await cdp.click('Thanh toán ngay'); await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`);
   assert.equal(scenario.pay, 0); assert.equal(scenario.cart[0].quantity, 1);
   assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
@@ -194,14 +351,12 @@ try {
   assert.equal(scenario.pay, 1); results.push('mobile: quantity, changed-price confirmation, decline/edit, no overflow, redirect');
 
   reset({ catalogError: true }); await boot(cdp);
-  await cdp.wait(`document.body.textContent.includes('Chưa tải được danh mục combo')`);
-  assert.equal(await cdp.evaluate(`[...document.querySelectorAll('button')].filter(b=>b.textContent.includes('Thanh toán ngay')).every(b=>b.disabled)`), true);
-  assert.equal(scenario.put, 0); scenario.catalogError = false; await cdp.click('Thử lại danh mục');
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`); results.push('catalog error blocks new payment and retry restores catalog');
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
+  await cdp.click('Thanh toán ngay'); await cdp.wait(`location.hostname === 'sandbox.vnpayment.vn'`);
+  assert.equal(scenario.pay, 1); results.push('checkout: ticket-only direct links validate through PUT without fetching catalog');
 
   reset(); await boot(cdp);
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
-  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
   scenario.revision = 'f'.repeat(64);
   scenario.cart = [{ productId: 1, productName: 'Combo Một', quantity: 2, unitPrice: 30000, subtotal: 60000 }];
   await cdp.click('Thanh toán ngay'); await cdp.wait(`document.body.textContent.includes('Tải lại lựa chọn đã lưu')`);
@@ -209,17 +364,19 @@ try {
   await cdp.click('Thanh toán ngay'); await cdp.wait(`location.hostname === 'sandbox.vnpayment.vn'`);
   assert.equal(scenario.pay, 1); assert.equal(scenario.cart[0].quantity, 2); results.push('409 from another tab requires explicit reload before payment');
 
-  reset({ unavailableOnPut: true }); await boot(cdp);
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
-  await cdp.evaluate(`document.querySelector('button[aria-label="Tăng Combo Một"]').click()`);
-  await cdp.click('Thanh toán ngay'); await cdp.wait(`document.body.textContent.includes('Combo đã ngừng bán. Vui lòng bỏ khỏi đơn.')`);
+  reset({ unavailableOnPut: true, cart: [{ productId: 1, productName: 'Combo Một', unitPrice: 30000, quantity: 1, subtotal: 30000 }] }); await boot(cdp);
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
+  await cdp.click('Thanh toán ngay'); await cdp.wait(`Boolean(document.querySelector('[role="alert"]'))`);
   assert.equal(scenario.pay, 0);
+  await cdp.evaluate(`document.querySelector('a[href="${productsRoute}"]').click()`);
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã ngừng bán. Vui lòng bỏ khỏi đơn.')`);
   await cdp.evaluate(`document.querySelector('button[aria-label="Giảm Combo Một"]').click()`);
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
   await cdp.click('Thanh toán ngay'); await cdp.wait(`location.hostname === 'sandbox.vnpayment.vn'`);
-  assert.equal(scenario.pay, 1); assert.equal(scenario.cart.length, 0); results.push('combo withdrawn after selection remains visible for removal, never silently dropped');
+  assert.equal(scenario.pay, 1); assert.equal(scenario.cart.length, 0); results.push('checkout: withdrawn saved product requires explicit edit/removal before payment');
 
   reset({ payMode: 'unknown' }); await boot(cdp);
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
   await cdp.click('Thanh toán ngay'); await cdp.wait(`document.body.textContent.includes('Chưa xác định được kết quả kết nối')`);
   await cdp.click('Kiểm tra trạng thái'); assert.equal(scenario.pay, 1);
   await cdp.click('Hủy giữ ghế để chọn lại'); await cdp.wait(`Boolean(document.querySelector('dialog[open]'))`);
@@ -227,14 +384,14 @@ try {
   await cdp.click('Quay lại'); results.push('UNKNOWN: one POST, status check only, state-aware cancellation warning');
 
   reset({ payMode: 'lost-response' }); await boot(cdp);
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
   await cdp.click('Thanh toán ngay'); await cdp.wait(`[...document.querySelectorAll('button')].some(b=>b.textContent.includes('Tiếp tục thanh toán')&&!b.disabled)`);
   assert.equal(scenario.pay, 1); const oldPut = scenario.put;
   await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.hostname === 'sandbox.vnpayment.vn'`);
   assert.equal(scenario.pay, 1); assert.equal(scenario.put, oldPut); results.push('lost creation response: GET recovers READY, resume without another PUT/POST');
 
   reset({ cancelError: true }); await boot(cdp);
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
   await cdp.click('Hủy giữ ghế để chọn lại'); await cdp.click('Vẫn hủy giữ ghế');
   await cdp.wait(`!document.querySelector('dialog[open]')`); assert.equal(await cdp.evaluate('location.pathname'), `/checkout/${code}`);
   scenario.cancelError = false; await cdp.click('Hủy giữ ghế để chọn lại'); await cdp.click('Vẫn hủy giữ ghế');
@@ -254,10 +411,20 @@ try {
   // Kết nối STOMP có thể vừa kích hoạt GET đối chiếu; đợi nút sẵn sàng sau render/refetch.
   await cdp.wait(`[...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Tiếp tục' && !button.disabled)`);
   await cdp.click('Tiếp tục');
-  await cdp.wait(`location.pathname === '/checkout/${code}'`); results.push('seat Continue creates hold and navigates using returned bookingCode');
+  await cdp.wait(`location.pathname === '${productsRoute}'`);
+  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  assert.equal(scenario.create, 1);
+  await cdp.evaluate(`Date.now = () => new Date().getTime(); sessionStorage.setItem('cinema:hold:7:5950', '${code}'); history.pushState({}, '', '/booking/5950'); window.dispatchEvent(new PopStateEvent('popstate'));`);
+  await cdp.wait(`Boolean(document.querySelector('a[href="${productsRoute}"]'))`);
+  await cdp.evaluate(`document.querySelector('a[href="${productsRoute}"]').click()`);
+  await cdp.wait(`location.pathname === '${productsRoute}'`);
+  await cdp.wait(`[...document.querySelectorAll('button')].some(button => button.textContent.includes('Tiếp tục thanh toán') && !button.disabled)`);
+  await cdp.click('Tiếp tục thanh toán'); await cdp.wait(`location.pathname === '/checkout/${code}'`);
+  assert.equal(scenario.create, 1);
+  results.push('seat Continue and restored hold reuse one bookingCode through products and checkout');
 
   reset(); await boot(cdp);
-  await cdp.wait(`Boolean(document.querySelector('button[aria-label="Tăng Combo Một"]'))`);
+  await cdp.wait(`document.body.textContent.includes('Sản phẩm đã chọn')`);
   await writeFile(path.join(artifacts, 'checkout-desktop.png'), Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })).data, 'base64'));
 
   const callback = '/payment/vnpay-callback?' + new URLSearchParams({ vnp_TxnRef: 'a'.repeat(32), vnp_SecureHash: 'b'.repeat(128),
@@ -296,6 +463,7 @@ try {
   reset(); await boot(cdp, { route: '/payment/vnpay-callback?vnp_ResponseCode=00' });
   await cdp.wait(`document.body.textContent.includes('Đường dẫn kết quả không hợp lệ')`);
   assert.equal(scenario.resultChecks ?? 0, 0); results.push('VNPay return: incomplete URL renders an error rather than a blank route');
+  }
   assert.deepEqual(exceptions, []);
   console.log(JSON.stringify({ passed: results, runtimeExceptions: exceptions.length, artifacts, mockRequests: requests.length }, null, 2));
 } catch (error) {

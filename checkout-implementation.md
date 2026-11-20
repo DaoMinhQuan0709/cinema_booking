@@ -1,6 +1,8 @@
 # Triển khai Checkout
 
 Thiết kế: [Checkout](docs/plans/2026-11-09-checkout-design.md).
+Luồng cập nhật ngày 20/11/2026: tách chọn sản phẩm thành bước riêng trước
+Checkout, xem [product-selection-plan.md](product-selection-plan.md).
 Hướng giao diện: vé điện ảnh tối/đỏ, tóm tắt vé và countdown nổi bật;
 font/token hiện có, nhịp khoảng cách 4/8px, chuyển động tối thiểu.
 DFII: impact 3 + fit 5 + feasibility 4 + performance 4 - consistency risk 2 = 14.

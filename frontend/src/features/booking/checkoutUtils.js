@@ -1,5 +1,8 @@
-export const checkoutKey = (userId, code) => ['bookings', userId, code];
+export const checkoutKey = (userId, code, sessionId) => ['bookings', userId, code, sessionId ?? null];
 export const productKey = ['products'];
+export const productSelectionHref = code => `/booking/${encodeURIComponent(code)}/products`;
+export const bookingContinueHref = booking => booking.checkout?.state === 'EDITABLE'
+  ? productSelectionHref(booking.bookingCode) : `/checkout/${encodeURIComponent(booking.bookingCode)}`;
 export const draftFromBooking = (booking) => Object.fromEntries((booking.products ?? []).map(item => [item.productId, item.quantity]));
 
 export function selectedProducts(draft) {

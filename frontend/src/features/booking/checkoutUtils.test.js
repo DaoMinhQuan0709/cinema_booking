@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { selectedProducts, priceChanged, safePaymentUrl, remainingSeconds, formatCountdown, checkoutStatusText, formatCheckoutShowtime } from './checkoutUtils.js';
+import { bookingContinueHref, checkoutKey, productSelectionHref, selectedProducts, priceChanged, safePaymentUrl, remainingSeconds, formatCountdown, checkoutStatusText, formatCheckoutShowtime } from './checkoutUtils.js';
+
+test('editable holds continue to products; active payments and legacy links continue to checkout', () => {
+  const booking = { bookingCode: 'BK20261109130000ABCD', checkout: { state: 'EDITABLE' } };
+  assert.equal(bookingContinueHref(booking), productSelectionHref(booking.bookingCode));
+  for (const state of ['READY', 'CREATING', 'UNKNOWN', 'CLOSED']) {
+    assert.equal(bookingContinueHref({ ...booking, checkout: { state } }), `/checkout/${booking.bookingCode}`);
+  }
+  assert.equal(bookingContinueHref({ bookingCode: booking.bookingCode }), `/checkout/${booking.bookingCode}`);
+  assert.notDeepEqual(checkoutKey(7, booking.bookingCode, 'old'), checkoutKey(7, booking.bookingCode, 'new'));
+});
 
 test('replaces combo choices and excludes zero quantities without mutating the draft', () => {
   const draft = { 9: 2, 3: 0, 5: 1 };
