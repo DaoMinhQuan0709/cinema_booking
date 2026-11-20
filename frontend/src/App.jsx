@@ -22,6 +22,10 @@ const ProductSelectionPage = lazy(() => import('./features/booking/ProductSelect
 const VNPayReturnPage = lazy(() => import('./features/booking/VNPayReturnPage'));
 const MyTicketsPage = lazy(() => import('./features/tickets/MyTicketsPage'));
 const TicketDetailPage = lazy(() => import('./features/tickets/TicketDetailPage'));
+const PolicyPage = lazy(() => import('./features/information/PolicyPage'));
+const BookingGuidePage = lazy(() => import('./features/information/BookingGuidePage'));
+const FaqPage = lazy(() => import('./features/information/FaqPage'));
+const ConcessionsPage = lazy(() => import('./features/information/ConcessionsPage'));
 
 // Admin Portal: chi tai sau khi AdminRoute xac minh quyen ADMIN
 const AdminLayout = lazy(() => import('./layouts/AdminLayout'));
@@ -124,6 +128,12 @@ export const App = () => {
             <Route path="showtimes" element={<LegacyShowtimesRedirect />} />
             <Route path="cinemas" element={<CinemasPage />} />
             <Route path="cinemas/:id" element={<CinemaDetailPage />} />
+            <Route path="concessions" element={<ConcessionsPage />} />
+            <Route path="terms" element={<PolicyPage documentKey="terms" />} />
+            <Route path="privacy" element={<PolicyPage documentKey="privacy" />} />
+            <Route path="booking-guide" element={<BookingGuidePage />} />
+            <Route path="refund-policy" element={<PolicyPage documentKey="refunds" />} />
+            <Route path="faq" element={<FaqPage />} />
             {/* Vé của tôi: MyTicketsRoute chờ xác minh phiên rồi mới mount trang con */}
             <Route path="profile/bookings" element={<MyTicketsRoute />}>
               <Route index element={<MyTicketsPage />} />

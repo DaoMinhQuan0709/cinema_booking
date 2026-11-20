@@ -57,9 +57,9 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <span className="text-neutral-500 cursor-not-allowed">
+                <Link to="/concessions" className="hover:text-primary transition-colors">
                   Bắp nước & Combo ưu đãi
-                </span>
+                </Link>
               </li>
             </ul>
           </div>
@@ -71,29 +71,29 @@ export const Footer = () => {
             </h4>
             <ul className="space-y-2.5 text-xs">
               <li>
-                <span className="hover:text-primary transition-colors cursor-pointer">
+                <Link to="/terms" className="hover:text-primary transition-colors">
                   Điều khoản sử dụng
-                </span>
+                </Link>
               </li>
               <li>
-                <span className="hover:text-primary transition-colors cursor-pointer">
+                <Link to="/privacy" className="hover:text-primary transition-colors">
                   Chính sách bảo mật thông tin
-                </span>
+                </Link>
               </li>
               <li>
-                <span className="hover:text-primary transition-colors cursor-pointer">
+                <Link to="/booking-guide" className="hover:text-primary transition-colors">
                   Quy trình giữ chỗ 10 phút
-                </span>
+                </Link>
               </li>
               <li>
-                <span className="hover:text-primary transition-colors cursor-pointer">
+                <Link to="/refund-policy" className="hover:text-primary transition-colors">
                   Chính sách đổi trả & hoàn vé
-                </span>
+                </Link>
               </li>
               <li>
-                <span className="hover:text-primary transition-colors cursor-pointer">
+                <Link to="/faq" className="hover:text-primary transition-colors">
                   Câu hỏi thường gặp (FAQ)
-                </span>
+                </Link>
               </li>
             </ul>
           </div>
