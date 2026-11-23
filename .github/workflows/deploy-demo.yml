@@ -1,0 +1,174 @@
+name: Verify and publish demo images
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_USER: admin_test
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U admin_test -d postgres"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379/tcp
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Verify frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: /api/v1
+          VITE_WS_BASE_URL: /ws
+        run: |
+          npm ci
+          npm test
+          npm run lint
+          npm run build
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/cinema-booking-backend/pom.xml
+      - name: Verify backend on isolated PostgreSQL and Redis
+        working-directory: backend/cinema-booking-backend
+        env:
+          SPRING_PROFILES_ACTIVE: prod
+          SPRING_CONFIG_LOCATION: classpath:/application-prod.yml
+          SPRING_JPA_HIBERNATE_DDL_AUTO: update
+          MANAGEMENT_SERVER_PORT: "0"
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ job.services.postgres.ports['5432'] }}
+          DB_NAME: postgres
+          DB_USERNAME: admin_test
+          DB_PASSWORD: ci-ephemeral-db
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: ${{ job.services.redis.ports['6379'] }}
+          JWT_SECRET: ci-only-test-jwt-at-least-thirty-two-bytes
+          VNPAY_RETURN_URL: http://127.0.0.1/payment/vnpay-callback
+          DEBUG: "false"
+          LOGGING_LEVEL_ROOT: WARN
+          LOGGING_LEVEL_COM_CINEMA_BOOKING: INFO
+          CINEMA_TEST_DB_URL: jdbc:postgresql://127.0.0.1:${{ job.services.postgres.ports['5432'] }}/postgres
+          CINEMA_TEST_DB_USER: admin_test
+          CINEMA_TEST_DB_PASSWORD: ""
+          CINEMA_TEST_REDIS: "true"
+          CINEMA_TEST_REDIS_HOST: 127.0.0.1
+          CINEMA_TEST_REDIS_PORT: ${{ job.services.redis.ports['6379'] }}
+          CINEMA_TEST_HTTP: "true"
+          CINEMA_TEST_ARTIFACTS: ${{ runner.temp }}
+        run: sh mvnw --batch-mode --no-transfer-progress verify
+
+  publish:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    concurrency:
+      group: cinema-release-${{ github.sha }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      COMPOSE_FILE: deploy/compose.yaml
+      COMPOSE_PROJECT_NAME: cinema-ci-smoke
+      CINEMA_ORIGIN: http://127.0.0.1:18080
+      CADDY_SITE_ADDRESS: ":80"
+      WEB_BIND: 127.0.0.1
+      HTTP_PORT: "18080"
+      HTTPS_PORT: "18443"
+      POSTGRES_PASSWORD: ci-postgres-admin
+      DB_PASSWORD: ci-postgres-app
+      REDIS_PASSWORD: ci-redis-password
+      JWT_SECRET: ci-only-test-jwt-at-least-thirty-two-bytes
+      VNPAY_TMN_CODE: CIPAY001
+      VNPAY_HASH_SECRET: cinema-ci-sandbox-signing-key
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Build release images
+        shell: bash
+        run: |
+          repository="ghcr.io/${GITHUB_REPOSITORY,,}"
+          frontend_image="$repository/frontend:$GITHUB_SHA"
+          backend_image="$repository/backend:$GITHUB_SHA"
+          source_label="org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          docker build --label "$source_label" --tag "$frontend_image" frontend
+          docker build --label "$source_label" --tag "$backend_image" backend/cinema-booking-backend
+          printf 'FRONTEND_IMAGE=%s\nBACKEND_IMAGE=%s\n' "$frontend_image" "$backend_image" >> "$GITHUB_ENV"
+      - name: Migrate a fresh DB and verify the release stack
+        shell: bash
+        run: |
+          docker compose up -d --wait --wait-timeout 90 postgres redis
+          docker compose run --rm --no-deps migrate
+          docker compose run --rm --no-deps migrate
+          for seed in deploy/seed-demo.sql backend/cinema-booking-backend/src/main/resources/db/manual/{seed-products,update-product-images}.sql; do
+            docker compose exec -T postgres psql -X -U cinema -d cinema -v ON_ERROR_STOP=1 < "$seed"
+          done
+          docker compose up -d --wait --wait-timeout 90 --force-recreate postgres redis
+          docker compose up -d --wait --wait-timeout 120 backend frontend
+          curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 --max-time 5 \
+            --output /dev/null "$CINEMA_ORIGIN/"
+          node deploy/smoke.mjs
+      - name: Verify backup restoration in a separate database
+        shell: bash
+        run: |
+          docker compose exec -T postgres pg_dump -U cinema -d cinema --format=custom --no-owner --no-acl > "$RUNNER_TEMP/cinema.dump"
+          docker compose exec -T postgres createdb -U postgres -O cinema cinema_restore_check
+          docker compose exec -T postgres pg_restore -U cinema -d cinema_restore_check --exit-on-error --no-owner --no-privileges < "$RUNNER_TEMP/cinema.dump"
+          restored=$(docker compose exec -T postgres psql -X -U cinema -d cinema_restore_check -Atc "SELECT count(*) FROM bookings WHERE status = 'CONFIRMED'")
+          test "$restored" = 1
+      - name: Show stack status on smoke failure
+        if: failure()
+        run: |
+          docker compose ps --all
+          docker compose logs --tail 120 postgres redis backend frontend
+      - name: Publish images and capture digests
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$FRONTEND_IMAGE"
+          docker push "$BACKEND_IMAGE"
+          frontend_digest=$(docker buildx imagetools inspect "$FRONTEND_IMAGE" --format '{{.Manifest.Digest}}')
+          backend_digest=$(docker buildx imagetools inspect "$BACKEND_IMAGE" --format '{{.Manifest.Digest}}')
+          [[ "$frontend_digest" =~ ^sha256:[0-9a-f]{64}$ && "$backend_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf 'RELEASE_COMMIT=%s\nFRONTEND_IMAGE=%s\nBACKEND_IMAGE=%s\n' \
+            "$GITHUB_SHA" "${FRONTEND_IMAGE%:*}@$frontend_digest" "${BACKEND_IMAGE%:*}@$backend_digest" > release.env
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cinema-release-${{ github.sha }}
+          path: release.env
+          if-no-files-found: error

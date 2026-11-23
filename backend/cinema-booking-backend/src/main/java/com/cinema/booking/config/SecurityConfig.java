@@ -58,6 +58,7 @@ public class SecurityConfig {
                             response.getWriter().write("{\"code\":403,\"message\":\"Bạn không có quyền truy cập chức năng này\"}");
                         }))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
                         // Public endpoints
                         .requestMatchers(

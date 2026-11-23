@@ -1,0 +1,35 @@
+{$CINEMA_SITE_ADDRESS} {
+	encode zstd gzip
+	log {
+		output stdout
+		format filter {
+			request>uri regexp "[?].*$" ""
+			request>headers>Referer regexp "[?].*$" ""
+		}
+	}
+	header Referrer-Policy strict-origin-when-cross-origin
+
+	@backend path /api /api/* /ws /ws/* /images /images/*
+	handle @backend {
+		reverse_proxy backend:8080
+	}
+
+	@internal path /actuator /actuator/*
+	handle @internal {
+		respond 404
+	}
+
+	handle /assets/* {
+		root * /srv
+		file_server
+	}
+
+	handle {
+		root * /srv
+		route {
+			try_files {path} /index.html
+			header /index.html Cache-Control no-cache
+			file_server
+		}
+	}
+}

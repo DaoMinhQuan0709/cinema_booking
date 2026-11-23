@@ -1,0 +1,60 @@
+server:
+  port: 8080
+  forward-headers-strategy: native
+  shutdown: graceful
+
+spring:
+  application:
+    name: cinema-booking-backend
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 12
+      minimum-idle: 2
+  sql:
+    init:
+      mode: never
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 3s
+      timeout: 3s
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: Asia/Ho_Chi_Minh
+
+management:
+  server:
+    address: 127.0.0.1
+    port: 8081
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+application:
+  jwt:
+    secret-key: ${JWT_SECRET}
+    access-token-expiration: 86400000
+    refresh-token-expiration: 604800000
+  galaxy:
+    enabled: false
+    details:
+      enabled: false
+  payment:
+    vnpay:
+      return-url: ${VNPAY_RETURN_URL}

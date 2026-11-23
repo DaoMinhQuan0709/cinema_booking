@@ -1,0 +1,121 @@
+name: cinema-demo
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  frontend:
+    image: ${FRONTEND_IMAGE:?Set FRONTEND_IMAGE in the release manifest}
+    environment:
+      CINEMA_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-${CINEMA_ORIGIN:?Set CINEMA_ORIGIN}}
+    ports:
+      - "${WEB_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80"
+      - "${WEB_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:443"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [web]
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
+  backend:
+    image: ${BACKEND_IMAGE:?Set BACKEND_IMAGE in the release manifest}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_CONFIG_LOCATION: classpath:/application-prod.yml
+      TZ: Asia/Ho_Chi_Minh
+      DB_HOST: postgres
+      DB_NAME: cinema
+      DB_USERNAME: cinema
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:?Set VNPAY_TMN_CODE}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:?Set VNPAY_HASH_SECRET}
+      VNPAY_RETURN_URL: ${CINEMA_ORIGIN:?Set CINEMA_ORIGIN}/payment/vnpay-callback
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, "8", http://127.0.0.1:8081/actuator/health]
+      interval: 10s
+      timeout: 9s
+      retries: 4
+      start_period: 35s
+    networks: [web, data]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stop_grace_period: 30s
+    restart: unless-stopped
+    logging: *logging
+
+  postgres:
+    image: postgres:18-bookworm
+    environment:
+      POSTGRES_DB: cinema
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/00-init-db.sql:ro
+    healthcheck:
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, cinema, -d, cinema]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [data]
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    command: [sh, -ec, 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [data]
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    image: redgate/flyway:13.13.0
+    profiles: [tools]
+    command: [migrate]
+    environment:
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/cinema
+      FLYWAY_USER: cinema
+      FLYWAY_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      FLYWAY_LOCATIONS: filesystem:/flyway/sql
+      FLYWAY_CLEAN_DISABLED: "true"
+      FLYWAY_VALIDATE_MIGRATION_NAMING: "true"
+    volumes:
+      - ./migrations:/flyway/sql:ro
+    networks: [data]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+
+networks:
+  web:
+  data:
+    internal: true
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

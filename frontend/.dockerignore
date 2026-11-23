@@ -1,0 +1,16 @@
+*
+!package.json
+!package-lock.json
+!index.html
+!vite.config.js
+!postcss.config.js
+!tailwind.config.js
+!src/
+!src/**
+!public/
+!public/**
+!Caddyfile
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
