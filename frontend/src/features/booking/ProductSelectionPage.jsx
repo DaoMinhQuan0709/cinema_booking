@@ -5,20 +5,20 @@ import { ArrowRight, LoaderCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { productService } from '../../services/productService';
 import { bookingService } from '../../services/bookingService';
-import { invalidateTicketCache } from '../../config/queryClient';
 import { formatCurrency } from '../../utils/formatCurrency';
 import BookingPageAccess from './BookingPageAccess';
 import ProductCard from './ProductCard';
 import { BookingProgress, BookingSummary, ConfirmDialog } from './BookingUI';
-import { useBookingCancellation, useBookingCountdown, useBookingSession } from './hooks/useCheckoutBooking';
+import { useApplySavedProducts, useBookingCancellation, useBookingCountdown, useBookingSession } from './hooks/useCheckoutBooking';
 import { primary, secondary } from './bookingStyles';
-import { checkoutKey, draftFromBooking, priceChanged, productKey, remainingSeconds, selectedProducts } from './checkoutUtils';
+import { draftFromBooking, priceChanged, productKey, remainingSeconds, selectedProducts } from './checkoutUtils';
 import { productChoices } from './productSelection';
 
 function ProductSelectionForm({ booking, query, code, userId, sessionId }) {
   const client = useQueryClient();
   const navigate = useNavigate();
   const isCurrentUser = useBookingSession(userId, sessionId);
+  const applySavedProducts = useApplySavedProducts(userId, code, sessionId, isCurrentUser);
   const catalog = useQuery({ queryKey: productKey, queryFn: ({ signal }) => productService.getProducts(signal),
     staleTime: 60_000, retry: 1, refetchOnWindowFocus: true, enabled: booking.checkout.state === 'EDITABLE' });
   const [draft, setDraft] = useState(() => draftFromBooking(booking));
@@ -50,13 +50,11 @@ function ProductSelectionForm({ booking, query, code, userId, sessionId }) {
     busy.current = true; setOperation('products');
     try {
       const saved = await bookingService.updateProducts(code, { expectedRevision: baseRevision, products: selectedProducts(draft) });
-      if (!isCurrentUser()) return;
-      await client.cancelQueries({ queryKey: checkoutKey(userId, code, sessionId) });
-      if (!isCurrentUser()) return;
-      client.setQueryData(checkoutKey(userId, code, sessionId), saved);
-      setBaseRevision(saved.checkoutRevision); setDraft(draftFromBooking(saved));
-      setQuote({ catalog: catalog.data, prices: Object.fromEntries(saved.products.map(item => [item.productId, item.unitPrice])) });
-      void invalidateTicketCache(sessionId);
+      const applied = await applySavedProducts(saved, () => {
+        setBaseRevision(saved.checkoutRevision); setDraft(draftFromBooking(saved));
+        setQuote({ catalog: catalog.data, prices: Object.fromEntries(saved.products.map(item => [item.productId, item.unitPrice])) });
+      });
+      if (!applied || !isCurrentUser()) return;
       if (priceChanged(lines, saved, total)) setDialog({ kind: 'price', booking: saved, previousProducts: lines, previousTotal: total });
       else navigate(`/checkout/${encodeURIComponent(code)}`);
     } catch (error) {

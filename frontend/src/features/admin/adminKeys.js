@@ -19,3 +19,7 @@ export const adminInvalidationKeys = {
   showtime: [adminKeys.showtimes, adminKeys.reports, ['showtimes'], ['movies']],
   sync: [adminKeys.all, ['movies'], ['showtimes'], ['cinemas']],
 };
+
+export function invalidateAdminQueries(client, queryKeys) {
+  return Promise.all(queryKeys.map(queryKey => client.invalidateQueries({ queryKey })));
+}

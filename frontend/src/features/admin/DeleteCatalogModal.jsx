@@ -6,7 +6,7 @@ import AdminModal from './components/AdminModal';
 import { AdminError, AdminLoading } from './components/AdminStates';
 import { useDeletionPreview } from './hooks/useAdminQueries';
 import { useDeleteCatalog } from './hooks/useAdminMutations';
-import { adminInvalidationKeys } from './adminKeys';
+import { adminInvalidationKeys, invalidateAdminQueries } from './adminKeys';
 import { formatShowtimeTime } from './showtimeForm';
 
 const buttonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary';
@@ -25,7 +25,7 @@ export default function DeleteCatalogModal({ kind, item, onClose, onDeleted }) {
   const movie = kind === 'movies';
 
   async function finish() {
-    await Promise.all(adminInvalidationKeys.sync.map(queryKey => client.invalidateQueries({ queryKey })));
+    await invalidateAdminQueries(client, adminInvalidationKeys.sync);
     if (current()) onDeleted();
   }
 

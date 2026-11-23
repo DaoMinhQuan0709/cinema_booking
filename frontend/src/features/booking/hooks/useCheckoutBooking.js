@@ -21,6 +21,21 @@ export function useBookingSession(userId, sessionId) {
   return () => activeRef.current && useAuthStore.getState().sessionId === sessionId && useAuthStore.getState().user?.id === userId;
 }
 
+export function useApplySavedProducts(userId, code, sessionId, isCurrentUser) {
+  const client = useQueryClient();
+  const queryKey = checkoutKey(userId, code, sessionId);
+
+  return async (saved, updateForm) => {
+    if (!isCurrentUser()) return false;
+    await client.cancelQueries({ queryKey });
+    if (!isCurrentUser()) return false;
+    client.setQueryData(queryKey, saved);
+    updateForm();
+    void invalidateTicketCache(sessionId);
+    return true;
+  };
+}
+
 export function useBookingCountdown(booking, query) {
   const [now, setNow] = useState(() => performance.now());
   const expiredChecked = useRef(false);

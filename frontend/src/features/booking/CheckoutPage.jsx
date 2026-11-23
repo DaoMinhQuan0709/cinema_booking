@@ -1,21 +1,17 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { ArrowRight, CreditCard, LoaderCircle, RefreshCw, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { bookingService } from '../../services/bookingService';
 import { paymentService } from '../../services/paymentService';
 import { formatCurrency } from '../../utils/formatCurrency';
-import { checkoutKey, productSelectionHref, selectedProducts, draftFromBooking, priceChanged, safePaymentUrl, checkoutStatusText } from './checkoutUtils';
+import { productSelectionHref, selectedProducts, draftFromBooking, priceChanged, safePaymentUrl, checkoutStatusText } from './checkoutUtils';
 import BookingPageAccess from './BookingPageAccess';
 import { BookingProgress, BookingSummary, ConfirmDialog } from './BookingUI';
-import { useBookingCountdown, useBookingCancellation, useBookingSession } from './hooks/useCheckoutBooking';
+import { useApplySavedProducts, useBookingCountdown, useBookingCancellation, useBookingSession } from './hooks/useCheckoutBooking';
 import { primary, secondary } from './bookingStyles';
-import { invalidateTicketCache } from '../../config/queryClient';
 
 function CheckoutForm({ booking, query, userId, code, sessionId }) {
-  const client = useQueryClient();
-  const key = checkoutKey(userId, code, sessionId);
   const [baseRevision, setBaseRevision] = useState(booking.checkoutRevision);
   const [productError, setProductError] = useState(null);
   const [operation, setOperation] = useState(null);
@@ -28,6 +24,7 @@ function CheckoutForm({ booking, query, userId, code, sessionId }) {
   const changedElsewhere = baseRevision !== booking.checkoutRevision;
   const activeSession = ['CREATING', 'READY', 'UNKNOWN'].includes(state);
   const isCurrentUser = useBookingSession(userId, sessionId);
+  const applySavedProducts = useApplySavedProducts(userId, code, sessionId, isCurrentUser);
 
   const total = Number(booking.totalAmount);
   const payable = editable && !changedElsewhere && !productError && !query.isError && !query.isFetching && Number.isSafeInteger(total) && total > 0;
@@ -57,11 +54,8 @@ function CheckoutForm({ booking, query, userId, code, sessionId }) {
       const expected = booking.products;
       const saved = await bookingService.updateProducts(code, { expectedRevision: baseRevision, products: selectedProducts(draftFromBooking(booking)) });
       savingProducts = false;
-      if (!isCurrentUser()) return;
-      await client.cancelQueries({ queryKey: key });
-      if (!isCurrentUser()) return;
-      client.setQueryData(key, saved); setBaseRevision(saved.checkoutRevision);
-      void invalidateTicketCache(sessionId);
+      const applied = await applySavedProducts(saved, () => setBaseRevision(saved.checkoutRevision));
+      if (!applied || !isCurrentUser()) return;
       if (priceChanged(expected, saved, total)) setDialog({ kind: 'price', booking: saved, previousProducts: expected, previousTotal: total });
       else await beginPayment(saved);
     } catch (error) {

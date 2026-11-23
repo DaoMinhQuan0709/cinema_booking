@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useAuthStore } from '../../auth/authStore';
 import { tokenStorage } from '../../../config/tokenStorage';
 import { adminService } from '../../../services/adminService';
-import { adminInvalidationKeys } from '../adminKeys';
+import { adminInvalidationKeys, invalidateAdminQueries } from '../adminKeys';
 import { getAdminError } from '../adminErrors';
 
 function useAdminMutation({ name, mutationFn, invalidates, successMessage }) {
@@ -30,7 +30,7 @@ function useAdminMutation({ name, mutationFn, invalidates, successMessage }) {
     },
     onSuccess: async (_data, _variables, context) => {
       if (!isCurrent(context)) return;
-      await Promise.all(invalidates.map(queryKey => client.invalidateQueries({ queryKey })));
+      await invalidateAdminQueries(client, invalidates);
       if (isCurrent(context)) toast.success(successMessage);
     },
     onError: (error, _variables, context) => {
