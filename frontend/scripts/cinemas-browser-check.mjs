@@ -774,7 +774,7 @@ async function runBookingJourneyMock() {
   assert.equal(await cdp.evaluate(`document.querySelector('${showtimePanel} a[href="/booking/502"]').textContent.includes('99.000đ')`), true);
   await cdp.evaluate(`document.querySelector('${showtimePanel} a[href="/booking/502"]').click()`);
   await cdp.wait(`location.pathname === '/booking/502' && Boolean(document.querySelector('button[aria-label^="A1 -"]'))`);
-  assert.equal(await cdp.evaluate(`document.querySelector('main h1')?.textContent`), 'Chọn ghế của bạn');
+  assert.equal(await cdp.evaluate(`document.querySelector('main [aria-current="step"]')?.textContent.endsWith('Chọn ghế')`), true);
   assert.equal(await cdp.evaluate(`document.querySelector('main aside').textContent.includes('Phim thứ hai') && document.querySelector('main aside').textContent.includes('Galaxy Hà Nội')`), true);
   assert.equal(await cdp.evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
   assert.equal(await cdp.evaluate(`document.querySelectorAll('footer').length`), 1);

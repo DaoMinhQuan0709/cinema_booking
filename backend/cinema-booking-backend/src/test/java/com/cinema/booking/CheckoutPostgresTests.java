@@ -59,7 +59,8 @@ class CheckoutPostgresTests {
 
     @Configuration @EnableTransactionManagement @EnableJpaRepositories(basePackageClasses = BookingRepository.class)
     @Import({ CheckoutSupport.class, BookingProductsService.class, BookingServiceImpl.class, CheckoutPaymentService.class,
-            PaymentServiceImpl.class, PaymentReturnService.class, BookingCleanupService.class, SeatChanges.class, CatalogGuard.class, PaymentReceiptService.class })
+            PaymentServiceImpl.class, PaymentReturnService.class, BookingCleanupService.class, SeatChanges.class,
+            CatalogGuard.class, PaymentReceiptService.class, QrCodeService.class })
     static class Config {
         @Bean DataSource dataSource() throws Exception {
             var ds = new DriverManagerDataSource(System.getenv("CINEMA_TEST_DB_URL"), System.getenv("CINEMA_TEST_DB_USER"), System.getenv("CINEMA_TEST_DB_PASSWORD"));
