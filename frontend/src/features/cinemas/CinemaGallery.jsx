@@ -6,13 +6,23 @@ const FOCUS_CLASS = 'focus-visible:outline focus-visible:outline-2 focus-visible
 
 const GalleryContent = ({ sources, name }) => {
   const [selectedSource, setSelectedSource] = useState(null);
+  const [previousSource, setPreviousSource] = useState(null);
   const [failedSources, setFailedSources] = useState([]);
   const gesture = useRef(null);
   const instructionId = useId();
   const images = sources.filter(source => !failedSources.includes(source));
   const index = Math.max(0, images.indexOf(selectedSource));
   const multiple = images.length > 1;
-  const select = next => setSelectedSource(images[(next + images.length) % images.length]);
+  const half = Math.floor((images.length - 1) / 2);
+  // Vị trí vòng tròn của ảnh so với ảnh trung tâm: 0 = hiện tại, ±1 = ảnh kề, còn lại nằm ngoài khung.
+  const offsetOf = (position, center) => ((position - center + images.length + half) % images.length) - half;
+  const previousIndex = images.includes(previousSource) ? images.indexOf(previousSource) : index;
+  const select = next => {
+    const target = images[(next + images.length) % images.length];
+    if (target === images[index]) return;
+    setPreviousSource(images[index]);
+    setSelectedSource(target);
+  };
   const fail = source => setFailedSources(previous => previous.includes(source) ? previous : [...previous, source]);
 
   const onKeyDown = event => {
@@ -38,12 +48,6 @@ const GalleryContent = ({ sources, name }) => {
     if (multiple && Math.abs(dx) >= 48 && Math.abs(dx) > Math.abs(dy) * 1.5) select(index + (dx < 0 ? 1 : -1));
   };
 
-  const slides = images.length ? [
-    ...(multiple ? [{ position: 'previous', source: images[(index - 1 + images.length) % images.length] }] : []),
-    { position: 'current', source: images[index] },
-    ...(multiple ? [{ position: 'next', source: images[(index + 1) % images.length] }] : []),
-  ] : [];
-
   return (
     <section aria-label={`Hình ảnh ${name}`} aria-roledescription="carousel" onKeyDown={onKeyDown} className="mb-10 min-w-0 sm:mb-12">
       <div className="mb-4 flex items-center justify-between gap-4">
@@ -66,24 +70,30 @@ const GalleryContent = ({ sources, name }) => {
         style={{ touchAction: 'pan-y pinch-zoom' }}
         className={`relative isolate aspect-video select-none overflow-hidden rounded-xl bg-background lg:aspect-[20/9] ${FOCUS_CLASS}`}
       >
-        {slides.length ? slides.map(({ position, source }) => {
-          const current = position === 'current';
-          const placement = current ? 'left-0' : position === 'previous' ? '-translate-x-[calc(100%+1rem)]' : 'translate-x-[calc(100%+1rem)]';
+        {images.length ? images.map((source, position) => {
+          const offset = offsetOf(position, index);
+          const current = offset === 0;
+          const neighbour = Math.abs(offset) === 1;
+          const before = offsetOf(position, previousIndex);
+          // Chỉ trượt khi ảnh dịch một vị trí hoặc đang vào/ra vị trí chính; ảnh phải nhảy xa (vòng từ đầu sang cuối,
+          // bấm chấm tròn) thì đặt lại ngay để không quét ngang qua ảnh đang xem.
+          const animate = Math.abs(offset - before) <= 1 || current || before === 0;
           return (
             <div
-              key={`${position}:${source}`}
+              key={source}
               role={current ? 'group' : undefined}
               aria-roledescription={current ? 'slide' : undefined}
               aria-label={current ? `${index + 1} / ${images.length}` : undefined}
               aria-hidden={current ? undefined : true}
-              className={`absolute inset-y-0 w-full overflow-hidden rounded-xl border border-surfaceBorder bg-surface ${placement} ${multiple ? 'lg:left-[10%] lg:w-4/5' : ''} ${current ? '' : 'hidden opacity-40 lg:block'}`}
+              style={{ transform: `translateX(calc(${offset} * (100% + 1rem)))` }}
+              className={`absolute inset-y-0 left-0 w-full overflow-hidden rounded-xl border border-surfaceBorder bg-surface will-change-transform ${animate ? 'transition-[transform,opacity] duration-500 ease-out motion-reduce:transition-none' : ''} ${multiple ? 'lg:left-[10%] lg:w-4/5' : ''} ${current ? 'opacity-100' : neighbour ? 'pointer-events-none opacity-0 lg:opacity-40' : 'pointer-events-none opacity-0'}`}
             >
               <img
                 src={source}
                 alt={current ? `Không gian ${name}, ảnh ${index + 1}` : ''}
                 width="1280"
                 height="720"
-                loading={current ? 'eager' : 'lazy'}
+                loading={current || neighbour ? 'eager' : 'lazy'}
                 decoding="async"
                 draggable={false}
                 onError={() => fail(source)}

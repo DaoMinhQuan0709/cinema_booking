@@ -809,7 +809,7 @@ async function runGalleryMock() {
   assert.equal(await cdp.evaluate(`(() => {
     const viewport = document.querySelector('${galleryViewport}').getBoundingClientRect();
     const center = document.querySelector('${gallery} [aria-roledescription="slide"]').getBoundingClientRect();
-    const [left, right] = [...document.querySelectorAll('${galleryViewport} > div[aria-hidden="true"]')].map(el => el.getBoundingClientRect());
+    const [left, right] = [...document.querySelectorAll('${galleryViewport} > div[aria-hidden="true"]')].map(el => el.getBoundingClientRect()).sort((a, b) => a.left - b.left);
     return center.left > viewport.left && center.right < viewport.right
       && left.left < viewport.left && left.right > viewport.left
       && right.left < viewport.right && right.right > viewport.right;
