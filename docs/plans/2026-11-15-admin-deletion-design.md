@@ -151,7 +151,7 @@ thì giữ bằng chứng đã có và ghi cảnh báo đối soát, không ghi 
 Chỉ mở rộng nhánh an toàn cho phim/suất đã xóa, không thiết kế lại toàn bộ
 thanh toán của các đơn không bị ảnh hưởng.
 
-Chuẩn hóa provider theo method cố định VNPAY/MOMO; chuẩn hóa transactionId
+Chuẩn hóa provider theo method cố định VNPAY; chuẩn hóa transactionId
 theo định dạng provider, không biến đổi làm mất danh tính giao dịch. PostgreSQL
 phải có ràng buộc duy nhất `(method, provider_transaction_id)` cho ID đã ghi
 nhận (giá trị null chưa xác minh được phép lặp). Mỗi lần ghi nhận thành công
@@ -285,7 +285,7 @@ tiêu chí nghiệm thu, không phải kết quả đã đạt.
 Đồng thời chạy lint/unit/build frontend và hồi quy backend liên quan tới
 catalog, booking, checkout, thanh toán, sync và báo cáo. Báo riêng kiểm thử
 mô phỏng, DB/Redis thật và những tích hợp ngoài chưa chạy. Fixture sync/cổng
-thanh toán không chứng minh Galaxy/VNPay/MoMo bên ngoài hoạt động thật.
+thanh toán không chứng minh Galaxy/VNPay bên ngoài hoạt động thật.
 
 Không xóa phim/suất hoặc thay đổi cấu hình DB vận hành để nghiệm thu. Dùng
 PostgreSQL/Redis thử riêng và helper hiện có, dừng đúng các tiến trình thử đã

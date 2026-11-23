@@ -100,6 +100,7 @@ async function intercept(cdp, event) {
   }
   if (url.pathname.endsWith('/payments/create-url')) {
     scenario.pay++;
+    assert.equal(body.paymentMethod, 'VNPAY');
     assert.equal(body.expectedRevision, scenario.revision); assert.equal(body.bookingCode, code);
     scenario.phase = scenario.payMode === 'unknown' ? 'UNKNOWN' : 'READY';
     if (scenario.payMode === 'lost-response') return cdp.send('Fetch.failRequest', { requestId, errorReason: 'ConnectionReset' });

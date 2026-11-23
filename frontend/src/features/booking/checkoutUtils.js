@@ -24,8 +24,7 @@ export function priceChanged(expected, actual, expectedTotal) {
 
 export function safePaymentUrl(value, method) {
   const url = new URL(value);
-  const host = { VNPAY: 'sandbox.vnpayment.vn', MOMO: 'test-payment.momo.vn' }[method];
-  if (!host || url.protocol !== 'https:' || url.hostname !== host || url.username || url.password || url.hash || (url.port && url.port !== '443'))
+  if (method !== 'VNPAY' || url.protocol !== 'https:' || url.hostname !== 'sandbox.vnpayment.vn' || url.username || url.password || url.hash || (url.port && url.port !== '443'))
     throw new Error('Không nhận được đường dẫn thanh toán Sandbox hợp lệ.');
   return url.href;
 }

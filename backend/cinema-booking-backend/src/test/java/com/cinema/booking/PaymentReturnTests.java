@@ -110,6 +110,16 @@ class PaymentReturnTests {
         verifyNoInteractions(attempts, bookings, payments);
     }
 
+    @Test void createUrlRejectsUnsupportedMethodsBeforeCallingPaymentService() throws Exception {
+        var paymentService = mock(PaymentService.class);
+        var mvc = MockMvcBuilders.standaloneSetup(new PaymentController(paymentService, service))
+                .setControllerAdvice(new GlobalExceptionHandler()).build();
+        mvc.perform(post("/api/v1/payments/create-url").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"bookingCode\":\"BKTEST\",\"paymentMethod\":\"UNSUPPORTED\",\"expectedRevision\":\"a\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value(400));
+        verifyNoInteractions(paymentService);
+    }
+
     @Test void endpointReturnsVerifiedPrivateResultAndDisablesHttpCaching() throws Exception {
         var mvc = MockMvcBuilders.standaloneSetup(new PaymentController(mock(PaymentService.class), service))
                 .setControllerAdvice(new GlobalExceptionHandler())

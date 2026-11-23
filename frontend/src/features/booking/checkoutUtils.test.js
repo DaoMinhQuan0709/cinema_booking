@@ -27,10 +27,12 @@ test('reconfirms per-item price changes even if the total is unchanged', () => {
   assert.equal(priceChanged(expected, { ...actual, products: [...expected].reverse() }, 150000), false);
 });
 
-test('redirects only to the selected HTTPS Sandbox and rejects deceptive URLs', () => {
+test('redirects only to VNPay HTTPS Sandbox and rejects unsupported methods and deceptive URLs', () => {
   assert.equal(safePaymentUrl('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?a=1', 'VNPAY'), 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?a=1');
-  assert.equal(safePaymentUrl('https://test-payment.momo.vn/v2/gateway/pay?t=example', 'MOMO'), 'https://test-payment.momo.vn/v2/gateway/pay?t=example');
-  for (const url of ['javascript:alert(1)', 'http://sandbox.vnpayment.vn/pay', 'https://sandbox.vnpayment.vn.evil.invalid/pay', 'https://user@sandbox.vnpayment.vn/pay', 'https://test-payment.momo.vn/pay', 'https://sandbox.vnpayment.vn:444/pay']) {
+  for (const method of ['UNSUPPORTED', '', null, undefined]) {
+    assert.throws(() => safePaymentUrl('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html', method));
+  }
+  for (const url of ['javascript:alert(1)', 'http://sandbox.vnpayment.vn/pay', 'https://sandbox.vnpayment.vn.evil.invalid/pay', 'https://user@sandbox.vnpayment.vn/pay', 'https://payments.example.invalid/pay', 'https://sandbox.vnpayment.vn:444/pay']) {
     assert.throws(() => safePaymentUrl(url, 'VNPAY'));
   }
 });

@@ -19,7 +19,7 @@ quyết APPROVED của Integrator/Arbiter. Đã triển khai và kiểm chứng 
 - Sau khi giữ ghế thành công, chuyển sang Checkout bằng mã đơn backend trả về.
 - Hiển thị phim, rạp, phòng, suất chiếu, ghế, combo và tổng tiền của đơn.
 - Đếm ngược theo `expiresAt`; tải lại trang hoặc quay lại tab không gia hạn.
-- Cho chọn combo bắp nước và VNPay/MoMo Sandbox trên một trang.
+- Cho chọn combo bắp nước và thanh toán VNPay Sandbox trên một trang.
 - Chỉ lưu combo khi bấm “Thanh toán ngay”, sau đó tạo URL thanh toán.
 - Bổ sung API cập nhật combo cho đơn đang chờ thanh toán còn hạn.
 - Cho hủy giữ chỗ để chọn lại ghế, có xác nhận và chờ backend hủy thành công.
@@ -52,7 +52,7 @@ quyết APPROVED của Integrator/Arbiter. Đã triển khai và kiểm chứng 
 
 | Quyết định | Phương án đã cân nhắc | Lý do và trạng thái |
 | --- | --- | --- |
-| Checkout đầy đủ: vé, countdown, combo, VNPay/MoMo | Làm thanh toán trước combo; chỉ làm vé/countdown | Người dùng chọn phạm vi 1 và xác nhận bản tóm tắt. |
+| Checkout đầy đủ: vé, countdown, combo, VNPay | Làm thanh toán trước combo; chỉ làm vé/countdown | Người dùng chọn phạm vi 1 và xác nhận bản tóm tắt. |
 | Một trang, lưu combo khi bấm thanh toán | Tự lưu từng lần đổi số lượng; chia thành nhiều màn hình | Người dùng chọn phương án 1; ít request và dễ bảo trì. |
 | Giữ theme tối/đỏ, hai cột desktop và một cột mobile | Phong cách riêng hoặc nhiều bước | Nhất quán dự án; bố cục đã được xác nhận. |
 | Dùng `expiresAt` có sẵn, không đặt lại 10 phút | Tạo timer mới khi vào Checkout | Không gia hạn giữ ghế khi reload hoặc chọn combo; đã xác nhận. |
@@ -68,7 +68,7 @@ quyết APPROVED của Integrator/Arbiter. Đã triển khai và kiểm chứng 
 Kết quả” và thời gian giữ ghế còn lại.
 
 Desktop dùng hai cột. Cột trái hiển thị thẻ combo với ảnh, tên, mô tả ngắn,
-đơn giá và nút tăng/giảm từ 0; bên dưới là lựa chọn VNPay/MoMo Sandbox.
+đơn giá và nút tăng/giảm từ 0; bên dưới là thông tin thanh toán VNPay Sandbox.
 Cột phải sticky hiển thị thông tin vé, các vị trí ghế, tiền vé, combo đã chọn,
 tổng tạm tính và nút “Thanh toán ngay”. Ghế đôi giữ nguyên hai vị trí và giá
 đã lưu trong đơn, không tính lại bằng công thức loại ghế ở frontend.
@@ -202,8 +202,7 @@ chứng minh rollback không phát event và lỗi sau commit không sửa kết
 - Tách trạng thái tạo URL khỏi kết quả tài chính `PaymentStatus`; không dùng
   “đang tạo URL” để suy ra đã thanh toán.
 - Dùng transaction ngắn để đặt trước ngữ cảnh, kết thúc transaction rồi mới
-  gọi MoMo với timeout hữu hạn. Ghi kết quả bằng transaction ngắn tiếp theo.
-  Không giữ khóa DB trong khi chờ phản hồi HTTP của cổng.
+  tạo URL VNPay. Ghi URL bằng transaction ngắn tiếp theo.
 - Với URL đã có và đơn còn hợp lệ, yêu cầu lặp cùng ngữ cảnh trả lại URL đó.
   Không tạo orderId mới chỉ vì client bấm lại hoặc mất phản hồi.
 - Trong lúc tạo hoặc chưa rõ kết quả, server giữ số tiền/phương thức đã chốt.
@@ -213,7 +212,7 @@ chứng minh rollback không phát event và lỗi sau commit không sửa kết
   Chỉ đánh dấu REJECTED khi có bằng chứng cổng cho biết không có giao dịch
   còn khả năng thu tiền. REJECTED cho phép chỉnh combo/phương thức và thử lại
   trong hạn cũ; attempt cũ được giữ để đối chiếu. Không suy luận điều này chỉ
-  từ mã HTTP, lỗi mạng hoặc một trường resultCode không được phân loại rõ.
+  từ lỗi mạng hoặc một mã kết quả chưa được phân loại rõ.
 - Nếu không thể xác định kết quả trong phạm vi tích hợp hiện tại, hiển thị
   trạng thái chưa biết, chặn tạo giao dịch mới và cho kiểm tra lại đơn. Không
   cam kết tự phục hồi hoàn toàn; đây là đánh đổi độ sẵn sàng để giữ nhất quán.
@@ -263,8 +262,7 @@ không kích hoạt giao dịch mới hoặc tự gọi create của cổng.
 Xác thực chữ ký và đối chiếu provider/merchant, định danh attempt/reference,
 orderId/requestId khi cổng cung cấp, số tiền và đơn vị theo ngữ cảnh đã lưu.
 Không chỉ cắt prefix bookingCode hoặc tự tạo Payment khi không thấy bản ghi.
-VNPay TxnRef của attempt mới và MoMo orderId phải ánh xạ về đúng attempt;
-requestId dùng đối chiếu theo loại callback thực tế của cổng.
+VNPay TxnRef phải ánh xạ về đúng attempt đã lưu.
 
 IPN đến sớm sau commit intent vẫn có ngữ cảnh để kiểm tra. IPN trùng không
 bán vé/nhả ghế/phát fulfillment lần nữa. SUCCESS không bị IPN lỗi hoặc worker
@@ -275,20 +273,6 @@ quyền sở hữu/trạng thái ghế dưới khóa, không ghi đè lượt gi
 Payment cũ thiếu định danh attempt không được tự gán một định danh mới rồi
 coi là giao dịch chưa gửi. Giữ nguyên lịch sử, phân loại chưa xác định và
 xử lý bảo thủ đến khi có bằng chứng đối soát hoặc hết/hủy đơn.
-
-### Căn cứ tích hợp MoMo
-
-MoMo mô tả requestId là khóa idempotency; vì vậy phục hồi phải giữ đúng ID
-và nội dung của yêu cầu cũ. Gửi lại có thể trả trạng thái đang xử lý, không
-được diễn giải thành từ chối chắc chắn. Tham khảo [API Idempotency](https://developers.momo.vn/v3/docs/payment/api/result-handling/idempotency/).
-
-Có API truy vấn theo orderId để lấy trạng thái. API này không được coi là
-nguồn chắc chắn trả lại payUrl; phục hồi URL chỉ thực hiện khi có phản hồi
-create hợp lệ hoặc URL đã lưu. Tham khảo [Check Transaction Status](https://developers.momo.vn/v3/docs/payment/api/payment-api/query/).
-
-Phân loại kết quả theo [List Result Codes](https://developers.momo.vn/v3/docs/payment/api/result-handling/resultcode/),
-không xem mọi resultCode khác 0 là terminal/no-order. Ngưỡng timeout/lease
-phải tương thích thời gian chờ theo hợp đồng cổng và được ghi vào cấu hình.
 
 ## Countdown, hủy và trạng thái đơn
 
@@ -338,9 +322,6 @@ phải tương thích thời gian chờ theo hợp đồng cổng và được g
 
 - `PaymentServiceImpl.createPaymentUrl` hiện cập nhật lại phương thức/số tiền
   trên Payment cũ, chưa có kiểm soát phiên bản hoặc khóa chung với sửa combo.
-- Nhánh MoMo hiện tạo `orderId` mới mỗi lần và trả URL callback có
-  `resultCode=0` nếu thiếu `payUrl` hoặc có exception. Phải bỏ fallback giả
-  thành công này trước khi kết nối Checkout với cổng.
 - Callback và QR chưa nằm trong phạm vi Checkout: việc chuyển được sang cổng
   không chứng minh toàn bộ quy trình trả kết quả đã hoàn thành.
 - Tích hợp cổng có kết quả chưa biết không thể giải quyết chỉ bằng chống
@@ -354,7 +335,7 @@ phải tương thích thời gian chờ theo hợp đồng cổng và được g
 1. Chốt hợp đồng revision/ngữ cảnh thanh toán, thay đổi dữ liệu tối thiểu và
    quy tắc khóa; viết test backend cho quyền, giá, trạng thái và cạnh tranh.
 2. Bổ sung PUT combo; lưu toàn bộ lựa chọn nguyên khối, bảo toàn giá vé/hạn giữ.
-3. Bảo vệ create-url/gửi lặp/timeout, loại bỏ MoMo fallback; kiểm tra hành vi
+3. Bảo vệ create-url/gửi lặp/timeout; kiểm tra hành vi
    IPN, cancel và expiry liên quan dưới cùng quy tắc đồng thời.
 4. Xây route, service, hook và các khối UI Checkout; nối điều hướng từ giữ
    ghế mới/đơn đã khôi phục, countdown, xác nhận thay đổi giá và hủy.
@@ -419,7 +400,7 @@ và cách giải quyết được giữ trong nhật ký trên.
   giá combo từ catalog và giữ giá vé/deadline đã lưu. Giá đổi yêu cầu xác nhận
   rõ từng đơn giá/tổng tiền; 409 yêu cầu tải lại lựa chọn trước khi thanh toán.
 - Attempt được đặt trước trong transaction ngắn, gọi cổng ngoài transaction,
-  lưu URL để resume, không tạo ID mới khi UNKNOWN. Đã bỏ MoMo fallback thành công.
+  lưu URL để resume, không tạo ID mới khi UNKNOWN.
 - IPN đối chiếu attempt, chữ ký, merchant, request/reference và số tiền.
   Đã áp dụng khóa/recheck cho cancel/expiry/IPN, token Redis compare-delete,
   side effect sau commit và version message ghế; sơ đồ làm mới khoảng 30 giây.
@@ -443,7 +424,7 @@ và cách giải quyết được giữ trong nhật ký trên.
 - Đã cập nhật kế hoạch frontend và README; hướng dẫn migration/API/khởi chạy
   nằm trong [CHECKOUT.md](../../backend/cinema-booking-backend/CHECKOUT.md).
 
-Chưa kiểm thử merchant VNPay/MoMo thật hoặc luồng callback/QR. UNKNOWN hiện
+Chưa kiểm thử merchant VNPay thật hoặc luồng callback/QR. UNKNOWN hiện
 đồng bộ từ dữ liệu đã lưu/IPN, chưa có job tự đối soát toàn bộ trạng thái từ
 cổng. Side effect sau commit vẫn best-effort, key Redis cũ có thể tồn tại đến
 TTL gốc khi hạ tầng lỗi. Không thực hiện commit/push hoặc đổi cấu hình bí mật.

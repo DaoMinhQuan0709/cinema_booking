@@ -117,8 +117,8 @@ frontend/
 | **Catalog**| `GET` | `/products` | Public | Lấy danh sách combo bắp nước bán kèm. |
 | **Booking**| `POST`| `/bookings` | Customer | **Giữ ghế 10 phút**: Body: `{ showtimeId, showtimeSeatIds: [1,2], products: [...] }`. Trả về `bookingCode`, `expiresAt`, `totalAmount`. Bắt lỗi `409 Conflict` nếu có người nhanh tay hơn. |
 | **Booking**| `DELETE`| `/bookings/{code}/cancel`| Customer | Hủy giữ chỗ chủ động khi bấm nút "Quay lại". |
-| **Payment**| `POST`| `/payments/create-url` | Customer | Body: `{ bookingCode, paymentMethod: "VNPAY" \| "MOMO" }`. Trả về `paymentUrl` để redirect sang cổng thanh toán. |
-| **Payment**| `GET` | *(Callback trang kết quả)* | Customer | Frontend bắt URL callback VNPay/MoMo để hiển thị vé và QR Code. |
+| **Payment**| `POST`| `/payments/create-url` | Customer | Body: `{ bookingCode, paymentMethod: "VNPAY", expectedRevision }`. Trả về `paymentUrl` để redirect sang cổng thanh toán. |
+| **Payment**| `GET` | *(Callback trang kết quả)* | Customer | Frontend bắt URL callback VNPay để hiển thị vé và QR Code. |
 | **AI Chat**| `POST`| `/chat/ask` | Public | Body: `{ message, conversationHistory: [] }`. Trợ lý ảo tư vấn lịch chiếu. |
 | **Admin**  | `GET` | `/admin/reports/revenue` | Admin | Lọc doanh thu theo khoảng ngày, theo phim, theo rạp. |
 | **Admin**  | `GET` | `/admin/reports/occupancy`| Admin | Thống kê tỷ lệ lấp đầy phòng chiếu (%). |
@@ -133,7 +133,7 @@ frontend/
 *   **Hero Carousel / Banner:** Hiển thị 3-5 phim bom tấn nổi bật nhất (ảnh ngang chất lượng cao), nút xem nhanh Trailer popup và nút "Đặt Vé".
 *   **Tabs Lọc Phim:** Tab "Phim Đang Chiếu" (`NOW_SHOWING`) và Tab "Phim Sắp Chiếu" (`COMING_SOON`).
 *   **Movie Card Component:** Ảnh poster dọc tỷ lệ 2:3, nhãn độ tuổi (P, C13, C16, C18 viền đỏ nổi bật), thời lượng phim, tên phim, sao đánh giá, nút "Mua vé" dẫn tới trang chi tiết.
-*   **Footer:** Thông tin bản quyền, quy định, đối tác thanh toán (VNPay, MoMo, Visa/Mastercard).
+*   **Footer:** Thông tin bản quyền, quy định, đối tác thanh toán (VNPay, Visa/Mastercard).
 
 ### 2. Trang Chi Tiết Phim & Chọn Suất Chiếu (`/movies/:id`)
 *   **Banner Mờ (Backdrop Blur):** Ảnh nền mờ phía sau tạo cảm giác điện ảnh.
@@ -180,7 +180,7 @@ Tiến độ và kiểm chứng (mô phỏng tách API thật): [cinemas-impleme
 > “Tiếp tục” gọi API giữ ghế, yêu cầu đăng nhập, xử lý 409, xác nhận mã/thời hạn,
 > hủy giữ chỗ và khôi phục bằng API khi tải lại trang. Sau giữ ghế mở bước
 > chọn sản phẩm, sau đó Checkout; cả hai bước dùng countdown server và cùng đơn.
-> Trang kết quả VNPay ở mục 5 đã có; callback MoMo và vé QR là công việc tiếp theo.
+> Trang kết quả VNPay ở mục 5 đã có; vé QR là công việc tiếp theo.
 
 *   **Màn hình chiếu cong (Curved Screen):** Đồ họa SVG vòm cong với dòng chữ sáng *"MÀN HÌNH"*.
 *   **Ma trận ghế (Seat Matrix):**
@@ -210,7 +210,7 @@ Tiến độ và kiểm chứng (mô phỏng tách API thật): [cinemas-impleme
 > Kế hoạch/checklist: [product-selection-plan.md](product-selection-plan.md).
 > Thiết kế và nhật ký rà soát: [2026-11-09-checkout-design.md](docs/plans/2026-11-09-checkout-design.md).
 > Cần cập nhật schema và khởi động lại backend; hướng dẫn trong
-> [CHECKOUT.md](backend/cinema-booking-backend/CHECKOUT.md). Callback VNPay đã có; callback MoMo/vé QR làm sau.
+> [CHECKOUT.md](backend/cinema-booking-backend/CHECKOUT.md). Callback VNPay đã có; vé QR làm sau.
 
 *   **Đồng hồ đếm ngược 10 phút (Countdown Timer):**
     *   Đếm ngược theo `serverTime` và deadline, không phụ thuộc đồng hồ máy khách.
@@ -219,14 +219,14 @@ Tiến độ và kiểm chứng (mô phỏng tách API thật): [cinemas-impleme
     *   Trang sản phẩm có thẻ ảnh, tên, mô tả, đơn giá, tăng/giảm số lượng từ 0.
     *   Không bắt buộc mua kèm; không xóa sản phẩm khi catalog lỗi; sản phẩm ngừng bán cho bỏ rõ ràng.
 *   **Phương thức thanh toán:**
-    *   Lựa chọn Radio Button giữa **VNPay** và **MoMo**.
+    *   Hiển thị **VNPay**, hỗ trợ thẻ ngân hàng và mã QR.
 *   **Nút "Thanh Toán Ngay":**
-    *   Gọi API `POST /api/v1/payments/create-url`. Nhận `paymentUrl` và chuyển hướng thẳng trình duyệt sang cổng VNPay/MoMo Sandbox.
+    *   Gọi API `POST /api/v1/payments/create-url`. Nhận `paymentUrl` và chuyển hướng thẳng trình duyệt sang cổng VNPay Sandbox.
 
-### 5. Trang Kết Quả Thanh Toán (`/payment/vnpay-callback` & `/payment/momo-callback`)
+### 5. Trang Kết Quả Thanh Toán (`/payment/vnpay-callback`)
 > Đã triển khai VNPay (10/11/2026): trang kết quả có xác minh chữ ký tại backend,
 > kiểm tra quyền xem đơn, thông tin phim/rạp/ghế/combo/tổng tiền và chờ IPN.
-> Chỉ báo đặt vé thành công khi booking CONFIRMED/payment SUCCESS. MoMo, QR và
+> Chỉ báo đặt vé thành công khi booking CONFIRMED/payment SUCCESS. QR và
 > hiệu ứng pháo hoa bên dưới chưa triển khai.
 
 *   Frontend bắt các query parameters do cổng thanh toán trả về.
@@ -299,7 +299,7 @@ Có kiểm chứng HTTP/DB/Redis thật trên dữ liệu/tài khoản thử đ�
 4.  **Bước 4: Trọng tâm - Sơ đồ Ghế Real-time, Countdown & Thanh toán**
     *   Dựng sơ đồ ma trận ghế uốn cong.
     *   Tích hợp WebSocket STOMP lắng nghe đổi màu ghế real-time.
-    *   Tích hợp API giữ ghế 10 phút (`/bookings`), Timer đếm ngược và chuyển hướng sang VNPay/MoMo.
+    *   Tích hợp API giữ ghế 10 phút (`/bookings`), Timer đếm ngược và chuyển hướng sang VNPay.
     *   Dựng trang Callback hiển thị vé điện tử và mã QR Code.
 5.  **Bước 5: Hoàn thiện CineBot AI Widget & Admin Portal**
     *   Tích hợp Widget chat với Google Gemini API.

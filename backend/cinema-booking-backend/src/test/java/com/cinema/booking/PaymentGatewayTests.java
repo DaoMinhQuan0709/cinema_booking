@@ -12,8 +12,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PaymentGatewayTests {
+    @Test void rejectsUnsupportedMethodsBeforeUsingCredentialsOrSigningUrls() {
+        var config = mock(VNPayConfig.class);
+        var gateway = new PaymentGateway(config, Clock.systemUTC());
+        for (String method : new String[]{null, "", "UNSUPPORTED"}) {
+            assertThrows(BadRequestException.class, () -> gateway.validate(method));
+            assertThrows(BadRequestException.class, () -> gateway.create(new PaymentGateway.Order(
+                    "BKTEST", method, new BigDecimal("80000"), "reference", "request", LocalDateTime.now(), "127.0.0.1")));
+            assertThrows(BadRequestException.class, () -> PaymentGateway.safeUrl(
+                    "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html", method));
+        }
+        verifyNoInteractions(config);
+    }
+
     @Test void rejectsUntrustedRedirectsAndNonIntegralVndAmounts() {
-        for (String url : new String[]{"http://sandbox.vnpayment.vn/pay", "https://sandbox.vnpayment.vn.evil.invalid/pay", "https://user@sandbox.vnpayment.vn/pay", "https://test-payment.momo.vn/pay"})
+        for (String url : new String[]{"http://sandbox.vnpayment.vn/pay", "https://sandbox.vnpayment.vn.evil.invalid/pay", "https://user@sandbox.vnpayment.vn/pay", "https://payments.example.invalid/pay"})
             assertThrows(BadRequestException.class, () -> PaymentGateway.safeUrl(url, "VNPAY"));
         assertThrows(BadRequestException.class, () -> CheckoutSupport.money(new BigDecimal("10000.50")));
         assertThrows(BadRequestException.class, () -> CheckoutSupport.money(new BigDecimal("10000000000")));
@@ -23,7 +36,7 @@ class PaymentGatewayTests {
         var config = mock(VNPayConfig.class); when(config.getUrl()).thenReturn("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html");
         when(config.getHashSecret()).thenReturn("test-only-signing-key"); when(config.getTmnCode()).thenReturn("test-merchant");
         when(config.getReturnUrl()).thenReturn("http://localhost:5173/payment/vnpay-callback");
-        var gateway = new PaymentGateway(config, mock(MoMoConfig.class), Clock.fixed(Instant.parse("2026-11-09T06:00:00Z"), BookingClockConfig.ZONE));
+        var gateway = new PaymentGateway(config, Clock.fixed(Instant.parse("2026-11-09T06:00:00Z"), BookingClockConfig.ZONE));
         String url = gateway.create(new PaymentGateway.Order("BKTEST", "VNPAY", new BigDecimal("80000"), "attempt-reference", "request", LocalDateTime.of(2026,11,9,13,10), "127.0.0.1"));
         assertTrue(url.contains("vnp_TxnRef=attempt-reference")); assertTrue(url.contains("vnp_Amount=8000000"));
         assertTrue(url.contains("vnp_CreateDate=20261109130000")); assertTrue(url.contains("vnp_ExpireDate=20261109131000"));
@@ -41,7 +54,7 @@ class PaymentGatewayTests {
     @Test void rejectsMissingPlaceholderOrPaddedMerchantCredentials() {
         var config = mock(VNPayConfig.class);
         when(config.getUrl()).thenReturn("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html");
-        var gateway = new PaymentGateway(config, mock(MoMoConfig.class), Clock.systemUTC());
+        var gateway = new PaymentGateway(config, Clock.systemUTC());
         for (String invalid : new String[]{null, "", "  ", "your-value", "<value-from-vnpay>", " test-value", "test-value\n"}) {
             when(config.getTmnCode()).thenReturn("test-merchant");
             when(config.getHashSecret()).thenReturn(invalid);
@@ -58,7 +71,7 @@ class PaymentGatewayTests {
         var config = resolveConfig(new MockEnvironment());
         assertEquals("", config.getTmnCode());
         assertEquals("", config.getHashSecret());
-        var gateway = new PaymentGateway(config, mock(MoMoConfig.class), Clock.systemUTC());
+        var gateway = new PaymentGateway(config, Clock.systemUTC());
         var error = assertThrows(BadRequestException.class, () -> gateway.validate("VNPAY"));
         assertTrue(error.getMessage().contains("VNPAY_TMN_CODE"));
         assertTrue(error.getMessage().contains("VNPAY_HASH_SECRET"));

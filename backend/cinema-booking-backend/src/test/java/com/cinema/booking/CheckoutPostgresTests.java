@@ -83,7 +83,6 @@ class CheckoutPostgresTests {
         @Bean TicketFulfillmentService fulfillment() { return mock(TicketFulfillmentService.class); }
         @Bean PaymentGateway gateway() { return mock(PaymentGateway.class); }
         @Bean VNPayConfig vnpay() { var config = mock(VNPayConfig.class); when(config.getTmnCode()).thenReturn("test-merchant"); when(config.verifyIpnChecksum(anyMap())).thenReturn(true); return config; }
-        @Bean MoMoConfig momo() { var config = mock(MoMoConfig.class); when(config.getPartnerCode()).thenReturn("test-merchant"); when(config.verifyIpnSignature(any())).thenReturn(true); return config; }
     }
 
     record Fixture(String code, Long seat, Long product, String email, LocalDateTime expires) { }

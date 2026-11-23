@@ -25,7 +25,6 @@ public class PaymentServiceImpl implements PaymentService {
     private final SeatChanges seatChanges;
     private final TicketFulfillmentService fulfillment;
     private final VNPayConfig vnpay;
-    private final MoMoConfig momo;
     private final CatalogGuard guard;
     private final PaymentReceiptService receipts;
 
@@ -55,24 +54,6 @@ public class PaymentServiceImpl implements PaymentService {
         if (a.getOutcome() != PaymentStatus.PENDING && !(success && deleted && a.getOutcome() == PaymentStatus.FAILED)) return VNPayIpnResponse.alreadyConfirmed();
         settle(a, success, "02".equals(params.get("vnp_TransactionStatus")), params.get("vnp_TransactionNo"));
         return VNPayIpnResponse.success();
-    }
-
-    @Override @Transactional
-    public MoMoIpnResponse processMoMoIpn(MoMoIpnRequest request) {
-        if (!momo.verifyIpnSignature(request) || !Objects.equals(momo.getPartnerCode(), request.getPartnerCode()))
-            return MoMoIpnResponse.invalidSignature();
-        PaymentAttempt a = context(request.getOrderId(), "MOMO");
-        if (a == null || !Objects.equals(a.getRequestId(), request.getRequestId())) return MoMoIpnResponse.error(1, "Order not found");
-        if (request.getAmount() == null || a.getAmount().compareTo(BigDecimal.valueOf(request.getAmount())) != 0)
-            return MoMoIpnResponse.error(4, "Invalid amount");
-        int code = request.getResultCode() == null ? -1 : request.getResultCode();
-        if (code == 0 && (request.getTransId() == null || request.getTransId() <= 0)) return MoMoIpnResponse.error(4, "Invalid transaction identity");
-        boolean deleted = guard.showtime(a.getBooking().getShowtime().getId(), false, true);
-        if (code == 0 && !receipts.record(a, request.getTransId().toString())) return MoMoIpnResponse.error(4, "Transaction identity conflict");
-        if (a.getOutcome() != PaymentStatus.PENDING && !(code == 0 && deleted && a.getOutcome() == PaymentStatus.FAILED)) return MoMoIpnResponse.alreadyConfirmed();
-        boolean finalFailure = Set.of(1001, 1002, 1003, 1004, 1005, 1006, 1007, 1017, 1026).contains(code);
-        settle(a, code == 0, finalFailure, request.getTransId() == null ? null : request.getTransId().toString());
-        return MoMoIpnResponse.success();
     }
 
     private PaymentAttempt context(String reference, String method) {

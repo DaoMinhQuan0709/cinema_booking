@@ -88,9 +88,9 @@ Chi tiết và giới hạn được mô tả trong `ARCHITECTURE.md` (mục 0) 
 
 ### GIAI ĐOẠN 5: Payment Gateway & Asynchronous Processing
 - **Công việc 5.1:** Tích hợp cổng thanh toán Sandbox:
-  - `POST /api/v1/payments/create-url`: Sinh URL thanh toán kèm chữ ký số (Checksum HMAC-SHA512) cho VNPay / MoMo.
+  - `POST /api/v1/payments/create-url`: Sinh URL thanh toán kèm chữ ký số (Checksum HMAC-SHA512) cho VNPay.
 - **Công việc 5.2: Xử lý Webhook IPN & Idempotency**
-  - Endpoints: `GET /api/v1/payments/vnpay-ipn`, `POST /api/v1/payments/momo-ipn`.
+  - Endpoint: `GET /api/v1/payments/vnpay-ipn`.
   - Xác thực chữ ký số (Signature Verification).
   - Kiểm tra tính lũy đẳng: Nếu đơn đã thanh toán trước đó (`payment.status == SUCCESS`), return mã thành công ngay lập tức.
   - **Xử lý Edge Case thanh toán trễ (ở phút 10:01):**
@@ -138,9 +138,8 @@ Chi tiết và giới hạn được mô tả trong `ARCHITECTURE.md` (mục 0) 
 | **Booking** | `POST` | `/api/v1/bookings` | Customer | **Giữ ghế 10p & Tạo đơn (Lock 2 tầng)** |
 | **Booking** | `GET`  | `/api/v1/bookings/{bookingCode}` | Customer | Chi tiết đơn đặt vé |
 | **Booking** | `DELETE`| `/api/v1/bookings/{bookingCode}/cancel` | Customer | Hủy giữ chỗ chủ động |
-| **Payment** | `POST` | `/api/v1/payments/create-url` | Customer | Khởi tạo link thanh toán VNPay / MoMo |
+| **Payment** | `POST` | `/api/v1/payments/create-url` | Customer | Khởi tạo link thanh toán VNPay |
 | **Payment** | `GET`  | `/api/v1/payments/vnpay-ipn` | Public | Webhook IPN xử lý kết quả VNPay |
-| **Payment** | `POST` | `/api/v1/payments/momo-ipn` | Public | Webhook IPN xử lý kết quả MoMo |
 | **AI** | `POST` | `/api/v1/chat/ask` | Public | Chatbot tư vấn chọn phim & lịch chiếu |
 | **Admin** | `POST` | `/api/v1/admin/movies` | Admin | Quản lý phim |
 | **Admin** | `POST` | `/api/v1/admin/cinemas` | Admin | Quản lý rạp và phòng chiếu |

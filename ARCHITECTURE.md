@@ -255,8 +255,8 @@ Table booking_products {
 Table payments {
   id bigserial [pk]
   booking_id bigint [ref: > bookings.id, not null]
-  transaction_no varchar(100) [unique] // Mã giao dịch từ VNPay/MoMo
-  payment_method varchar(50) [not null] // VNPAY, MOMO
+  transaction_no varchar(100) [unique] // Mã giao dịch từ VNPay
+  payment_method varchar(50) [not null] // VNPAY
   amount decimal(12,2) [not null]
   status payment_status [default: 'PENDING', not null]
   paid_at timestamp
@@ -309,13 +309,13 @@ FOR UPDATE NOWAIT;
 3. Lưu chi tiết ghế vào `booking_seats` và bắp nước vào `booking_products`.
 
 
-* Commit Transaction và tạo URL thanh toán (VNPay/MoMo) trả về cho Client.
+* Commit Transaction và tạo URL thanh toán VNPay trả về cho Client.
 
 
 
 ### 2.3. Luồng Xử lý Thanh toán (Webhook IPN) & Nhả ghế (Release Path)
 
-* **Trường hợp 1: Thanh toán thành công (VNPay/MoMo gọi IPN Webhook)**
+* **Trường hợp 1: Thanh toán thành công (VNPay gọi IPN Webhook)**
 1. Kiểm tra chữ ký số (Checksum/Signature) từ cổng thanh toán.
 2. Mở DB Transaction, lock bản ghi `bookings` (`FOR UPDATE`).
 3. Lưu ý **Edge Case (Thanh toán trễ ở phút thứ 10:01)**:
@@ -373,9 +373,8 @@ Quy ước chung:
 | `POST` | `/bookings` | **API giữ ghế & tạo đơn**: Nhận `showtimeId`, `seatIds[]`, `products[]`. Thực thi lock Redis + DB. | Customer |
 | `GET` | `/bookings/{bookingCode}` | Xem chi tiết đơn hàng & trạng thái vé (kèm QR code nếu đã thanh toán) | Customer |
 | `DELETE` | `/bookings/{bookingCode}/cancel` | Hủy giữ chỗ chủ động khi người dùng bấm quay lại/hủy đơn | Customer |
-| `POST` | `/payments/create-url` | Tạo URL thanh toán chuyển hướng sang VNPay / MoMo Sandbox | Customer |
+| `POST` | `/payments/create-url` | Tạo URL thanh toán chuyển hướng sang VNPay Sandbox | Customer |
 | `GET` | `/payments/vnpay-ipn` | Webhook (IPN) để server VNPay gọi ngầm xác nhận kết quả giao dịch | Public (Verify Hash) |
-| `POST` | `/payments/momo-ipn` | Webhook (IPN) để server MoMo gọi ngầm xác nhận kết quả giao dịch | Public (Verify Hash) |
 
 ### Module 4: AI Chatbot
 
@@ -399,6 +398,6 @@ Quy ước chung:
 
 ## 4. Điểm nhấn Kiến trúc cần lưu ý khi Implement (Best Practices cho CV)
 
-1. **Idempotency (Tính lũy đẳng) tại Webhook Thanh toán:** Cổng thanh toán VNPay/MoMo có thể gọi lại IPN nhiều lần nếu mạng chập chờn. API `/payments/*-ipn` bắt buộc kiểm tra nếu `payment.status == 'SUCCESS'` thì trả về mã thành công ngay lập tức mà không xử lý lặp lại logic cộng tiền hay gửi lại email.
+1. **Idempotency (Tính lũy đẳng) tại Webhook Thanh toán:** Cổng thanh toán VNPay có thể gọi lại IPN nhiều lần nếu mạng chập chờn. API `/payments/vnpay-ipn` bắt buộc xác minh chữ ký và ngữ cảnh giao dịch trước khi trả về kết quả đã xử lý, không lặp lại logic cấp vé hay gửi email.
 2. **Real-time Seat Updates (Tùy chọn nâng cao):** Tích hợp **Spring WebSocket (STOMP)** để mỗi khi có 1 user giữ ghế thành công (`POST /bookings`) hoặc nhả ghế, Server broadcast sự kiện tới topic `/topic/showtimes/{showtimeId}/seats` để các màn hình người dùng khác đang mở cùng suất chiếu thấy ghế đó đổi màu ngay lập tức mà không cần F5.
 3. **Async Processing:** Việc render ảnh mã QR (dùng thư viện `ZXing`), upload lên Cloudinary/S3 và gửi Email (JavaMailSender) phải được đẩy vào `@Async` hoặc Message Queue để không làm chậm thời gian phản hồi của luồng thanh toán.

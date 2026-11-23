@@ -126,7 +126,7 @@ Backend cần schema mới và khởi động lại; xem
 `/payment/vnpay-callback`: backend xác minh chữ ký/quyền xem đơn, frontend
 hiển thị thông tin giao dịch và kiểm tra trạng thái chờ IPN. Chỉ xác nhận vé
 khi DB có booking CONFIRMED/payment SUCCESS; không tin query parameter
-`vnp_ResponseCode=00` đơn lẻ. QR và callback MoMo còn ở bước tiếp theo.
+`vnp_ResponseCode=00` đơn lẻ. QR còn ở bước tiếp theo.
 
 Sau `npm.cmd run build`, có thể chạy `npm.cmd run test:checkout-browser`
 trên Windows với Edge. Script dùng REST/STOMP/cổng mô phỏng, kiểm tra desktop,

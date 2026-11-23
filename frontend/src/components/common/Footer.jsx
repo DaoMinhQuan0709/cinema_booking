@@ -108,9 +108,6 @@ export const Footer = () => {
                 <CreditCard className="w-3.5 h-3.5 text-blue-400" /> VNPay
               </div>
               <div className="px-3 py-1.5 rounded-lg bg-surface border border-surfaceBorder text-xs text-neutral-300 flex items-center gap-1.5 font-medium">
-                <CreditCard className="w-3.5 h-3.5 text-pink-400" /> MoMo
-              </div>
-              <div className="px-3 py-1.5 rounded-lg bg-surface border border-surfaceBorder text-xs text-neutral-300 flex items-center gap-1.5 font-medium">
                 <CreditCard className="w-3.5 h-3.5 text-amber-400" /> Visa / Master
               </div>
             </div>

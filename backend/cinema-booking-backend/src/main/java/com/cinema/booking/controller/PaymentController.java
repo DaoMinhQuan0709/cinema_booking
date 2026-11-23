@@ -1,9 +1,7 @@
 package com.cinema.booking.controller;
 
-import com.cinema.booking.dto.request.MoMoIpnRequest;
 import com.cinema.booking.dto.request.PaymentCreateUrlRequest;
 import com.cinema.booking.dto.response.ApiResponse;
-import com.cinema.booking.dto.response.MoMoIpnResponse;
 import com.cinema.booking.dto.response.PaymentUrlResponse;
 import com.cinema.booking.dto.response.VNPayIpnResponse;
 import com.cinema.booking.service.PaymentService;
@@ -40,7 +38,7 @@ public class PaymentController {
     }
 
     /**
-     * POST /api/v1/payments/create-url - Sinh URL thanh toan Sandbox (VNPay / MoMo).
+     * POST /api/v1/payments/create-url - Sinh URL thanh toan VNPay Sandbox.
      */
     @PostMapping("/create-url")
     public ResponseEntity<ApiResponse<PaymentUrlResponse>> createPaymentUrl(
@@ -70,14 +68,4 @@ public class PaymentController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * POST /api/v1/payments/momo-ipn - Webhook IPN tu MoMo (Cong viec 5.2).
-     * Endpoint public duoc MoMo goi qua phuong thuc POST de cap nhat trang thai thanh toan.
-     */
-    @PostMapping("/momo-ipn")
-    public ResponseEntity<MoMoIpnResponse> momoIpn(@RequestBody MoMoIpnRequest request) {
-        log.info("POST /api/v1/payments/momo-ipn - orderId={}", request.getOrderId());
-        MoMoIpnResponse response = paymentService.processMoMoIpn(request);
-        return ResponseEntity.ok(response);
-    }
 }

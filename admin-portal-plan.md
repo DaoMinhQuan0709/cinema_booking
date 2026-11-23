@@ -41,7 +41,7 @@ Mỗi phần là một mốc bàn giao; khi bắt đầu, tách thành việc 2�
 
 ## Tiến độ phần 1 — Phân quyền và phiên
 
-Bắt đầu ngày 12/11/2026. Git trước khi sửa: chỉ có `momo-payment-integration.md` chưa được theo dõi; giữ nguyên file này. Phạm vi đợt này là phần 1; các màn hình nghiệp vụ thuộc các phần sau.
+Bắt đầu ngày 12/11/2026. Phạm vi đợt này là phần 1; các màn hình nghiệp vụ thuộc các phần sau.
 
 - [x] Trạng thái xác minh phiên và chống phản hồi cũ ghi đè khi đổi tài khoản.
 - [x] `AdminRoute` chờ `/users/me`, kiểm tra ADMIN và dùng lại modal đăng nhập tại URL đích.

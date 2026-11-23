@@ -171,11 +171,11 @@ attempt đã lưu; IPN kiểm tra chữ ký, merchant, reference/request ID và 
 đã chốt. Không tạo Payment từ một IPN không nhận diện được. Kết quả SUCCESS
 không bị callback lỗi đến trễ ghi đè.
 
-MoMo không còn fallback URL giả `resultCode=0`. Nếu gọi cổng lỗi hoặc thiếu
-payUrl hợp lệ, hệ thống giữ UNKNOWN và ghi mã lỗi đã lọc, không báo thành công.
+Checkout chỉ hỗ trợ VNPay. Yêu cầu dùng phương thức khác bị từ chối trước
+khi tạo phiên; URL thanh toán chỉ chấp nhận HTTPS trên host VNPay Sandbox.
 Lưu URL nhạy cảm chỉ để owner/admin tiếp tục phiên; không log URL/chữ ký/token
-hoặc toàn bộ IPN. Quy tắc kết quả tham khảo [MoMo result codes](https://developers.momo.vn/v3/docs/payment/api/result-handling/resultcode/)
-và [VNPAY payment](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html).
+hoặc toàn bộ IPN. Quy tắc kết quả tham khảo
+[VNPAY payment](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html).
 
 ## Ghế và thời gian
 
@@ -225,7 +225,7 @@ Theo [phân biệt Return URL và IPN của VNPay](https://sandbox.vnpayment.vn/
 IPN dùng để cập nhật thanh toán; Return URL dùng để hiển thị kết quả.
 Trang này không tự gọi lại endpoint IPN để ép xác nhận đơn. Với giao dịch
 đã trả tiền nhưng chưa có IPN, cần kiểm tra/đối soát giao dịch; không yêu cầu
-khách thanh toán lại. QR và trang callback MoMo vẫn là phần tiếp theo.
+khách thanh toán lại. Vé QR vẫn là phần tiếp theo.
 
 ### Thẻ test thành công nhưng trang vẫn chờ xác nhận
 

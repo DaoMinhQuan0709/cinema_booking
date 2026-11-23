@@ -17,7 +17,7 @@ public class PaymentCreateUrlRequest {
     private String bookingCode;
 
     @NotBlank(message = "Phuong thuc thanh toan khong duoc de trong")
-    @Pattern(regexp = "^(?i)(VNPAY|MOMO)$", message = "Phuong thuc thanh toan chi chap nhan VNPAY hoac MOMO")
+    @Pattern(regexp = "^(?i)VNPAY$", message = "Phuong thuc thanh toan chi chap nhan VNPAY")
     private String paymentMethod;
 
     @NotBlank(message = "Phien ban don khong duoc de trong")

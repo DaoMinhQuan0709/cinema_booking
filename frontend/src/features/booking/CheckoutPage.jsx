@@ -18,7 +18,6 @@ function CheckoutForm({ booking, query, userId, code, sessionId }) {
   const key = checkoutKey(userId, code, sessionId);
   const [baseRevision, setBaseRevision] = useState(booking.checkoutRevision);
   const [productError, setProductError] = useState(null);
-  const [method, setMethod] = useState('VNPAY');
   const [operation, setOperation] = useState(null);
   const [dialog, setDialog] = useState(null);
   const busy = useRef(false);
@@ -36,10 +35,10 @@ function CheckoutForm({ booking, query, userId, code, sessionId }) {
 
   async function synchronize() { await query.refetch(); }
 
-  async function beginPayment(saved, selectedMethod) {
+  async function beginPayment(saved) {
     if (!isCurrentUser()) return;
     setOperation('payment');
-    const response = await paymentService.createUrl({ bookingCode: code, paymentMethod: selectedMethod, expectedRevision: saved.checkoutRevision });
+    const response = await paymentService.createUrl({ bookingCode: code, paymentMethod: 'VNPAY', expectedRevision: saved.checkoutRevision });
     if (!isCurrentUser()) return;
     if (response.state === 'READY' && response.paymentUrl) window.location.assign(safePaymentUrl(response.paymentUrl, response.paymentMethod));
     else { await synchronize(); toast.info('Chưa có đường dẫn thanh toán. Vui lòng kiểm tra trạng thái đơn.', { id: 'checkout-status' }); }
@@ -53,7 +52,7 @@ function CheckoutForm({ booking, query, userId, code, sessionId }) {
     busy.current = true;
     let savingProducts = !confirmed;
     try {
-      if (confirmed) { setDialog(null); await beginPayment(confirmed.booking, confirmed.method); return; }
+      if (confirmed) { setDialog(null); await beginPayment(confirmed.booking); return; }
       setOperation('products');
       const expected = booking.products;
       const saved = await bookingService.updateProducts(code, { expectedRevision: baseRevision, products: selectedProducts(draftFromBooking(booking)) });
@@ -63,8 +62,8 @@ function CheckoutForm({ booking, query, userId, code, sessionId }) {
       if (!isCurrentUser()) return;
       client.setQueryData(key, saved); setBaseRevision(saved.checkoutRevision);
       void invalidateTicketCache(sessionId);
-      if (priceChanged(expected, saved, total)) setDialog({ kind: 'price', booking: saved, method, previousProducts: expected, previousTotal: total });
-      else await beginPayment(saved, method);
+      if (priceChanged(expected, saved, total)) setDialog({ kind: 'price', booking: saved, previousProducts: expected, previousTotal: total });
+      else await beginPayment(saved);
     } catch (error) {
       if (isCurrentUser()) {
         toast.error(error.response?.data?.message ?? error.message ?? 'Chưa thể thanh toán. Vui lòng thử lại.', { id: 'checkout-error' });
@@ -98,7 +97,14 @@ function CheckoutForm({ booking, query, userId, code, sessionId }) {
           <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold text-white">Sản phẩm đã chọn</h2><Link className={secondary} to={productSelectionHref(code)} aria-disabled={Boolean(operation)} onClick={event => { if (busy.current) event.preventDefault(); }}>Chỉnh sửa sản phẩm</Link></div>
           {booking.products.length ? <ul className="mt-5 divide-y divide-surfaceBorder">{booking.products.map(item => <li key={item.productId} className="flex justify-between gap-4 py-3 text-sm"><span className="text-neutral-200">{item.quantity} × {item.productName}</span><strong className="shrink-0 text-white">{formatCurrency(item.subtotal)}</strong></li>)}</ul> : <p className="mt-4 text-sm text-muted">Bạn chỉ đặt vé, không kèm sản phẩm.</p>}
           {productError && <p role="alert" className="mt-4 text-sm text-amber-300">{productError} Vui lòng chọn “Chỉnh sửa sản phẩm” để cập nhật đơn.</p>}
-        </section><section className="rounded-2xl border border-surfaceBorder bg-surface/40 p-5 sm:p-6"><h2 className="text-xl font-bold text-white">Phương thức thanh toán</h2><fieldset disabled={Boolean(operation) || changedElsewhere} className="mt-5 grid gap-3 sm:grid-cols-2"><legend className="sr-only">Chọn cổng thanh toán Sandbox</legend>{[['VNPAY', 'VNPay', 'Thẻ ngân hàng / mã QR'], ['MOMO', 'MoMo', 'Ví điện tử']].map(([value, label, detail]) => <label key={value} className={`flex min-h-24 cursor-pointer items-center gap-3 rounded-xl border p-4 ${method === value ? 'border-primary bg-primary/5' : 'border-surfaceBorder'}`}><input type="radio" name="paymentMethod" value={value} checked={method === value} onChange={() => setMethod(value)} className="h-4 w-4 accent-primary" /><span><strong className="text-lg text-white">{label}</strong><span className="mt-1 block text-xs text-muted">{detail} · Sandbox</span></span></label>)}</fieldset><p className="mt-4 text-xs leading-relaxed text-muted">Combo và phương thức được chốt khi bắt đầu tạo phiên thanh toán. Hạn giữ ghế vẫn tiếp tục chạy khi chuyển sang cổng.</p></section></>}
+        </section><section className="rounded-2xl border border-surfaceBorder bg-surface/40 p-5 sm:p-6">
+          <h2 className="text-xl font-bold text-white">Phương thức thanh toán</h2>
+          <div className="mt-5 flex min-h-24 items-center gap-3 rounded-xl border border-primary bg-primary/5 p-4">
+            <CreditCard className="h-5 w-5 text-primary" aria-hidden="true" />
+            <span><strong className="text-lg text-white">VNPay</strong><span className="mt-1 block text-xs text-muted">Thẻ ngân hàng / mã QR · Sandbox</span></span>
+          </div>
+          <p className="mt-4 text-xs leading-relaxed text-muted">Combo được chốt khi bắt đầu tạo phiên thanh toán. Hạn giữ ghế vẫn tiếp tục chạy khi chuyển sang VNPay.</p>
+        </section></>}
       </div>
     </div>
     <div className="fixed inset-x-0 bottom-0 z-30 border-t border-surfaceBorder bg-background/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur lg:hidden"><div className="mx-auto flex max-w-xl items-center gap-4"><div className="shrink-0"><p className="text-[11px] text-muted">{editable ? 'Tổng tạm tính' : 'Tổng tiền'}</p><strong className="text-lg font-black text-primary">{formatCurrency(total)}</strong></div><div className="min-w-0 flex-1">{action}</div></div></div>

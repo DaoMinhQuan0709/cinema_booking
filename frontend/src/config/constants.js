@@ -51,5 +51,4 @@ export const MAX_SEATS_PER_BOOKING = 8;
 // Phuong thuc thanh toan ho tro
 export const PAYMENT_METHOD = {
   VNPAY: 'VNPAY',
-  MOMO: 'MOMO',
 };
