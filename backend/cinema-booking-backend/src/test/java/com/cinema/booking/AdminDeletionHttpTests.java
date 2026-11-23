@@ -22,6 +22,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.*;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -121,6 +124,46 @@ class AdminDeletionHttpTests {
         api("DELETE",path(f),adminToken,null,"\"stale\"",412);
         api("GET","/admin/movies/9223372036854775807/deletion-preview",adminToken,null,null,404);
         assertNull(jdbc.queryForObject("select deleted_at from movies where id=?",Object.class,f.movie()));
+    }
+
+    @Test void scopeTokenStaysCompatibleForMovieShowtimeAndDeletedPreviews() throws Exception {
+        var f = fixture();
+        String title = "Xóa thử " + f.galaxy();
+        var movie = api("GET", path(f) + "/deletion-preview", adminToken, null, null, 200);
+        var slots = movie.path("showtimes");
+        assertEquals(2, slots.size());
+        String first = legacySlot(slots.get(0), f.first());
+        String second = legacySlot(slots.get(1), f.second());
+        String movieToken = legacyScopeToken("movies:%s:%s:false:[%s, %s]".formatted(f.movie(), title, first, second));
+        assertEquals(movieToken, movie.path("scopeToken").asText());
+
+        var showtime = api("GET", "/admin/showtimes/" + f.first() + "/deletion-preview", adminToken, null, null, 200);
+        assertEquals(1, showtime.path("showtimes").size());
+        assertEquals(slots.get(0), showtime.path("showtimes").get(0));
+        assertEquals(legacyScopeToken("showtimes:%s:%s:false:[%s]".formatted(f.first(), title, first)),
+                showtime.path("scopeToken").asText());
+
+        Long blocker = booking(f, BookingStatus.PENDING);
+        assertEquals(movieToken, preview(f));
+        api("DELETE", path(f), adminToken, null, movieToken, 409);
+        jdbc.update("update bookings set status='CANCELLED' where id=?", blocker);
+
+        var deleted = api("DELETE", path(f), adminToken, null, movieToken, 200);
+        assertEquals(legacyScopeToken("movies:%s:%s:true:[]".formatted(f.movie(), title)), deleted.path("scopeToken").asText());
+        assertEquals(deleted, api("GET", path(f) + "/deletion-preview", adminToken, null, null, 200));
+    }
+
+    private static String legacySlot(JsonNode slot, long id) {
+        assertEquals(id, slot.path("id").asLong());
+        assertEquals("Rạp xóa thử", slot.path("cinemaName").asText());
+        assertEquals("Phòng A", slot.path("auditoriumName").asText());
+        return "Slot[id=%s, cinemaName=Rạp xóa thử, auditoriumName=Phòng A, startTime=%s, endTime=%s]"
+                .formatted(id, slot.path("startTime").asText(), slot.path("endTime").asText());
+    }
+
+    private static String legacyScopeToken(String fingerprint) throws NoSuchAlgorithmException {
+        byte[] digest = MessageDigest.getInstance("SHA-256").digest(fingerprint.getBytes(StandardCharsets.UTF_8));
+        return "\"" + HexFormat.of().formatHex(digest) + "\"";
     }
 
     @Test void deletesWholeMovieKeepsRowsHistoryAndOriginalActor() throws Exception {
