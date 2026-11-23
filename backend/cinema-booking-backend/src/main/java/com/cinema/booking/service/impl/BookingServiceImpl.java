@@ -6,17 +6,17 @@ import com.cinema.booking.dto.response.BookingResponse;
 import com.cinema.booking.entity.*;
 import com.cinema.booking.enums.BookingStatus;
 import com.cinema.booking.enums.ShowtimeSeatStatus;
-import com.cinema.booking.enums.UserRole;
 import com.cinema.booking.exception.BadRequestException;
 import com.cinema.booking.exception.ConflictException;
 import com.cinema.booking.exception.ForbiddenException;
 import com.cinema.booking.exception.ResourceNotFoundException;
 import com.cinema.booking.exception.SeatConflictException;
 import com.cinema.booking.repository.*;
+import com.cinema.booking.service.BookingResponseMapper;
 import com.cinema.booking.service.BookingService;
+import com.cinema.booking.service.CheckoutSupport;
 import com.cinema.booking.service.QrCodeService;
 import com.cinema.booking.service.SeatLockService;
-import com.cinema.booking.service.WebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,9 +55,9 @@ public class BookingServiceImpl implements BookingService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final SeatLockService seatLockService;
-    private final WebSocketService webSocketService;
     private final QrCodeService qrCodeService;
-    private final com.cinema.booking.service.CheckoutSupport checkout;
+    private final BookingResponseMapper responseMapper;
+    private final CheckoutSupport checkout;
     private final com.cinema.booking.service.SeatChanges seatChanges;
     private final com.cinema.booking.service.CatalogGuard guard;
 
@@ -244,7 +244,7 @@ public class BookingServiceImpl implements BookingService {
             log.info("=== TAO DON THANH CONG === bookingCode={}, totalAmount={}, expiresAt={}",
                     bookingCode, totalAmount, lockedUntil);
 
-            return mapToBookingResponse(savedBooking, availableSeats);
+            return responseMapper.toResponse(savedBooking, availableSeats);
 
         } catch (SeatConflictException | ResourceNotFoundException | BadRequestException e) {
             throw e;
@@ -265,10 +265,7 @@ public class BookingServiceImpl implements BookingService {
         User currentUser = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
 
-        boolean isOwner = booking.getUser().getId().equals(currentUser.getId());
-        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
-
-        if (!isOwner && !isAdmin) {
+        if (!CheckoutSupport.canAccess(booking, currentUser)) {
             throw new ForbiddenException("Ban khong co quyen xem don dat ve nay");
         }
 
@@ -277,7 +274,7 @@ public class BookingServiceImpl implements BookingService {
                 .collect(Collectors.toList());
         List<ShowtimeSeat> seats = showtimeSeatRepository.findAllByIdIn(seatIds);
 
-        return mapToBookingResponse(booking, seats);
+        return responseMapper.toResponse(booking, seats);
     }
 
     @Override
@@ -289,7 +286,7 @@ public class BookingServiceImpl implements BookingService {
         if (booking.getStatus() != BookingStatus.PENDING) throw new BadRequestException("Booking is no longer pending");
         booking.setStatus(BookingStatus.CANCELLED);
         seatChanges.release(booking);
-        return mapToBookingResponse(booking, booking.getBookingSeats().stream().map(BookingSeat::getShowtimeSeat).toList());
+        return responseMapper.toResponse(booking, booking.getBookingSeats().stream().map(BookingSeat::getShowtimeSeat).toList());
     }
 
     @Override
@@ -301,10 +298,7 @@ public class BookingServiceImpl implements BookingService {
         User currentUser = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
 
-        boolean isOwner = booking.getUser().getId().equals(currentUser.getId());
-        boolean isAdmin = currentUser.getRole() == UserRole.ADMIN;
-
-        if (!isOwner && !isAdmin) {
+        if (!CheckoutSupport.canAccess(booking, currentUser)) {
             throw new ForbiddenException("Ban khong co quyen xem ma QR cua don dat ve nay");
         }
 
@@ -326,66 +320,5 @@ public class BookingServiceImpl implements BookingService {
                 .format(checkout.now());
         String random = UUID.randomUUID().toString().substring(0, 4).toUpperCase();
         return "BK" + timestamp + random;
-    }
-
-    /**
-     * Map entity Booking sang BookingResponse DTO.
-     */
-    private BookingResponse mapToBookingResponse(Booking booking, List<ShowtimeSeat> showtimeSeats) {
-        Showtime showtime = booking.getShowtime();
-
-        // Map showtime info
-        BookingResponse.ShowtimeInfo showtimeInfo = BookingResponse.ShowtimeInfo.builder()
-                .showtimeId(showtime.getId())
-                .movieTitle(showtime.getMovie().getTitle())
-                .cinemaName(showtime.getAuditorium().getCinema().getName())
-                .auditoriumName(showtime.getAuditorium().getName())
-                .startTime(showtime.getStartTime())
-                .endTime(showtime.getEndTime())
-                .build();
-
-        // Map seat info
-        Map<Long, ShowtimeSeat> seatMap = showtimeSeats.stream()
-                .collect(Collectors.toMap(ShowtimeSeat::getId, s -> s));
-
-        List<BookingResponse.SeatInfo> seatInfos = booking.getBookingSeats().stream()
-                .map(bs -> {
-                    ShowtimeSeat ss = seatMap.get(bs.getShowtimeSeat().getId());
-                    Seat seat = ss != null ? ss.getSeat() : bs.getShowtimeSeat().getSeat();
-                    return BookingResponse.SeatInfo.builder()
-                            .showtimeSeatId(bs.getShowtimeSeat().getId())
-                            .rowChar(seat.getRowChar())
-                            .seatNumber(seat.getSeatNumber())
-                            .seatType(seat.getType().name())
-                            .price(bs.getPrice())
-                            .build();
-                })
-                .collect(Collectors.toList());
-
-        // Map product info
-        List<BookingResponse.ProductInfo> productInfos = booking.getBookingProducts().stream()
-                .map(bp -> BookingResponse.ProductInfo.builder()
-                        .productId(bp.getProduct().getId())
-                        .productName(bp.getProduct().getName())
-                        .quantity(bp.getQuantity())
-                        .unitPrice(bp.getUnitPrice())
-                        .subtotal(bp.getUnitPrice().multiply(BigDecimal.valueOf(bp.getQuantity())))
-                        .build())
-                .collect(Collectors.toList());
-
-        return BookingResponse.builder()
-                .id(booking.getId())
-                .bookingCode(booking.getBookingCode())
-                .status(booking.getStatus())
-                .totalAmount(booking.getTotalAmount())
-                .createdAt(booking.getCreatedAt())
-                .expiresAt(booking.getExpiresAt())
-                .serverTime(checkout.instant())
-                .checkoutRevision(checkout.revision(booking))
-                .checkout(checkout.view(booking))
-                .showtime(showtimeInfo)
-                .seats(seatInfos)
-                .products(productInfos)
-                .build();
     }
 }

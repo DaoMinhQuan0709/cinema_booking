@@ -258,6 +258,30 @@ class AdminDeletionHttpTests {
         assertEquals(transaction,jdbc.queryForObject("select provider_transaction_id from payment_attempts where provider_order_id=?",String.class,ref));
     }
 
+    @Test void ipnWaitingForDeletionObservesTheCommittedDeletion() throws Exception {
+        var f = fixture();
+        Long bookingId = booking(f, BookingStatus.EXPIRED);
+        String reference = attempt(bookingId, PaymentStatus.FAILED);
+        String token = preview(f);
+        var started = new CountDownLatch(1);
+        try (var pool = Executors.newSingleThreadExecutor()) {
+            var callback = tx.execute(status -> {
+                deletion.delete("movies", f.movie(), token, email);
+                var pending = pool.submit(() -> {
+                    started.countDown();
+                    return paymentService.processVNPayIpn(ipn(reference, "tx-" + UUID.randomUUID()));
+                });
+                assertTrue(assertDoesNotThrow(() -> started.await(2, TimeUnit.SECONDS)));
+                assertThrows(TimeoutException.class, () -> pending.get(150, TimeUnit.MILLISECONDS));
+                return pending;
+            });
+            assertEquals("00", callback.get(5, TimeUnit.SECONDS).getRspCode());
+        }
+        assertEquals("REFUND_REQUIRED", jdbc.queryForObject(
+                "select outcome from payment_attempts where provider_order_id=?", String.class, reference));
+        assertEquals("EXPIRED", jdbc.queryForObject("select status from bookings where id=?", String.class, bookingId));
+    }
+
     @Test void twoOrdersCannotClaimSameProviderTransaction() throws Exception {
         var f=fixture();Long one=booking(f,BookingStatus.EXPIRED),two=booking(f,BookingStatus.EXPIRED);
         String first=attempt(one,PaymentStatus.FAILED),second=attempt(two,PaymentStatus.FAILED);

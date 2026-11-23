@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Objects;
 
@@ -44,7 +43,7 @@ public class PaymentReturnService {
         var booking = bookings.getBookingByCode(code, email);
         var attempt = attempts.findByProviderOrderId(reference)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy phiên thanh toán."));
-        if (new BigDecimal(params.get("vnp_Amount")).movePointLeft(2).compareTo(attempt.getAmount()) != 0)
+        if (VNPayConfig.parseAmount(params.get("vnp_Amount")).compareTo(attempt.getAmount()) != 0)
             throw new BadRequestException("Số tiền VNPay trả về không khớp phiên thanh toán.");
         var paymentStatus = payments.findByBookingId(booking.getId()).map(p -> p.getStatus()).orElse(PaymentStatus.PENDING);
         // A result page does not need the resumable, signed payment URL.

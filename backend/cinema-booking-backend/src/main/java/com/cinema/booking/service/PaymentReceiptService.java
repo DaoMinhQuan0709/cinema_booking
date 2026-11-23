@@ -5,6 +5,8 @@ import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 /** Giữ bằng chứng theo attempt; khóa danh tính giao dịch giữa các đơn khác nhau. */
@@ -13,7 +15,7 @@ import java.util.Objects;
 @Slf4j
 public class PaymentReceiptService {
     private final EntityManager em;
-    private final CheckoutSupport checkout;
+    private final Clock clock;
 
     public boolean record(PaymentAttempt attempt, String transaction) {
         if (transaction == null || transaction.isBlank() || transaction.length() > 100) return false;
@@ -36,7 +38,7 @@ public class PaymentReceiptService {
                     .setParameter("tx", identity).setParameter("booking", attempt.getBooking().getId()).getSingleResult()).longValue();
             if (ownLegacy > 0) return false;
             attempt.setProviderTransactionId(transaction);
-            attempt.setReceivedAt(checkout.now());
+            attempt.setReceivedAt(LocalDateTime.now(clock));
             em.flush();
         }
         return true;

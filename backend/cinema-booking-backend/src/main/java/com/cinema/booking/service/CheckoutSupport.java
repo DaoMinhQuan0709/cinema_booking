@@ -30,8 +30,12 @@ public class CheckoutSupport {
 
     public void authorize(Booking b, String email) {
         User user = users.findByEmail(email).orElseThrow(() -> new ForbiddenException("Vui lòng đăng nhập lại."));
-        if (!b.getUser().getId().equals(user.getId()) && user.getRole() != UserRole.ADMIN)
+        if (!canAccess(b, user))
             throw new ForbiddenException("Bạn không có quyền truy cập đơn này.");
+    }
+
+    public static boolean canAccess(Booking booking, User user) {
+        return booking.getUser().getId().equals(user.getId()) || user.getRole() == UserRole.ADMIN;
     }
 
     public boolean live(Booking b) {

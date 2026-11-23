@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -35,6 +36,11 @@ public class VNPayConfig {
     public static final String VNP_CURR_CODE = "VND";
     public static final String VNP_LOCALE = "vn";
     public static final String VNP_ORDER_TYPE = "other";
+
+    /** Converts a VNPay callback amount to VND. Callers handle input validation. */
+    public static BigDecimal parseAmount(String amount) {
+        return new BigDecimal(amount).movePointLeft(2);
+    }
 
     /**
      * Tinh toan chu ky so HMAC-SHA512 cho VNPay.

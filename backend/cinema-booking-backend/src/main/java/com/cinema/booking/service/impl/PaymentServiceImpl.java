@@ -12,12 +12,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
     private final CheckoutPaymentService checkoutPayments;
-    private final CheckoutSupport checkout;
+    private final Clock clock;
     private final BookingRepository bookings;
     private final PaymentRepository payments;
     private final PaymentAttemptRepository attempts;
@@ -43,16 +45,17 @@ public class PaymentServiceImpl implements PaymentService {
         PaymentAttempt a = context(params.get("vnp_TxnRef"), "VNPAY");
         if (a == null) return VNPayIpnResponse.orderNotFound();
         BigDecimal amount;
-        try { amount = new BigDecimal(params.get("vnp_Amount")).movePointLeft(2); }
+        try { amount = VNPayConfig.parseAmount(params.get("vnp_Amount")); }
         catch (Exception e) { return VNPayIpnResponse.invalidAmount(); }
         if (amount.compareTo(a.getAmount()) != 0) return VNPayIpnResponse.invalidAmount();
         boolean success = "00".equals(params.get("vnp_ResponseCode")) && "00".equals(params.get("vnp_TransactionStatus"));
         if (success && (params.get("vnp_TransactionNo") == null || params.get("vnp_TransactionNo").isBlank() || "0".equals(params.get("vnp_TransactionNo"))))
             return VNPayIpnResponse.otherError("Invalid transaction identity");
-        boolean deleted = guard.showtime(a.getBooking().getShowtime().getId(), false, true);
+        boolean catalogDeleted = guard.showtime(a.getBooking().getShowtime().getId(), false, true);
         if (success && !receipts.record(a, params.get("vnp_TransactionNo"))) return VNPayIpnResponse.otherError("Transaction identity conflict");
-        if (a.getOutcome() != PaymentStatus.PENDING && !(success && deleted && a.getOutcome() == PaymentStatus.FAILED)) return VNPayIpnResponse.alreadyConfirmed();
-        settle(a, success, "02".equals(params.get("vnp_TransactionStatus")), params.get("vnp_TransactionNo"));
+        if (a.getOutcome() != PaymentStatus.PENDING && !(success && catalogDeleted && a.getOutcome() == PaymentStatus.FAILED)) return VNPayIpnResponse.alreadyConfirmed();
+        // The catalog share locks remain held through settlement.
+        settle(a, success, "02".equals(params.get("vnp_TransactionStatus")), params.get("vnp_TransactionNo"), catalogDeleted);
         return VNPayIpnResponse.success();
     }
 
@@ -70,17 +73,16 @@ public class PaymentServiceImpl implements PaymentService {
         return candidate;
     }
 
-    private void settle(PaymentAttempt a, boolean success, boolean finalFailure, String transaction) {
+    private void settle(PaymentAttempt a, boolean success, boolean finalFailure, String transaction, boolean catalogDeleted) {
         Booking b = a.getBooking();
         Payment payment = payments.findByBookingId(b.getId()).orElse(null);
         if (payment == null) return;
-        boolean deleted = guard.showtime(b.getShowtime().getId(), false, true);
-        if (success && deleted) {
+        if (success && catalogDeleted) {
             a.setState(CheckoutState.CLOSED);
             a.setOutcome(PaymentStatus.REFUND_REQUIRED);
             if (payment.getTransactionNo() == null) {
                 payment.setTransactionNo(a.getMethod() + ":" + transaction);
-                payment.setPaidAt(checkout.now());
+                payment.setPaidAt(LocalDateTime.now(clock));
             }
             if (payment.getStatus() != PaymentStatus.SUCCESS && payment.getStatus() != PaymentStatus.REFUNDED)
                 payment.setStatus(PaymentStatus.REFUND_REQUIRED);
@@ -102,7 +104,7 @@ public class PaymentServiceImpl implements PaymentService {
         boolean canBook = locked.size() == b.getBookingSeats().size() && !locked.isEmpty()
                 && (b.getStatus() == BookingStatus.PENDING || b.getStatus() == BookingStatus.EXPIRED)
                 && locked.stream().allMatch(s -> SeatChanges.owns(b, s) || s.getStatus() == ShowtimeSeatStatus.AVAILABLE);
-        payment.setTransactionNo(a.getMethod() + ":" + transaction); payment.setPaidAt(checkout.now());
+        payment.setTransactionNo(a.getMethod() + ":" + transaction); payment.setPaidAt(LocalDateTime.now(clock));
         if (!canBook) {
             payment.setStatus(PaymentStatus.REFUND_REQUIRED); a.setOutcome(PaymentStatus.REFUND_REQUIRED); return;
         }

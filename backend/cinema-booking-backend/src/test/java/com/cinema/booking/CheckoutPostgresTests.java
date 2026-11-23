@@ -58,7 +58,7 @@ class CheckoutPostgresTests {
     }
 
     @Configuration @EnableTransactionManagement @EnableJpaRepositories(basePackageClasses = BookingRepository.class)
-    @Import({ CheckoutSupport.class, BookingProductsService.class, BookingServiceImpl.class, CheckoutPaymentService.class,
+    @Import({ CheckoutSupport.class, BookingProductsService.class, BookingResponseMapper.class, BookingServiceImpl.class, CheckoutPaymentService.class,
             PaymentServiceImpl.class, PaymentReturnService.class, BookingCleanupService.class, SeatChanges.class,
             CatalogGuard.class, PaymentReceiptService.class, QrCodeService.class })
     static class Config {
@@ -223,6 +223,30 @@ class CheckoutPostgresTests {
         verify(context.getBean(TicketFulfillmentService.class), times(1)).fulfillTicketAsync(anyLong());
     }
 
+    @Test void ipnKeepsItsAmountValidationAndStoresTimestampsFromTheBookingClock() {
+        checkoutPayments.create(payment(get().getCheckoutRevision()), fixture.email(), new MockHttpServletRequest());
+        String reference = reference();
+        var params = new HashMap<>(ipn(reference));
+        params.remove("vnp_Amount");
+        assertEquals(VNPayIpnResponse.invalidAmount(), paymentService.processVNPayIpn(params));
+        for (String invalid : List.of("invalid", "8000001")) {
+            params.put("vnp_Amount", invalid);
+            assertEquals(VNPayIpnResponse.invalidAmount(), paymentService.processVNPayIpn(params));
+        }
+        assertEquals(BookingStatus.PENDING, get().getStatus());
+
+        context.getBean(TestClock.class).time.set(Instant.parse("2026-11-09T06:01:00Z"));
+        params.put("vnp_Amount", "8E6");
+        assertEquals(VNPayIpnResponse.success(), paymentService.processVNPayIpn(params));
+        tx.executeWithoutResult(status -> {
+            var attempt = context.getBean(PaymentAttemptRepository.class).findByProviderOrderId(reference).orElseThrow();
+            var payment = context.getBean(PaymentRepository.class).findByBookingId(attempt.getBooking().getId()).orElseThrow();
+            var expected = LocalDateTime.of(2026, 11, 9, 13, 1);
+            assertEquals(expected, attempt.getReceivedAt());
+            assertEquals(expected, payment.getPaidAt());
+        });
+    }
+
     @Test void paymentAndBothExpiryPathsCannotDowngradeBookedSeats() throws Exception {
         checkoutPayments.create(payment(get().getCheckoutRevision()), fixture.email(), new MockHttpServletRequest());
         String reference = reference(); context.getBean(TestClock.class).time.set(Instant.parse("2026-11-09T06:11:00Z"));
@@ -251,10 +275,61 @@ class CheckoutPostgresTests {
         tx.executeWithoutResult(s -> em.persist(User.builder().email("other-" + fixture.code() + "@example.invalid").fullName("Other").passwordHash("unused").build()));
         String other = "other-" + fixture.code() + "@example.invalid";
         String revision = get().getCheckoutRevision();
-        assertThrows(ForbiddenException.class, () -> bookingService.getBookingByCode(fixture.code(), other));
-        assertThrows(ForbiddenException.class, () -> products.replace(fixture.code(), cart(revision, 1), other));
+        assertEquals("Ban khong co quyen xem don dat ve nay",
+                assertThrows(ForbiddenException.class, () -> bookingService.getBookingByCode(fixture.code(), other)).getMessage());
+        assertEquals("Ban khong co quyen xem ma QR cua don dat ve nay",
+                assertThrows(ForbiddenException.class, () -> bookingService.getBookingQrCode(fixture.code(), other)).getMessage());
+        assertEquals("Bạn không có quyền truy cập đơn này.",
+                assertThrows(ForbiddenException.class, () -> products.replace(fixture.code(), cart(revision, 1), other)).getMessage());
         assertThrows(ForbiddenException.class, () -> checkoutPayments.create(payment(revision), other, new MockHttpServletRequest()));
         verify(gateway, never()).create(any());
+    }
+
+    @Test void bookingAccessKeepsAdminAndMissingUserBehavior() {
+        String admin = "admin-" + fixture.code() + "@example.invalid";
+        tx.executeWithoutResult(status -> em.persist(User.builder().email(admin).fullName("Admin")
+                .passwordHash("unused").role(UserRole.ADMIN).build()));
+        String revision = get().getCheckoutRevision();
+        assertEquals(revision, bookingService.getBookingByCode(fixture.code(), admin).getCheckoutRevision());
+
+        String missing = "missing-" + fixture.code() + "@example.invalid";
+        assertEquals("Khong tim thay nguoi dung",
+                assertThrows(ResourceNotFoundException.class, () -> bookingService.getBookingByCode(fixture.code(), missing)).getMessage());
+        assertEquals("Vui lòng đăng nhập lại.",
+                assertThrows(ForbiddenException.class, () -> products.replace(fixture.code(), cart(revision, 1), missing)).getMessage());
+        assertEquals(1, products.replace(fixture.code(), cart(revision, 1), admin).getProducts().size());
+    }
+
+    @Test void createdBookingResponseKeepsSeatAndProductOrderAndCheckoutSnapshot() {
+        Long showtimeId = get().getShowtime().getShowtimeId();
+        record AdditionalItems(Long seatId, Long productId) { }
+        var additional = tx.execute(status -> {
+            Showtime showtime = em.find(Showtime.class, showtimeId);
+            Seat seat = Seat.builder().auditorium(showtime.getAuditorium()).rowChar("A").seatNumber(2).type(SeatType.VIP).build();
+            em.persist(seat);
+            ShowtimeSeat inventory = ShowtimeSeat.builder().showtime(showtime).seat(seat).price(new BigDecimal("40000")).build();
+            em.persist(inventory);
+            Product product = Product.builder().name("Combo two").price(new BigDecimal("10000")).isAvailable(true).build();
+            em.persist(product);
+            return new AdditionalItems(inventory.getId(), product.getId());
+        });
+        bookingService.cancelBooking(fixture.code(), fixture.email());
+        when(context.getBean(SeatLockService.class).lockSeats(anyLong(), anyList(), anyString())).thenReturn(true);
+        var request = BookingCreateRequest.builder().showtimeId(showtimeId)
+                .showtimeSeatIds(List.of(additional.seatId(), fixture.seat()))
+                .products(List.of(BookingProductItem.builder().productId(additional.productId()).quantity(2).build(),
+                        BookingProductItem.builder().productId(fixture.product()).quantity(1).build())).build();
+
+        var held = bookingService.createBooking(request, fixture.email());
+
+        assertEquals(List.of(fixture.seat(), additional.seatId()), held.getSeats().stream().map(BookingResponse.SeatInfo::getShowtimeSeatId).toList());
+        assertEquals(List.of("STANDARD", "VIP"), held.getSeats().stream().map(BookingResponse.SeatInfo::getSeatType).toList());
+        assertEquals(List.of(additional.productId(), fixture.product()), held.getProducts().stream().map(BookingResponse.ProductInfo::getProductId).toList());
+        assertEquals(new BigDecimal("20000.00"), held.getProducts().getFirst().getSubtotal());
+        assertEquals(new BigDecimal("170000.00"), held.getTotalAmount());
+        assertEquals("Checkout test", held.getShowtime().getMovieTitle());
+        assertEquals(CheckoutState.EDITABLE, held.getCheckout().getState());
+        assertEquals(held.getCheckoutRevision(), bookingService.getBookingByCode(held.getBookingCode(), fixture.email()).getCheckoutRevision());
     }
 
     @Test void createsANewHoldWithServerTimeAndRollsBackRedisOnlyAfterDatabaseRollback() {
