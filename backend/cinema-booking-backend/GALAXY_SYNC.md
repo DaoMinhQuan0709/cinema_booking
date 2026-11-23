@@ -245,6 +245,39 @@ Chỉ lần online đầy đủ mới đối chiếu các bản ghi bị gỡ kh
 `limitShowtimes > 0` và lần offline không ẩn các bản ghi vắng mặt, không cập nhật
 mốc thành công của đồng bộ online đầy đủ.
 
+## Bảo trì snapshot Galaxy đóng gói
+
+[File mẫu `galaxy_sessions.json`](src/main/resources/data/galaxy_sessions.json)
+được thêm ở commit `8263deb` cùng ví dụ response của
+`sessions2?includeCinema=true&includeMovie=true`. Hai ID suất xuất hiện ở cả
+hai file, với ngày chiếu `2026-11-04` trong ví dụ và `2026-11-08` trong mẫu.
+Lịch sử Git chưa xác định được response gốc hoặc lệnh tạo file mẫu.
+[Ví dụ định dạng trong repo](../../api_galaxy.md#L1)
+
+Mẫu hiện tại chứa 8 suất của 5 phim, đều có `showDate` là `2026-11-08`.
+`data.total` ghi 12. Luồng offline nhập mảng `data.result`, còn client online
+yêu cầu `data.total` khớp số phần tử để xác nhận đã nhận đủ danh sách. Sau
+ngày chiếu của mẫu, importer vẫn có thể cập nhật phim và bỏ qua lịch đã qua.
+
+Khi chuẩn bị bản mẫu mới, dùng JSON suất chiếu đã lưu và ghi lại nguồn cùng
+thời điểm lấy mẫu. Giữ mảng `data.result` với ID suất duy nhất, đúng ngày giờ
+nguồn, tên phòng và các object `movie`/`cinema` có ID và tên. Các ca HTTP cũng
+đọc mảng `data.result` của file này để xác định những phim cần kiểm chứng.
+
+Lưu file UTF-8 tại `src/main/resources/data/galaxy_sessions.json` và đóng gói
+lại backend. Spring Boot JAR chứa file tại
+`BOOT-INF/classes/data/galaxy_sessions.json`. `POST /api/v1/admin/sync/galaxy/local-file`
+đọc tài nguyên từ classpath của bản backend đang chạy.
+
+Với bản build frontend có sẵn, chạy các ca nhập file, kiểm tra trạng thái
+online và kiểm tra dấu xóa bằng helper trong thư mục `backend/cinema-booking-backend`.
+Helper tạo PostgreSQL và Redis thử riêng. Xem
+[cách chuẩn bị môi trường nghiệm thu](../../ADMIN_PORTAL.md#chạy-nghiệm-thu-lại).
+
+```powershell
+.\scripts\test-admin-acceptance.ps1 -SkipFrontendChecks -Tests 'AdminPortalHttpTests,AdminDeletionHttpTests,GalaxySyncServiceTests,GalaxyApiClientTests'
+```
+
 ## Cách cập nhật dữ liệu
 
 - Phim, rạp và suất chiếu được nhận diện bằng ID Galaxy. Thông tin phim/rạp
